@@ -13,6 +13,8 @@ import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.Action
 import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.model.meta.RemoteService
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Future
 
 class UpnpManager {
 
@@ -89,6 +91,63 @@ class UpnpManager {
 
         var IGDDevices : MutableList<IGDDevice> = mutableListOf()
 
+
+        fun GetSpecificPortMappingRule(
+            remoteIp : String,
+            remotePort : String,
+            protocol : String) : java.util.concurrent.Future<Any> {
+
+            var device : IGDDevice = getIGDDevice(remoteIp)
+            var action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
+            var actionInvocation = ActionInvocation(action)
+            actionInvocation.setInput("NewRemoteHost",remoteIp)
+            actionInvocation.setInput("NewExternalPort",remotePort)
+            actionInvocation.setInput("NewProtocol",protocol)
+
+            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+                override fun success(invocation: ActionInvocation<*>?) {
+                    invocation!!
+
+                    var internalPort = actionInvocation.getOutput("NewInternalPort")
+                    var internalClient = actionInvocation.getOutput("NewInternalClient")
+                    var enabled = actionInvocation.getOutput("NewEnabled")
+                    var description = actionInvocation.getOutput("NewPortMappingDescription")
+                    var leaseDuration = actionInvocation.getOutput("NewLeaseDuration")
+
+                    var pm = PortMapping(
+                        description.toString(),
+                        remoteIp.toString(),
+                        internalClient.toString(),
+                        remotePort.toString().toInt(),
+                        internalPort.toString().toInt(),
+                        protocol.toString(),
+                        enabled.toString().toInt() == 1,
+                        leaseDuration.toString().toInt())
+                    var device = getIGDDevice(remoteIp)
+                    device.portMappings.add(pm)
+                    UpnpManager.PortFoundEvent.invoke(pm)
+                }
+
+                override fun failure(
+                    invocation: ActionInvocation<*>?,
+                    operation: UpnpResponse,
+                    defaultMsg: String
+                ) {
+                    println(defaultMsg)
+
+                    println(operation.statusMessage)
+                    println(operation.responseDetails)
+                    println(operation.statusCode)
+                    println(operation.isFailed)
+
+                    // Handle failure
+                }
+            })
+
+            return future
+        }
+
+
         fun CreatePortMappingRule(
             description : String,
             internalIp : String,
@@ -96,12 +155,13 @@ class UpnpManager {
             externalIp : String,
             externalPortText : String,
             protocol : String,
-            leaseDuration : String)
+            leaseDuration : String) : CompletableFuture<String>
         {
             var device : IGDDevice = getIGDDevice(externalIp)
             var action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             var actionInvocation = ActionInvocation(action)
             actionInvocation.setInput("NewRemoteHost", "$externalIp");
+            // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", "$externalPortText");
             actionInvocation.setInput("NewProtocol", "$protocol");
             actionInvocation.setInput("NewInternalPort", "$internalPortText");
@@ -112,20 +172,14 @@ class UpnpManager {
 
 
 
-            UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+            return UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
-                    //if you want actual info about the new mappnig
+                    GetSpecificPortMappingRule(externalIp, externalPortText, protocol).get()
+                    //if you want actual info about the new mapping (i.e. lease will almost certainly be different)
                     // GetSpecificPortMappingEntry() with the remote port, remote ip, and protocol.
-                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
-                    var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
-                    var internalClient = invocation.getOutput("NewInternalClient") //string datatype
-                    var internalPort = invocation.getOutput("NewInternalPort")
-                    var protocol = invocation.getOutput("NewProtocol")
-                    var description = invocation.getOutput("NewPortMappingDescription")
-                    var enabled = invocation.getOutput("NewEnabled")
-                    var leaseDuration = invocation.getOutput("NewLeaseDuration")
+
 //                    portMappings.add(PortMapping(
 //                        description.toString(),
 //                        remoteHost.toString(),
@@ -145,15 +199,41 @@ class UpnpManager {
                     defaultMsg: String
                 ) {
                     // Handle failure
+                    println(defaultMsg)
+
+                    println(operation.statusMessage)
+                    println(operation.responseDetails)
+                    println(operation.statusCode)
+                    println(operation.isFailed)
                 }
-            }).get() // SYNCHRONOUS
+            })// SYNCHRONOUS
         }
 
         private fun getIGDDevice(ipAddr : String): IGDDevice {
             return IGDDevices.first {it.ipAddress == ipAddr };
         }
+
+
         //fun List<IGDDevice>
     }
+}
+
+class UPnPCreateMappingResult : UPnPResult
+{
+    constructor(success: Boolean) : super(success)
+    var ResultingMapping : PortMapping? = null
+}
+
+open class UPnPResult constructor(success : Boolean)
+{
+    var Success : Boolean
+    var FailureReason : String? = null
+
+    init
+    {
+        Success = success
+    }
+
 }
 
 class OurNetworkInfo {

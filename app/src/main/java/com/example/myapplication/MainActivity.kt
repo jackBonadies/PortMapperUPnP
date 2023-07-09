@@ -37,13 +37,15 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -62,15 +65,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
@@ -78,8 +88,10 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -96,19 +108,8 @@ import org.fourthline.cling.registry.RegistryListener
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.CompletableFuture
 import kotlin.random.Random
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.toSize
 
 
 //object UpnpManager {
@@ -124,6 +125,8 @@ class PortForwardApplication : Application() {
 
     companion object {
         lateinit var appContext: Context
+        lateinit var showPopup : MutableState<Boolean>
+        var PaddingBetweenCreateNewRuleRows = 4.dp
     }
 }
 
@@ -160,6 +163,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState);
 
         //android router set wifi enabled
+
+        val future = CompletableFuture<String>()
+        future.complete("Hello")
+        var result = future.get()
 
         //AndroidRouter().enableWiFi()
         UpnpManager.Initialize()
@@ -321,6 +328,18 @@ class MainActivity : ComponentActivity() {
                 val scrollState = rememberScrollState()
                 var showDialogMutable = remember { mutableStateOf(false) }
                 var showDialog by showDialogMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+
+                var singleSelectionPopupMutable = remember { mutableStateOf(false) }
+                var singleSelectionPopup by singleSelectionPopupMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+                PortForwardApplication.showPopup = singleSelectionPopupMutable
+                if(singleSelectionPopup)
+                {
+                    Popup(alignment = Alignment.Center) {
+                        Text("testing")
+                        Text("testing 001")
+                        Text("testing 010")
+                    }
+                }
 
                 if (showDialog) {
 
@@ -554,9 +573,10 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
             onDismissRequest = { showDialogMutable.value = false },
             properties = prop,
 
+
         ) {
-            Surface(modifier = Modifier.background(Color.White),
-                shape = RoundedCornerShape(size = 16.dp)) {
+            Surface(
+                shape = RoundedCornerShape(size = 6.dp)) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -565,12 +585,14 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 //                    )
                         .fillMaxWidth(0.9f)
                 ) {
-                    Text("My Dialog", style = MaterialTheme.typography.headlineLarge)
-
+                    Text("Create New Rule", style = MaterialTheme.typography.headlineLarge, modifier = Modifier
+                        .padding(6.dp, 6.dp)
+                        .align(Alignment.Start))
+                    Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(.9f)
-                            .padding(top = 8.dp),
+                            .padding(top = 4.dp),
                         horizontalArrangement = Arrangement.End
                     )
                     {
@@ -715,7 +737,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(.9f)
-                            .padding(top = 16.dp),
+                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
                     ) {
                         var defaultModifier = Modifier
                             .fillMaxWidth(.5f)
@@ -744,7 +766,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(.9f)
-                            .padding(top = 16.dp),
+                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Button(
@@ -757,11 +779,28 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             Text("Cancel")
                         }
                         Spacer(modifier = Modifier.padding(18.dp))
+                        val interactionSource = remember { MutableInteractionSource() }
+
+                        val text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)) {
+                                append("CREATE")
+                            }
+                        }
+
+//                        Text(text = "Create",
+//                            modifier = Modifier.weight(1.0f).clickable(interactionSource = interactionSource,
+//                                indication = null,
+//                                onClick = {
+//                                    println("TextField clicked")
+//                                })
+//                        )
+
                         Button(
                             onClick = {
                                 Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_LONG).show()
                                 // TODO external ip
-                                UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, ourGatewayIp!!, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value)
+                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, ourGatewayIp!!, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value)
+                                future.get() // even on failure this does not set exception
                                 showDialogMutable.value = false
                             },
                             shape = RoundedCornerShape(4),
@@ -890,7 +929,7 @@ fun DeviceRow(content: @Composable () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth(.9f)
-            .padding(top = 0.dp),
+            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
         horizontalArrangement = Arrangement.End
     ) {
         content()
@@ -1293,12 +1332,18 @@ fun NoMappingsCard(remoteDevice : IGDDevice)
     //TODO. Also TODO make a dummy device..
 }
 
-@OptIn(ExperimentalUnitApi::class)
+@OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PortMappingCard(portMapping: PortMapping)
 {
     MyApplicationTheme(){
     Card(
+        onClick = {
+            if(PortForwardApplication.showPopup != null)
+            {
+                PortForwardApplication.showPopup.value = true
+            }
+                  },
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp, 4.dp)
@@ -1310,6 +1355,7 @@ fun PortMappingCard(portMapping: PortMapping)
         ),
 
     ) {
+
         Row(
             modifier = Modifier
                 .padding(15.dp, 6.dp),//.background(Color(0xffc5dceb)),
