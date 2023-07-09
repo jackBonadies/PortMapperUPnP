@@ -2,6 +2,7 @@ package com.example.myapplication
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.AsyncTask
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
@@ -95,7 +96,9 @@ class UpnpManager {
         fun GetSpecificPortMappingRule(
             remoteIp : String,
             remotePort : String,
-            protocol : String) : java.util.concurrent.Future<Any> {
+            protocol : String) : UPnPGetSpecificMappingResult {
+
+            var result = UPnPGetSpecificMappingResult()
 
             var device : IGDDevice = getIGDDevice(remoteIp)
             var action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
@@ -123,9 +126,11 @@ class UpnpManager {
                         protocol.toString(),
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt())
-                    var device = getIGDDevice(remoteIp)
-                    device.portMappings.add(pm)
-                    UpnpManager.PortFoundEvent.invoke(pm)
+
+                    result.ResultingMapping = pm
+                    result.Success = true
+
+
                 }
 
                 override fun failure(
@@ -140,14 +145,18 @@ class UpnpManager {
                     println(operation.statusCode)
                     println(operation.isFailed)
 
+                    result.FailureReason = defaultMsg
+                    result.Success = false
+
                     // Handle failure
                 }
             })
 
+
             return future
         }
 
-
+        // this method creates a rule, then grabs it again to verify it.
         fun CreatePortMappingRule(
             description : String,
             internalIp : String,
@@ -155,8 +164,12 @@ class UpnpManager {
             externalIp : String,
             externalPortText : String,
             protocol : String,
-            leaseDuration : String) : CompletableFuture<String>
+            leaseDuration : String) : UPnPCreateMappingResult
         {
+            //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
+
+            var result = UPnPCreateMappingResult()
+
             var device : IGDDevice = getIGDDevice(externalIp)
             var action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             var actionInvocation = ActionInvocation(action)
@@ -170,13 +183,15 @@ class UpnpManager {
             actionInvocation.setInput("NewPortMappingDescription", description);
             actionInvocation.setInput("NewLeaseDuration", "$leaseDuration");
 
-
-
-            return UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
-                    GetSpecificPortMappingRule(externalIp, externalPortText, protocol).get()
+                    var specificMappingResult = GetSpecificPortMappingRule(externalIp, externalPortText, protocol).get()
+
+                    result.ResultingMapping = specificMappingResult.Result
+                    result.Success = true
+
                     //if you want actual info about the new mapping (i.e. lease will almost certainly be different)
                     // GetSpecificPortMappingEntry() with the remote port, remote ip, and protocol.
 
@@ -205,11 +220,18 @@ class UpnpManager {
                     println(operation.responseDetails)
                     println(operation.statusCode)
                     println(operation.isFailed)
+
+                    result.Success = false
+                    result.FailureReason = defaultMsg
                 }
-            })// SYNCHRONOUS
+            })
+            result.Future = future
+
+
+            return result
         }
 
-        private fun getIGDDevice(ipAddr : String): IGDDevice {
+        public fun getIGDDevice(ipAddr : String): IGDDevice {
             return IGDDevices.first {it.ipAddress == ipAddr };
         }
 
@@ -218,23 +240,61 @@ class UpnpManager {
     }
 }
 
+//CompletableFuture is api >=24
+//basic futures do not implement continuewith...
+
 class UPnPCreateMappingResult : UPnPResult
 {
-    constructor(success: Boolean) : super(success)
+    constructor() : super()
+
+    @Volatile
     var ResultingMapping : PortMapping? = null
 }
 
-open class UPnPResult constructor(success : Boolean)
+class UPnPGetSpecificMappingResult : UPnPResult
 {
-    var Success : Boolean
+    constructor() : super()
+
+    @Volatile
+    var ResultingMapping : PortMapping? = null
+}
+
+open class UPnPResult constructor()
+{
+    var Future : Future<Any>? = null
+
+    @Volatile
+    var Success : Boolean? = null
+    @Volatile
     var FailureReason : String? = null
 
-    init
-    {
-        Success = success
-    }
-
+//    init
+//    {
+//        Success = success
+//        Future = future
+//    }
 }
+
+
+
+//class UPnPCreateMappingResult : UPnPResult
+//{
+//    constructor(success: Boolean) : super(success)
+//
+//    @Volatile
+//    var ResultingMapping : PortMapping? = null
+//}
+//
+//open class UPnPResult constructor(success : Boolean)
+//{
+//    var Success : Boolean
+//    var FailureReason : String? = null
+//
+//    init
+//    {
+//        Success = success
+//    }
+//}
 
 class OurNetworkInfo {
     companion object { //singleton

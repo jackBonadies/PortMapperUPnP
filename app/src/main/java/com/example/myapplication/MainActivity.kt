@@ -164,9 +164,9 @@ class MainActivity : ComponentActivity() {
 
         //android router set wifi enabled
 
-        val future = CompletableFuture<String>()
-        future.complete("Hello")
-        var result = future.get()
+//        val future = CompletableFuture<String>()
+//        future.complete("Hello")
+//        var result = future.get()
 
         //AndroidRouter().enableWiFi()
         UpnpManager.Initialize()
@@ -797,10 +797,25 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
                         Button(
                             onClick = {
-                                Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_LONG).show()
+                                Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
                                 // TODO external ip
-                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, ourGatewayIp!!, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value)
-                                future.get() // even on failure this does not set exception
+                                var result = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, ourGatewayIp!!, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value)
+                                result.Future!!.get() // even on failure this does not set exception
+
+                                if(result.Success!!)
+                                {
+                                    result.ResultingMapping!!
+                                    var device = UpnpManager.getIGDDevice(result.ResultingMapping!!.ExternalIP)
+                                    device.portMappings.add(result.ResultingMapping!!)
+                                    UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
+                                    Toast.makeText(PortForwardApplication.appContext, "Success", Toast.LENGTH_SHORT).show()
+                                }
+                                else
+                                {
+                                    Toast.makeText(PortForwardApplication.appContext, "Failure - ${result.FailureReason!!}", Toast.LENGTH_LONG).show()
+                                }
+
+                                //future.
                                 showDialogMutable.value = false
                             },
                             shape = RoundedCornerShape(4),
