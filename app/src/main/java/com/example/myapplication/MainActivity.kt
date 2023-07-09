@@ -83,6 +83,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
@@ -93,7 +94,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -127,7 +127,8 @@ class PortForwardApplication : Application() {
     companion object {
         lateinit var appContext: Context
         lateinit var CurrentActivity: ComponentActivity
-        lateinit var showPopup : MutableState<Boolean>
+//        lateinit var showPopup : MutableState<Boolean>
+        lateinit var currentSingleSelectedObject : MutableState<Any?>
         var PaddingBetweenCreateNewRuleRows = 4.dp
     }
 }
@@ -331,17 +332,32 @@ class MainActivity : ComponentActivity() {
                 var showDialogMutable = remember { mutableStateOf(false) }
                 var showDialog by showDialogMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
 
-                var singleSelectionPopupMutable = remember { mutableStateOf(false) }
-                var singleSelectionPopup by singleSelectionPopupMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
-                PortForwardApplication.showPopup = singleSelectionPopupMutable
-                if(singleSelectionPopup)
+                PortForwardApplication.currentSingleSelectedObject = remember { mutableStateOf(null) }
+
+//                if(singleSelectionPopup)
+//                {
+//                    Popup(alignment = Alignment.Center) {
+//                        DropdownMenu(
+//                            expanded = true,
+//                            onDismissRequest = {}
+//                        ) {
+//                            DropdownMenuItem(
+//                                text = { Text("Load") },
+//                                onClick = {  }
+//                            )
+//                            DropdownMenuItem(
+//                                text = { Text("Save") },
+//                                onClick = {  }
+//                            )
+//                        }
+//                    }
+                //}
+
+                if(PortForwardApplication.currentSingleSelectedObject.value != null)
                 {
-                    Popup(alignment = Alignment.Center) {
-                        Text("testing")
-                        Text("testing 001")
-                        Text("testing 010")
-                    }
+                    EnterContextMenu(PortForwardApplication.currentSingleSelectedObject )
                 }
+
 
                 if (showDialog) {
 
@@ -533,6 +549,130 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Preview
+fun EnterContextMenu()
+{
+    var showDialogMutable : MutableState<Any?> = remember { mutableStateOf(null) }
+    EnterContextMenu(showDialogMutable)
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
+{
+    if(singleSelectedItem.value == null)
+    {
+        return;
+    }
+
+    var prop = DialogProperties(
+        dismissOnClickOutside = true,
+        dismissOnBackPress = true,
+        securePolicy = SecureFlagPolicy.SecureOff,
+        usePlatformDefaultWidth = false,
+        decorFitsSystemWindows = true,
+//            usePlatformDefaultWidth = false,
+//            shape = RoundedCornerShape(16.dp),
+//            backgroundColor = Color.LightGray // set your preferred color here
+    )
+    MyApplicationTheme {
+        Dialog(
+            onDismissRequest = { singleSelectedItem.value = null },
+            properties = prop,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(size = 6.dp)) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+
+                ) {
+                    // it redraws starting at this inner context...
+                    if (singleSelectedItem.value != null) {
+
+
+                        var menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
+                        var portMapping = singleSelectedItem.value as PortMapping
+                        menuItems.add(
+                            Pair<String, () -> Unit>(
+                                "Edit",
+                                {
+                                    Toast.makeText(
+                                        PortForwardApplication.appContext,
+                                        "Edit clicked",
+                                        Toast.LENGTH_SHORT
+                                    )
+                                })
+                        )
+                        menuItems.add(
+                            Pair<String, () -> Unit>(
+                                "Disable",
+                                {
+                                    Toast.makeText(
+                                        PortForwardApplication.appContext,
+                                        "Disable clicked",
+                                        Toast.LENGTH_SHORT
+                                    )
+                                })
+                        )
+                        menuItems.add(
+                            Pair<String, () -> Unit>(
+                                "Delete",
+                                {
+                                    Toast.makeText(
+                                        PortForwardApplication.appContext,
+                                        "Delete clicked",
+                                        Toast.LENGTH_SHORT
+                                    )
+                                })
+                        )
+                        menuItems.add(
+                            Pair<String, () -> Unit>("More Info",
+                                {
+                                    Toast.makeText(
+                                        PortForwardApplication.appContext,
+                                        "More Info clicked ${portMapping.Description}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    singleSelectedItem.value =
+                                        null //this redraws the inner composable before the outer...
+                                })
+                        )
+                        var index = 0
+                        var lastIndex = menuItems.size - 1
+                        for (menuItem in menuItems) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { menuItem.second() }
+                                    .padding(vertical = 14.dp)
+                            ) {
+                                Text(
+                                    text = menuItem.first,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    fontSize = 20.sp
+                                )
+                            }
+
+                            if (index != lastIndex) {
+                                Divider(color = Color.LightGray)
+                            }
+                            index++
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
@@ -560,12 +700,12 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
 
 
-        var prop = DialogProperties(
-        dismissOnClickOutside = true,
-        dismissOnBackPress = true,
-        securePolicy = SecureFlagPolicy.SecureOff,
-        usePlatformDefaultWidth = false,
-        decorFitsSystemWindows = true,
+    var prop = DialogProperties(
+    dismissOnClickOutside = true,
+    dismissOnBackPress = true,
+    securePolicy = SecureFlagPolicy.SecureOff,
+    usePlatformDefaultWidth = false,
+    decorFitsSystemWindows = true,
 //            usePlatformDefaultWidth = false,
 //            shape = RoundedCornerShape(16.dp),
 //            backgroundColor = Color.LightGray // set your preferred color here
@@ -574,8 +714,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
         Dialog(
             onDismissRequest = { showDialogMutable.value = false },
             properties = prop,
-
-
         ) {
             Surface(
                 shape = RoundedCornerShape(size = 6.dp)) {
@@ -1370,17 +1508,17 @@ fun PortMappingCard(portMapping: PortMapping)
 {
     MyApplicationTheme(){
     Card(
-        onClick = {
-            if(PortForwardApplication.showPopup != null)
-            {
-                PortForwardApplication.showPopup.value = true
-            }
-                  },
+//        onClick = {
+//            if(PortForwardApplication.showPopup != null)
+//            {
+//                PortForwardApplication.showPopup.value = true
+//            }
+//                  },
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .clickable { },
+            .clickable { PortForwardApplication.currentSingleSelectedObject.value = portMapping },
         elevation = CardDefaults.cardElevation(),
         colors = CardDefaults.cardColors(
             containerColor = AdditionalColors.CardSurface,
