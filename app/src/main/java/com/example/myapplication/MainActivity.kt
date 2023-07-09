@@ -8,6 +8,8 @@ import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -108,7 +110,6 @@ import org.fourthline.cling.registry.RegistryListener
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.CompletableFuture
 import kotlin.random.Random
 
 
@@ -125,6 +126,7 @@ class PortForwardApplication : Application() {
 
     companion object {
         lateinit var appContext: Context
+        lateinit var CurrentActivity: ComponentActivity
         lateinit var showPopup : MutableState<Boolean>
         var PaddingBetweenCreateNewRuleRows = 4.dp
     }
@@ -665,8 +667,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     }
 
                     val suggestions = gatewayIps
-                    var selectedTextMutable = remember { mutableStateOf(defaultGatewayIp) }
-                    var selectedText by selectedTextMutable
+                    var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
+                    var selectedText by externalDeviceText
 
 
 
@@ -675,7 +677,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                         var defaultModifier = Modifier
                             .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
                             .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-                        DropDownOutline(defaultModifier, selectedTextMutable, suggestions, "External Device")
+                        DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
 
                         Spacer(modifier = Modifier.width(8.dp))
 
@@ -798,24 +800,39 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                         Button(
                             onClick = {
                                 Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-                                // TODO external ip
-                                var result = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, ourGatewayIp!!, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value)
-                                result.Future!!.get() // even on failure this does not set exception
 
-                                if(result.Success!!)
-                                {
-                                    result.ResultingMapping!!
-                                    var device = UpnpManager.getIGDDevice(result.ResultingMapping!!.ExternalIP)
-                                    device.portMappings.add(result.ResultingMapping!!)
-                                    UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
-                                    Toast.makeText(PortForwardApplication.appContext, "Success", Toast.LENGTH_SHORT).show()
-                                }
-                                else
-                                {
-                                    Toast.makeText(PortForwardApplication.appContext, "Failure - ${result.FailureReason!!}", Toast.LENGTH_LONG).show()
+                                fun callback(result : UPnPCreateMappingResult) {
+
+                                    val mainLooper = Looper.getMainLooper()
+
+                                    // Create a Handler to run some code on the UI thread
+                                    val handler = Handler(mainLooper)
+                                    handler.post {
+                                        println("adding rule callback")
+                                        if (result.Success!!) {
+                                            result.ResultingMapping!!
+                                            var device =
+                                                UpnpManager.getIGDDevice(result.ResultingMapping!!.ExternalIP)
+                                            device.portMappings.add(result.ResultingMapping!!)
+                                            UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
+                                            Toast.makeText(
+                                                PortForwardApplication.appContext,
+                                                "Success",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                PortForwardApplication.appContext,
+                                                "Failure - ${result.FailureReason!!}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
                                 }
 
-                                //future.
+                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, ::callback)
+                                // dont wait, just continue...
+
                                 showDialogMutable.value = false
                             },
                             shape = RoundedCornerShape(4),
