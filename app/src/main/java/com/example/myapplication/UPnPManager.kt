@@ -2,7 +2,7 @@ package com.example.myapplication
 
 import android.content.Context
 import android.net.wifi.WifiManager
-import android.os.AsyncTask
+import android.widget.Toast
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
@@ -12,9 +12,11 @@ import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.Action
+import org.fourthline.cling.model.meta.LocalDevice
 import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.model.meta.RemoteService
-import java.util.concurrent.CompletableFuture
+import org.fourthline.cling.registry.Registry
+import org.fourthline.cling.registry.RegistryListener
 import java.util.concurrent.Future
 
 class UpnpManager {
@@ -22,6 +24,8 @@ class UpnpManager {
 
     companion object { //singleton
         private var _upnpService : UpnpService? = null
+        private var _initialized : Boolean = false
+        var HasSearched : Boolean = false
 
         object UPnPNames {
             val InternetGatewayDevice = "InternetGatewayDevice"
@@ -68,8 +72,29 @@ class UpnpManager {
         var PortFoundEvent = Event<PortMapping>()
         // used if we finish and there are no ports to show the "no devices" card
         var FinishedListingPortsEvent = Event<IGDDevice>()
+        var UpdateUIFromData = Event<Any?>()
 
+        fun Search(onlyIfNotYetSearched : Boolean) : Boolean
+        {
+            if(onlyIfNotYetSearched && HasSearched)
+            {
+                return false
+            }
+            ClearOldData()
+            HasSearched = true
+            // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
+            // 0-1 second response time intentional delay from devices
+            UpnpManager.GetUPnPService()?.controlPoint?.search(1)
+            //launchMockUPnPSearch(this, upnpElementsViewModel)
+            return true
+        }
 
+        fun ClearOldData(){
+            UpnpManager.GetUPnPService()?.registry?.removeAllLocalDevices()
+            UpnpManager.GetUPnPService()?.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
+            IGDDevices.clear()
+            UpdateUIFromData.invoke(null)
+        }
 
         fun GetUPnPService() : UpnpService {
             return _upnpService!!
@@ -77,12 +102,109 @@ class UpnpManager {
 
         fun Initialize()
         {
+            if(_initialized)
+            {
+                return
+            }
+
             class AndroidConfig : AndroidUpnpServiceConfiguration() {
                 override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder {
                     return UDA10ServiceDescriptorBinderImpl()
                 }
             }
             _upnpService = UpnpServiceImpl(AndroidConfig())
+
+            // Add a listener for device registration events
+            _upnpService!!.registry?.addListener(object : RegistryListener {
+                // ssdp datagrams have been alive and processed
+                // services are unhydrated, service descriptors not yet retrieved
+                override fun remoteDeviceDiscoveryStarted(registry: Registry, device: RemoteDevice) {
+                    println("Discovery started: " + device.displayString)
+                }
+
+                override fun remoteDeviceDiscoveryFailed(
+                    registry: Registry,
+                    device: RemoteDevice,
+                    ex: Exception
+                ) {
+                    println("Discovery failed: " + device.displayString + " => " + ex)
+                }
+
+                // complete metadata
+                override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
+
+                    println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
+
+                    if (rootDevice.type.type.equals(UpnpManager.Companion.UPnPNames.InternetGatewayDevice)) // version agnostic
+                    {
+                        println("Device ${rootDevice.displayString} is of interest, type is ${rootDevice.type}")
+
+                        // http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v1-Service.pdf
+                        // Device Tree: InternetGatewayDevice > WANDevice > WANConnectionDevice
+                        // Service is WANIPConnection
+                        var wanDevice = rootDevice.embeddedDevices.firstOrNull { it.type.type == UpnpManager.Companion.UPnPNames.WANDevice}
+                        if (wanDevice != null)
+                        {
+                            var wanConnectionDevice = wanDevice.embeddedDevices.firstOrNull {it.type.type == UpnpManager.Companion.UPnPNames.WANConnectionDevice }
+                            if (wanConnectionDevice != null)
+                            {
+                                var wanIPService = wanConnectionDevice.services.firstOrNull { it.serviceType.type == UpnpManager.Companion.UPnPNames.WANIPConnection }
+                                if (wanIPService != null)
+                                {
+                                    //get relevant actions here...
+                                    //TODO add relevant service (and cause event)
+                                    var igdDevice = IGDDevice(rootDevice, wanIPService)
+                                    UpnpManager.AddDevice(igdDevice)
+                                    //TODO get port mappings from this relevant service
+                                    igdDevice.EnumeratePortMappings()
+
+                                }
+                                else
+                                {
+                                    println("WanConnectionDevice does not have WanIPConnection service")
+                                }
+                            }
+                            else
+                            {
+                                println("WanConnectionDevice not found under WanDevice")
+                            }
+                        }
+                        else
+                        {
+                            println("WanDevice not found under InternetGatewayDevice")
+                        }
+                    }
+                    else
+                    {
+                        println("Device ${rootDevice.displayString} is NOT of interest, type is ${rootDevice.type}")
+                    }
+
+                }
+
+                // expiration timestamp updated
+                override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
+
+                    println("Device updated: " + device.displayString)
+                }
+
+                override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
+                    println("Device removed: " + device.displayString)
+                }
+
+                override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
+                    println("Added local device: " + device.displayString)
+                }
+
+                override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
+                    println("Removed local device: " + device.displayString)
+                }
+
+                override fun beforeShutdown(registry: Registry) {}
+
+                override fun afterShutdown() {}
+            });
+
+            _initialized = true
         }
 
         fun AddDevice(igdDevice: IGDDevice) {
@@ -129,7 +251,8 @@ class UpnpManager {
                         internalPort.toString().toInt(),
                         protocol.toString(),
                         enabled.toString().toInt() == 1,
-                        leaseDuration.toString().toInt())
+                        leaseDuration.toString().toInt(),
+                        remoteIp)
 
                     var result = UPnPCreateMappingResult(true)
                     result.ResultingMapping = pm
@@ -159,6 +282,128 @@ class UpnpManager {
             return future
         }
 
+        fun DisableEnablePortMappingEntry(portMapping: PortMapping, enable : Boolean)
+        {
+            // AddPortMapping
+            //  This action creates a new port mapping or overwrites an existing mapping with the same internal client. If
+            //  the ExternalPort and PortMappingProtocol pair is already mapped to another internal client, an error is
+            //  returned.  (On my Nokia, I can modify other devices rules no problem).
+            // However, deleting a mapping it is only a recommendation that they be the same..
+            //  so Edit = Delete and Add is more powerful?
+            fun callback(result : UPnPCreateMappingResult) {
+
+                RunUIThread {
+                    println("adding rule callback")
+                    if (result.Success!!) {
+                        result.ResultingMapping!!
+                        var device =
+                            UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
+                        var oldMappingIndex = device.portMappings.indexOf(portMapping)
+                        device.portMappings[oldMappingIndex] = result.ResultingMapping!!
+                        UpnpManager.UpdateUIFromData.invoke(null)
+                        Toast.makeText(
+                            PortForwardApplication.appContext,
+                            "Success",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            PortForwardApplication.appContext,
+                            "Failure - ${result.FailureReason!!}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+
+            CreatePortMappingRule(
+                portMapping.Description,
+                portMapping.LocalIP,
+                portMapping.InternalPort.toString(),
+                portMapping.ActualExternalIP,
+                portMapping.ExternalPort.toString(),
+                portMapping.Protocol,
+                portMapping.LeaseDuration.toString(),
+                enable,
+                ::callback)
+        }
+
+        fun DeletePortMappingEntry(portMapping : PortMapping) : Future<Any>
+        {
+
+            fun callback(result : UPnPResult) {
+
+                RunUIThread {
+                    println("delete callback")
+                    if (result.Success!!) {
+                        var device =
+                            UpnpManager.getIGDDevice(portMapping.ActualExternalIP)
+                        device.portMappings.remove(portMapping)
+                        UpnpManager.UpdateUIFromData.invoke(null)
+                        Toast.makeText(
+                            PortForwardApplication.appContext,
+                            "Success",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            PortForwardApplication.appContext,
+                            "Failure - ${result.FailureReason!!}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+
+
+            var future = DeletePortMapping(portMapping, ::callback)
+            return future
+        }
+
+        fun DeletePortMapping(portMapping : PortMapping, callback : (UPnPResult) -> Unit) : Future<Any>
+        {
+            var device : IGDDevice = getIGDDevice(portMapping.ExternalIP)
+            var action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
+            var actionInvocation = ActionInvocation(action)
+            actionInvocation.setInput("NewRemoteHost", "${portMapping.ActualExternalIP}");
+            // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
+            actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}");
+            actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}");
+
+            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+                override fun success(invocation: ActionInvocation<*>?) {
+                    invocation!!
+                    println("Successfully deleted")
+
+                    var result = UPnPResult(true)
+                    callback(result)
+
+                }
+
+                override fun failure(
+                    invocation: ActionInvocation<*>?,
+                    operation: UpnpResponse,
+                    defaultMsg: String
+                ) {
+                    // Handle failure
+                    println(defaultMsg)
+
+                    println(operation.statusMessage)
+                    println(operation.responseDetails)
+                    println(operation.statusCode)
+                    println(operation.isFailed)
+
+                    var result = UPnPResult(false)
+                    result.FailureReason = defaultMsg
+                    result.UPnPFailureResponse = operation
+                    callback(result)
+                }
+            })
+
+            return future
+
+        }
+
         // this method creates a rule, then grabs it again to verify it.
         fun CreatePortMappingRule(
             description : String,
@@ -168,6 +413,7 @@ class UpnpManager {
             externalPortText : String,
             protocol : String,
             leaseDuration : String,
+            enabled : Boolean,
             callback: (UPnPCreateMappingResult) -> Unit) : Future<Any>
         {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
@@ -183,7 +429,7 @@ class UpnpManager {
             actionInvocation.setInput("NewProtocol", "$protocol");
             actionInvocation.setInput("NewInternalPort", "$internalPortText");
             actionInvocation.setInput("NewInternalClient", "$internalIp");
-            actionInvocation.setInput("NewEnabled", "1");
+            actionInvocation.setInput("NewEnabled", if (enabled) "1" else "0");
             actionInvocation.setInput("NewPortMappingDescription", description);
             actionInvocation.setInput("NewLeaseDuration", "$leaseDuration");
 
@@ -404,6 +650,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
         {
             var success : Boolean = false;
             var actionInvocation = ActionInvocation(getPortMapping)
+            println("requesting slot $slotIndex")
             actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
             UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
@@ -425,7 +672,8 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                         internalPort.toString().toInt(),
                         protocol.toString(),
                         enabled.toString().toInt() == 1,
-                        leaseDuration.toString().toInt())
+                        leaseDuration.toString().toInt(),
+                        ipAddress)
                     portMappings.add(portMapping)
                     // TODO: new port mapping added event
                     UpnpManager.PortFoundEvent.invoke(portMapping)
@@ -440,7 +688,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                     println("GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
                     // Handle failure
                 }
-            }).get() // SYNCHRONOUS
+            }).get() // SYNCHRONOUS (note this can, and does, throw)
 
             if (!success)
             {
@@ -517,9 +765,10 @@ class PortMapping constructor(
     val _InternalPort: Int,
     val _Protocol: String,
     val _Enabled: Boolean,
-    val _LeaseDuration: Int)
+    val _LeaseDuration: Int,
+    val _ActionExternalIP : String)
 {
-    var ExternalIP : String
+    var ExternalIP : String // the returned ip from get port mapping
     var LocalIP : String
     var ExternalPort : Int
     var InternalPort : Int
@@ -527,6 +776,7 @@ class PortMapping constructor(
     var Enabled : Boolean
     var LeaseDuration : Int
     var Description : String
+    var ActualExternalIP : String // the actual ip of the IGD device
 
     init {
         this.ExternalIP = _ExternalIP
@@ -537,5 +787,6 @@ class PortMapping constructor(
         this.Enabled = _Enabled
         this.LeaseDuration = _LeaseDuration
         this.Description = _Description
+        this.ActualExternalIP = _ActionExternalIP
     }
 }

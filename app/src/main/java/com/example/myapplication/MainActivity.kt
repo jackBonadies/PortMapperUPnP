@@ -19,13 +19,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,6 +51,7 @@ import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,6 +82,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -101,6 +107,7 @@ import androidx.lifecycle.ViewModel
 import com.example.myapplication.ui.theme.AdditionalColors
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.LocalDevice
@@ -158,7 +165,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun updateUIFromData(o : Any?)
+    {
+        runOnUiThread {
+            var data : MutableList<UPnPViewElement> = mutableListOf()
+            for(device in UpnpManager.Companion.IGDDevices)
+            {
+                data.add(UPnPViewElement(device))
+
+                for(mapping in device.portMappings)
+                {
+                    data.add(UPnPViewElement(mapping))
+                }
+            }
+            upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
+        }
+    }
+
     var upnpElementsViewModel = UPnPElementViewModel()
+    var searchInProgressJob : Job? = null
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -176,161 +201,28 @@ class MainActivity : ComponentActivity() {
         UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
         UpnpManager.PortFoundEvent += ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
-        val (local, gateway) = OurNetworkInfo.GetLocalAndGatewayIpAddr(this, true)
-        println("Our local ip is $local")
-        println("Our gateway ip is $gateway")
+        UpnpManager.UpdateUIFromData += ::updateUIFromData
 
-//        var upnpElementsViewModel = UPnPElementViewModel()
-
-        var remoteDeviceOfInterest: RemoteDevice? = null
-
-        // Add a listener for device registration events
-        UpnpManager.GetUPnPService().registry?.addListener(object : RegistryListener {
-            // ssdp datagrams have been alive and processed
-            // services are unhydrated, service descriptors not yet retrieved
-            override fun remoteDeviceDiscoveryStarted(registry: Registry, device: RemoteDevice) {
-                println("Discovery started: " + device.displayString)
-
-//                if (device.displayString.contains("Nokia")) {
-//                    remoteDeviceOfInterest = device
-//                    runOnUiThread {
-//                        viewModel.addItem(device.displayString) // calls LiveData.setValue i.e. must be done on UI thread
-//                    }
-//                    println("Discovery started: " + device.displayString)
-//                } else {
-//                    runOnUiThread {
-//                        viewModel.addItem(device.displayString) // calls LiveData.setValue i.e. must be done on UI thread
-//                    }
-//                    println("Discovery started: " + device.displayString)
-//                }
-//                println("Discovery started: " + device.displayString)
+        var mainSearchInProgress = mutableStateOf(!UpnpManager.HasSearched)
+        if(mainSearchInProgress.value)
+        {
+            searchInProgressJob = GlobalScope.launch {
+                delay(6000)
+                mainSearchInProgress.value = false
             }
-
-            override fun remoteDeviceDiscoveryFailed(
-                registry: Registry,
-                device: RemoteDevice,
-                ex: Exception
-            ) {
-                println("Discovery failed: " + device.displayString + " => " + ex)
-//                if (device.displayString.contains("Nokia")) {
-//                    println("Discovery started: " + device.displayString)
-//                }
-//                println("Discovery failed: " + device.displayString + " => " + ex)
-            }
-
-            // complete metadata
-            override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
-
-                println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
-
-                if (rootDevice.type.type.equals(UpnpManager.Companion.UPnPNames.InternetGatewayDevice)) // version agnostic
-                {
-                    println("Device ${rootDevice.displayString} is of interest, type is ${rootDevice.type}")
-
-                    // http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v1-Service.pdf
-                    // Device Tree: InternetGatewayDevice > WANDevice > WANConnectionDevice
-                    // Service is WANIPConnection
-                    var wanDevice = rootDevice.embeddedDevices.firstOrNull { it.type.type == UpnpManager.Companion.UPnPNames.WANDevice}
-                    if (wanDevice != null)
-                    {
-                        var wanConnectionDevice = wanDevice.embeddedDevices.firstOrNull {it.type.type == UpnpManager.Companion.UPnPNames.WANConnectionDevice }
-                        if (wanConnectionDevice != null)
-                        {
-                            var wanIPService = wanConnectionDevice.services.firstOrNull { it.serviceType.type == UpnpManager.Companion.UPnPNames.WANIPConnection }
-                            if (wanIPService != null)
-                            {
-                                //get relevant actions here...
-                                //TODO add relevant service (and cause event)
-                                var igdDevice = IGDDevice(rootDevice, wanIPService)
-                                UpnpManager.AddDevice(igdDevice)
-                                //TODO get port mappings from this relevant service
-                                igdDevice.EnumeratePortMappings()
-
-                            }
-                            else
-                            {
-                                println("WanConnectionDevice does not have WanIPConnection service")
-                            }
-                        }
-                        else
-                        {
-                            println("WanConnectionDevice not found under WanDevice")
-                        }
-                    }
-                    else
-                    {
-                        println("WanDevice not found under InternetGatewayDevice")
-                    }
-
-                    //fallbackRecursiveSearch(rootDevice)
-
-                    // TODO: if it is an IGD and it does not have the relevant service (or it has one but without any
-                    //   relevant actions, then list all devices and services for diagnostic info.
-
-                }
-                else
-                {
-                    println("Device ${rootDevice.displayString} is NOT of interest, type is ${rootDevice.type}")
-                }
-
-            }
-
-            // expiration timestamp updated
-            override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
-
-                println("Device updated: " + device.displayString)
-
-
-                if (device.displayString.contains("Nokia")) {
-//                    runOnUiThread {
-//                        upnpElementsViewModel.addItem(device.displayString) // calls LiveData.setValue i.e. must be done on UI thread
-//                    }
-                    println("Discovery started: " + device.displayString)
-                }
-                println("Device updated: " + device.displayString)
-            }
-
-            override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
-                println("Device removed: " + device.displayString)
-            }
-
-            override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
-                println("Added local device: " + device.displayString)
-            }
-
-            override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
-                println("Removed local device: " + device.displayString)
-            }
-
-            override fun beforeShutdown(registry: Registry) {}
-
-            override fun afterShutdown() {}
         }
-        );
-//        } catch (ex: Exception) {
-//            println("Error: " + ex.message)
-//        } finally {
-//            upnpService?.shutdown()
-//        }
-        UpnpManager.GetUPnPService()?.controlPoint?.search() // by default STAll
+        var searchStarted = UpnpManager.Search(true) // by default STAll
 
-        //launchMockUPnPSearch(this, upnpElementsViewModel)
-
-
-        // Keep the main thread alive, otherwise the program will exit before the separate thread gets a chance to print
-        Thread.sleep(6000L)
-
-        // Broadcast a search request for all devices
-        //upnpService?.controlPoint?.search();*/
-        // composible programmatic.
-        // how it should look and data dependencies
-        // setContentView but with composable functions
         setContent {
             MyApplicationTheme {
                 // A surface container using the 'background' color from the theme
                 val scrollState = rememberScrollState()
                 var showDialogMutable = remember { mutableStateOf(false) }
                 var showDialog by showDialogMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+
+//                var showMainLoading = remember { mutableStateOf(searchStarted) }
+//
+
 
                 PortForwardApplication.currentSingleSelectedObject = remember { mutableStateOf(null) }
 
@@ -394,12 +286,11 @@ class MainActivity : ComponentActivity() {
 
                             val refreshScope = rememberCoroutineScope()
                             var refreshing by remember { mutableStateOf(false) }
-                            var itemCount by remember { mutableStateOf(15) }
 
                             fun refresh() = refreshScope.launch {
                                 refreshing = true
+                                UpnpManager.Search(false)
                                 delay(1500)
-                                itemCount += 5
                                 refreshing = false
                             }
 
@@ -408,11 +299,25 @@ class MainActivity : ComponentActivity() {
 
                             //
 
-                            Box(Modifier.pullRefresh(state))
+                            BoxWithConstraints(
+                                Modifier
+                                    .pullRefresh(state).fillMaxHeight().fillMaxWidth())
                             {
 
+                                val boxHeight = with(LocalDensity.current) { constraints.maxHeight.toDp() }
+                                val offset = boxHeight * 0.35f
+
+                                if(mainSearchInProgress.value)
+                                {
+                                    LoadingIcon("Searching for devices", Modifier.offset(y = offset))
+                                }
 
                                 Column(Modifier.padding(it)) {
+//                                    for (i in 1..10)
+//                                    {
+//                                        Text("test")
+//                                    }
+
                                     ConversationEntryPoint(upnpElementsViewModel)
 //                                MyScreen(viewModel)
 //                                Greeting("Android")
@@ -444,6 +349,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy()
+    {
+        super.onDestroy();
+        UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
+        UpnpManager.PortFoundEvent -= ::portMappingFoundHandler
+        UpnpManager.FinishedListingPortsEvent -= ::deviceFinishedListingPortsHandler
+        UpnpManager.UpdateUIFromData -= ::updateUIFromData
+    }
+    
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -483,7 +398,7 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 var index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0)),index)
+                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1")),index)
             }
 
         }
@@ -606,29 +521,33 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                                         PortForwardApplication.appContext,
                                         "Edit clicked",
                                         Toast.LENGTH_SHORT
-                                    )
+                                    ).show()
                                 })
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
-                                "Disable",
+                                if (portMapping.Enabled) "Disable" else "Enable",
                                 {
+                                    var future = UpnpManager.DisableEnablePortMappingEntry(portMapping, !portMapping.Enabled)
                                     Toast.makeText(
                                         PortForwardApplication.appContext,
                                         "Disable clicked",
                                         Toast.LENGTH_SHORT
-                                    )
+                                    ).show()
                                 })
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
                                 "Delete",
                                 {
-                                    Toast.makeText(
-                                        PortForwardApplication.appContext,
-                                        "Delete clicked",
-                                        Toast.LENGTH_SHORT
-                                    )
+                                    var future = UpnpManager.DeletePortMappingEntry(portMapping)
+
+//
+//                                    Toast.makeText(
+//                                        PortForwardApplication.appContext,
+//                                        "Delete clicked",
+//                                        Toast.LENGTH_SHORT
+//                                    ).show()
                                 })
                         )
                         menuItems.add(
@@ -639,8 +558,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                                         "More Info clicked ${portMapping.Description}",
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                    singleSelectedItem.value =
-                                        null //this redraws the inner composable before the outer...
                                 })
                         )
                         var index = 0
@@ -649,7 +566,11 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { menuItem.second() }
+                                    .clickable {
+                                        menuItem.second()
+                                        singleSelectedItem.value =
+                                            null //this redraws the inner composable before the outer...
+                                    }
                                     .padding(vertical = 14.dp)
                             ) {
                                 Text(
@@ -941,16 +862,12 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
                                 fun callback(result : UPnPCreateMappingResult) {
 
-                                    val mainLooper = Looper.getMainLooper()
-
-                                    // Create a Handler to run some code on the UI thread
-                                    val handler = Handler(mainLooper)
-                                    handler.post {
+                                    RunUIThread {
                                         println("adding rule callback")
                                         if (result.Success!!) {
                                             result.ResultingMapping!!
                                             var device =
-                                                UpnpManager.getIGDDevice(result.ResultingMapping!!.ExternalIP)
+                                                UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
                                             device.portMappings.add(result.ResultingMapping!!)
                                             UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
                                             Toast.makeText(
@@ -968,7 +885,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     }
                                 }
 
-                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, ::callback)
+                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, true, ::callback)
                                 // dont wait, just continue...
 
                                 showDialogMutable.value = false
@@ -987,6 +904,15 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
         }
         }
     }
+
+fun RunUIThread(runnable: Runnable)
+{
+    val mainLooper = Looper.getMainLooper()
+
+    // Create a Handler to run some code on the UI thread
+    val handler = Handler(mainLooper)
+    handler.post(runnable)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1171,6 +1097,11 @@ class UPnPElementViewModel: ViewModel() {
     private val _items = MutableLiveData<List<UPnPViewElement>>(emptyList())
     val items: LiveData<List<UPnPViewElement>> get() = _items
 
+    fun setData(data : List<UPnPViewElement>)
+    {
+        _items.value = data
+    }
+
     fun addItem(item: UPnPViewElement) {
         _items.value = _items.value!! + listOf(item)
     }
@@ -1204,7 +1135,7 @@ fun PreviewConversation() {
 
     //ComposeTutorialTheme {
     val msgs = mutableListOf<UPnPViewElement>()
-    var pm = PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0)
+    var pm = PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1")
     var upnpViewEl = UPnPViewElement(pm)
     msgs.add(upnpViewEl)
     msgs.add(upnpViewEl)
@@ -1356,7 +1287,8 @@ fun PortMappingCard()
                 80,
                 "UDP",
                 true,
-                0
+                0,
+                "192.168.18.1"
             )
         )
 }
@@ -1376,7 +1308,8 @@ fun PortMappingCardAlt()
             80,
             "UDP",
             true,
-            0
+            0,
+            "192.168.18.1"
         )
     )
 
@@ -1469,6 +1402,17 @@ fun PortMappingCardAlt(portMapping: PortMapping)
     }
 }
 
+// TODO: for mock purposes
+class IGDDeviceHolder
+{
+
+    var displayName: String = "Nokia"
+        get(){
+            return ""
+        }
+
+}
+
 @OptIn(ExperimentalUnitApi::class)
 @Composable
 fun DeviceHeader(device : IGDDevice)
@@ -1495,17 +1439,139 @@ fun DeviceHeader(device : IGDDevice)
     Spacer(modifier = Modifier.padding(2.dp))
 }
 
+@Preview
+@Composable
+fun LoadingIcon()
+{
+    LoadingIcon("Searching for devices", Modifier)
+}
 
 @Composable
-fun NoMappingsCard(remoteDevice : IGDDevice)
+fun LoadingIcon(label : String, modifier : Modifier)
 {
-    //TODO. Also TODO make a dummy device..
+    Column(modifier = modifier.fillMaxWidth()) {
+        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
+        Text("Searching for devices", modifier = Modifier.align(Alignment.CenterHorizontally).padding(0.dp, 16.dp, 0.dp, 0.dp))
+    }
+
+}
+
+@Composable
+fun NoMappingsCard(remoteDevice : IGDDevice) {
+    NoMappingsCard()
+}
+
+@Preview
+@Composable
+fun NoMappingsCard()
+{
+    MyApplicationTheme() {
+        Card(
+//        onClick = {
+//            if(PortForwardApplication.showPopup != null)
+//            {
+//                PortForwardApplication.showPopup.value = true
+//            }
+//                  },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp, 4.dp)
+//            .background(MaterialTheme.colorScheme.secondaryContainer)
+                .clickable {
+                    //PortForwardApplication.currentSingleSelectedObject.value = portMapping
+                },
+            elevation = CardDefaults.cardElevation(),
+            colors = CardDefaults.cardColors(
+                containerColor = AdditionalColors.CardSurfaceNoMappings,
+            ),
+
+            ) {
+
+            Row(
+                modifier = Modifier
+                    .padding(15.dp, 20.dp),//.background(Color(0xffc5dceb)),
+                //.background(MaterialTheme.colorScheme.secondaryContainer),
+                verticalAlignment = Alignment.CenterVertically
+
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+
+
+
+
+                    Text(
+                        "No port mappings found \nfor this device",
+                        fontSize = TextUnit(20f, TextUnitType.Sp),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(0.dp, 0.dp, 0.dp, 8.dp),
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Tap ",
+
+                            //color = MaterialTheme.colors.onSurface
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add icon",
+                            //tint = MaterialTheme.colors.secondary
+                        )
+                        Text(
+                            text = " to add new rules",
+                            //style = MaterialTheme.typography.body1,
+                            //color = MaterialTheme.colors.onSurface
+                        )
+                    }
+//                    Text("${portMapping.LocalIP}")
+
+//                    val text = buildAnnotatedString {
+//                        withStyle(style = SpanStyle(color = AdditionalColors.Enabled_Green)) {
+//                            append("⬤")
+//                        }
+//                        withStyle(style = SpanStyle()) {
+//                            append(if (portMapping.Enabled) " Enabled" else " Disabled")
+//                        }
+//                    }
+//
+//
+//                    Text(text)
+                }
+//
+//
+////                buildAnnotatedString {
+////                    append("welcome to ")
+////                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
+////                    ) {
+////                        append("Jetpack Compose Playground")
+////                    }
+////                }
+//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//                    Text(
+//                        "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
+//                        fontSize = TextUnit(20f, TextUnitType.Sp),
+//                        fontWeight = FontWeight.SemiBold
+//                    )
+//                    Text("${portMapping.Protocol}")
+//
+//                }
+        }
+        }
+    }
 }
 
 @OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PortMappingCard(portMapping: PortMapping)
 {
+    println("external ip test ${portMapping.ExternalIP}")
+
     MyApplicationTheme(){
     Card(
 //        onClick = {
@@ -1542,11 +1608,11 @@ fun PortMappingCard(portMapping: PortMapping)
                 Text("${portMapping.LocalIP}")
 
                 val text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(color = AdditionalColors.Enabled_Green)) {
+                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
                         append("⬤")
                     }
                     withStyle(style = SpanStyle()) {
-                        append(" Enabled")
+                        append(if (portMapping.Enabled) " Enabled" else " Disabled")
                     }
                 }
 
