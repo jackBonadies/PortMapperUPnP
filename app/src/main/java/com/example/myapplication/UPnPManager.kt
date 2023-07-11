@@ -17,7 +17,9 @@ import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
+import java.util.concurrent.Callable
 import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
 
 class UpnpManager {
 
@@ -98,6 +100,93 @@ class UpnpManager {
 
         fun GetUPnPService() : UpnpService {
             return _upnpService!!
+        }
+
+        fun splitUserInputIntoRules(portMappingUserInput : PortMappingUserInput) : MutableList<PortMappingRequest>
+        {
+            var portMappingRequests : MutableList<PortMappingRequest> = mutableListOf()
+            val (inStart, inEnd) = getRange(portMappingUserInput.internalPort)
+            val (outStart, outEnd) = getRange(portMappingUserInput.internalPort)
+            val protocols = getProtocols(portMappingUserInput.protocol)
+
+            // many 1 to 1 makes sense
+            // many external to 1 internal?? this makes sense but goes against retrieving ports with upnp
+            //   in the sense that you are supposed to be able to retrieve 1 single port with 1
+            //   (external ip, external port, protocol).
+            // not sure about others...
+            val inSize = inEnd - inStart + 1 // inclusive
+            val outSize = outEnd - outStart + 1
+            var xToOne = (inSize == 1 || outSize == 1) //many to one or one to one
+            if (inSize != outSize && !xToOne)
+            {
+                throw java.lang.Exception("Internal and External Ranges do not match")
+            }
+
+            var sizeOfRange = maxOf(inSize, outSize) - 1 // if just 1 element then size is 0
+            for (i in 0..sizeOfRange)
+            {
+                var inPort = if(inSize == 1) inStart else inStart + i
+                var outPort = if(inSize == 1) outStart else outStart + i
+                for (protocol in protocols)
+                {
+                    portMappingRequests.add(portMappingUserInput.with(inPort.toString(), outPort.toString(), protocol.toString()))
+                }
+            }
+            return portMappingRequests
+        }
+
+        fun getRange(portRange : String) : Pair<Int, Int>
+        {
+            if(portRange.contains('-'))
+            {
+                var inRange = portRange.split('-')
+                return Pair(inRange[0].toInt(), inRange[1].toInt())
+            }
+            else
+            {
+                return Pair(portRange.toInt(), portRange.toInt())
+            }
+        }
+
+        fun getProtocols(protocol : String) : List<String>
+        {
+            return when (protocol) {
+                "BOTH" -> listOf("TCP", "UDP")
+                else -> listOf(protocol)
+            }
+        }
+
+        data class PortMappingFullResult(val description : String, val internalIp : String, val internalPort : String)
+
+        fun CreatePortMappingRules(portMappingUserInput : PortMappingUserInput, onCompleteBatchCallback: (MutableList<PortMappingRequest>) -> Unit) : FutureTask<MutableList<PortMappingRequest>>
+        {
+            val callable = Callable {
+
+                var portMappingRequestRules = splitUserInputIntoRules(portMappingUserInput)
+                var listOfResults: MutableList<UPnPCreateMappingResult?> =
+                    MutableList(portMappingRequestRules.size) { null }
+
+                for (i in 0 until portMappingRequestRules.size) {
+
+                    fun callback(result: UPnPCreateMappingResult) {
+
+                        RunUIThread {
+                            listOfResults[i] = result
+                        }
+                    }
+
+                    var future = CreatePortMappingRule(portMappingRequestRules[i], ::callback)
+                    future.get()
+                }
+
+                onCompleteBatchCallback(portMappingRequestRules)
+
+                portMappingRequestRules
+            }
+
+            val task = FutureTask(callable)
+            Thread(task).start()
+            return task // a FutureTask is a Future
         }
 
         fun Initialize()
@@ -316,7 +405,7 @@ class UpnpManager {
                 }
             }
 
-            CreatePortMappingRule(
+            var portMappingRequest = PortMappingRequest(
                 portMapping.Description,
                 portMapping.LocalIP,
                 portMapping.InternalPort.toString(),
@@ -324,8 +413,8 @@ class UpnpManager {
                 portMapping.ExternalPort.toString(),
                 portMapping.Protocol,
                 portMapping.LeaseDuration.toString(),
-                enable,
-                ::callback)
+                enable)
+            CreatePortMappingRule(portMappingRequest, ::callback)
         }
 
         fun DeletePortMappingEntry(portMapping : PortMapping) : Future<Any>
@@ -467,6 +556,17 @@ class UpnpManager {
         //fun List<IGDDevice>
     }
 }
+
+
+data class PortMappingUserInput(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+{
+    fun with(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
+    {
+        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled)
+    }
+}
+data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+
 
 //CompletableFuture is api >=24
 //basic futures do not implement continuewith...

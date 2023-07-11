@@ -116,6 +116,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
+import java.lang.Exception
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -123,6 +124,8 @@ import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Collections
+import java.util.concurrent.Callable
+import java.util.concurrent.FutureTask
 import kotlin.random.Random
 
 
@@ -133,6 +136,28 @@ import kotlin.random.Random
 class PortForwardApplication : Application() {
 
     override fun onCreate() {
+
+        val num = 42  // The argument to capture
+
+        val callable = Callable {
+            Thread.sleep(10000)
+            num * 2  // Double the captured argument
+            "HELLO"
+        }
+
+        val task = FutureTask(callable)
+
+        Thread(task).start()
+
+        try {
+            val result = task.get()
+            println("Result: $result")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+
+
         super.onCreate()
         PortForwardApplication.appContext = applicationContext
     }
@@ -367,8 +392,8 @@ class MainActivity : ComponentActivity() {
                         content = {it  ->
 
                             val refreshScope = rememberCoroutineScope()
-                            var refreshState = mutableStateOf(false)
-                            var refreshing by remember { refreshState }
+                            var refreshState = remember { mutableStateOf(false) }
+                            var refreshing by refreshState
 
 //                            val refreshScope = rememberCoroutineScope()
 //                            var refreshing by remember { refreshState }
@@ -972,9 +997,17 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     }
                                 }
 
-                                var portMappingRequest = PortMappingRequest(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, true)
+                                var portMappingRequest = PortMappingRequest(
+                                    description.value,
+                                    internalIp.value,
+                                    internalPortText.value,
+                                    externalDeviceText.value,
+                                    externalPortText.value,
+                                    selectedProtocolMutable.value,
+                                    leaseDuration.value,
+                                    true
+                                )
                                 var future = UpnpManager.CreatePortMappingRule(portMappingRequest, ::callback)
-                                // dont wait, just continue...
 
                                 showDialogMutable.value = false
                             },
@@ -993,7 +1026,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
         }
     }
 
-data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
 
 fun RunUIThread(runnable: Runnable)
 {
