@@ -7,9 +7,15 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.SupplicantState
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -114,9 +120,13 @@ import org.fourthline.cling.model.meta.LocalDevice
 import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
+import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Collections
 import kotlin.random.Random
 
 
@@ -185,10 +195,82 @@ class MainActivity : ComponentActivity() {
     var upnpElementsViewModel = UPnPElementViewModel()
     var searchInProgressJob : Job? = null
 
+    fun getConnectionType(context: Context): Int {
+        var result = 0 // Returns connection type. 0: none; 1: mobile data; 2: wifi
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            cm.getNetworkCapabilities(cm.activeNetwork)?.run {
+                when {
+                    hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                        result = 2
+                    }
+                    hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                        result = 1
+                    }
+                    else -> {
+                        result = 0
+                    }
+                }
+            }
+        } else {
+            cm.activeNetworkInfo?.run {
+                when (type) {
+                    ConnectivityManager.TYPE_WIFI -> {
+                        result = 2
+                    }
+                    ConnectivityManager.TYPE_MOBILE -> {
+                        result = 1
+                    }
+                    else -> {
+                        result = 0
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    fun getLocalIpAddress(): String? {
+        try {
+            for (networkInterface in Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                for (inetAddress in Collections.list(networkInterface.inetAddresses)) {
+                    if (!inetAddress.isLoopbackAddress && inetAddress is Inet4Address) {
+                        return inetAddress.hostAddress
+                    }
+                }
+            }
+        } catch (ex: SocketException) {
+            Log.e("IP Address", "Failed getting IP address", ex)
+        }
+        return null
+    }
+
+
+
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);
+
+        getConnectionType(this)
+        getLocalIpAddress()
+
+        var wm : WifiManager = (this.getSystemService(Context.WIFI_SERVICE)) as WifiManager;
+        if (wm.wifiState == WifiManager.WIFI_STATE_DISABLED) //if just mobile is on and wifi is off.
+        {
+            //wifi is disabled.
+        }
+
+
+
+        // SupplicantState.UNINITIALIZED == off as well.
+        if (wm.connectionInfo.supplicantState == SupplicantState.DISCONNECTED || wm.connectionInfo.ipAddress == 0)
+        {
+            //wifi is disabled.
+            return;
+        }
+        var ipAddressString = android.text.format.Formatter.formatIpAddress(wm.connectionInfo.ipAddress);
+
 
         //android router set wifi enabled
 
@@ -212,6 +294,8 @@ class MainActivity : ComponentActivity() {
             }
         }
         var searchStarted = UpnpManager.Search(true) // by default STAll
+        //var refreshState = mutableStateOf(false)
+
 
         setContent {
             MyApplicationTheme {
@@ -267,7 +351,9 @@ class MainActivity : ComponentActivity() {
 
                     Scaffold(
                         floatingActionButton = {
-                            FloatingActionButton(onClick = { showDialog = true }) {
+                            FloatingActionButton(
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                onClick = { showDialog = true }) {
                                 Icon(
                                     Icons.Default.Add,
                                     contentDescription = "Localized description"
@@ -285,12 +371,17 @@ class MainActivity : ComponentActivity() {
                         content = {it  ->
 
                             val refreshScope = rememberCoroutineScope()
-                            var refreshing by remember { mutableStateOf(false) }
+                            var refreshState = mutableStateOf(false)
+                            var refreshing by remember { refreshState }
+
+//                            val refreshScope = rememberCoroutineScope()
+//                            var refreshing by remember { refreshState }
 
                             fun refresh() = refreshScope.launch {
                                 refreshing = true
-                                UpnpManager.Search(false)
-                                delay(1500)
+                                //UpnpManager.Search(false)
+                                delay(6000)
+                                println("finish refreshing $refreshing")
                                 refreshing = false
                             }
 
@@ -312,7 +403,7 @@ class MainActivity : ComponentActivity() {
                                     LoadingIcon("Searching for devices", Modifier.offset(y = offset))
                                 }
 
-                                Column(Modifier.padding(it)) {
+                                Column(Modifier.padding(it).fillMaxHeight().fillMaxWidth()) {
 //                                    for (i in 1..10)
 //                                    {
 //                                        Text("test")
@@ -1183,7 +1274,7 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
         LazyColumn(
             //modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+            modifier = Modifier.background(MaterialTheme.colorScheme.background).fillMaxHeight().fillMaxWidth(),
             contentPadding = PaddingValues(0.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
 
