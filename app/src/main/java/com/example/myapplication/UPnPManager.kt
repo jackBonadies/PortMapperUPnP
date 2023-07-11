@@ -406,39 +406,32 @@ class UpnpManager {
 
         // this method creates a rule, then grabs it again to verify it.
         fun CreatePortMappingRule(
-            description : String,
-            internalIp : String,
-            internalPortText : String,
-            externalIp : String,
-            externalPortText : String,
-            protocol : String,
-            leaseDuration : String,
-            enabled : Boolean,
+            portMappingRequest : PortMappingRequest,
             callback: (UPnPCreateMappingResult) -> Unit) : Future<Any>
         {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
 
-
+            var externalIp = portMappingRequest.externalIp
 
             var device : IGDDevice = getIGDDevice(externalIp)
             var action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             var actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", "$externalIp");
+            actionInvocation.setInput("NewRemoteHost", externalIp);
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-            actionInvocation.setInput("NewExternalPort", "$externalPortText");
-            actionInvocation.setInput("NewProtocol", "$protocol");
-            actionInvocation.setInput("NewInternalPort", "$internalPortText");
-            actionInvocation.setInput("NewInternalClient", "$internalIp");
-            actionInvocation.setInput("NewEnabled", if (enabled) "1" else "0");
-            actionInvocation.setInput("NewPortMappingDescription", description);
-            actionInvocation.setInput("NewLeaseDuration", "$leaseDuration");
+            actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort);
+            actionInvocation.setInput("NewProtocol", portMappingRequest.protocol);
+            actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort);
+            actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp);
+            actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0");
+            actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description);
+            actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration);
 
             var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
                     println("Successfully added, now reading back")
 
-                    var specificFuture = GetSpecificPortMappingRule(externalIp, externalPortText, protocol, callback)
+                    var specificFuture = GetSpecificPortMappingRule(externalIp, portMappingRequest.externalPort, portMappingRequest.protocol, callback)
                     specificFuture.get()
 
                 }

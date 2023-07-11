@@ -88,7 +88,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -116,10 +115,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.fourthline.cling.model.meta.LocalDevice
 import org.fourthline.cling.model.meta.RemoteDevice
-import org.fourthline.cling.registry.Registry
-import org.fourthline.cling.registry.RegistryListener
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -976,7 +972,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     }
                                 }
 
-                                var future = UpnpManager.CreatePortMappingRule(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, true, ::callback)
+                                var portMappingRequest = PortMappingRequest(description.value, internalIp.value, internalPortText.value, externalDeviceText.value, externalPortText.value, selectedProtocolMutable.value, leaseDuration.value, true)
+                                var future = UpnpManager.CreatePortMappingRule(portMappingRequest, ::callback)
                                 // dont wait, just continue...
 
                                 showDialogMutable.value = false
@@ -995,6 +992,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
         }
         }
     }
+
+data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
 
 fun RunUIThread(runnable: Runnable)
 {
