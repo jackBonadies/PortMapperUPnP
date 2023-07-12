@@ -8,6 +8,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.runtime.MutableState
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
@@ -33,6 +34,7 @@ class UpnpManager {
         private var _upnpService : UpnpService? = null
         private var _initialized : Boolean = false
         var HasSearched : Boolean = false
+        var AnyIgdDevices : MutableState<Boolean>? = null
 
         object UPnPNames {
             val InternetGatewayDevice = "InternetGatewayDevice"
@@ -101,7 +103,11 @@ class UpnpManager {
         fun ClearOldData(){
             UpnpManager.GetUPnPService()?.registry?.removeAllLocalDevices()
             UpnpManager.GetUPnPService()?.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
-            IGDDevices.clear()
+            AnyIgdDevices?.value = false
+            synchronized(lockIgdDevices)
+            {
+                IGDDevices.clear()
+            }
             UpdateUIFromData.invoke(null)
         }
 
@@ -184,13 +190,45 @@ class UpnpManager {
                         listOfResults[i] = result
                     }
 
-                    var future = CreatePortMappingRule(portMappingRequestRules[i], ::callback)
+                    var future = CreatePortMappingRule(portMappingRequestRules[i], true, ::callback)
                     future.get()
                 }
 
                 onCompleteBatchCallback(listOfResults)
 
                 portMappingRequestRules
+            }
+
+            val task = FutureTask(callable)
+            Thread(task).start()
+            return task // a FutureTask is a Future
+        }
+
+        fun DisableEnablePortMappingEntries(
+            portMappings: List<PortMapping>,
+            enable : Boolean,
+            onCompleteBatchCallback: (MutableList<UPnPCreateMappingResult?>) -> Unit
+        ) : FutureTask<List<PortMapping>>
+        {
+            val callable = Callable {
+
+                var listOfResults: MutableList<UPnPCreateMappingResult?> =
+                    MutableList(portMappings.size) { null }
+
+                for (i in 0 until portMappings.size) {
+
+                    fun callback(result: UPnPCreateMappingResult) {
+
+                        defaultRuleAddedCallback(result)
+                        listOfResults[i] = result
+                    }
+
+                    var future = DisableEnablePortMappingEntry(portMappings[i], enable, ::callback)
+                    future.get()
+                }
+
+                onCompleteBatchCallback(listOfResults)
+                portMappings
             }
 
             val task = FutureTask(callable)
@@ -306,8 +344,79 @@ class UpnpManager {
         }
 
         fun AddDevice(igdDevice: IGDDevice) {
-            IGDDevices.add(igdDevice)
+            AnyIgdDevices?.value = true
+            synchronized(lockIgdDevices)
+            {
+                IGDDevices.add(igdDevice)
+            }
             UpnpManager.DeviceFoundEvent.invoke(igdDevice)
+        }
+
+        var lockIgdDevices = Any()
+
+        fun AnyExistingRules() : Boolean
+        {
+            synchronized(lockIgdDevices)
+            {
+                for (device in IGDDevices)
+                {
+                    if (device.portMappings.isNotEmpty()) {
+                        return true
+                    }
+                }
+                return false
+            }
+        }
+
+        // returns anyEnabled, anyDisabled
+        fun GetExistingRuleInfos() : Pair<Boolean, Boolean>
+        {
+            var anyEnabled : Boolean = false;
+            var anyDisabled : Boolean = false;
+            synchronized(lockIgdDevices)
+            {
+                for (device in IGDDevices)
+                {
+                    for (portMapping in device.portMappings)
+                    {
+                        if(portMapping.Enabled)
+                        {
+                            anyEnabled = true
+                        }
+                        else
+                        {
+                            anyDisabled = true
+                        }
+
+                        if(anyEnabled && anyDisabled)
+                        {
+                            //exit early
+                            return Pair(anyEnabled, anyDisabled)
+                        }
+                    }
+                }
+            }
+            return Pair(anyEnabled, anyDisabled)
+        }
+
+        // returns anyEnabled, anyDisabled
+        fun GetEnabledDisabledRules(enabledRules : Boolean) : MutableList<PortMapping>
+        {
+            var enablePortMapping : MutableList<PortMapping> = mutableListOf();
+            synchronized(lockIgdDevices)
+            {
+                for (device in IGDDevices)
+                {
+                    for (portMapping in device.portMappings)
+                    {
+                        if(portMapping.Enabled == enabledRules)
+                        {
+                            enablePortMapping.add(portMapping)
+                        }
+                    }
+                }
+            }
+            return enablePortMapping
         }
 
         var IGDDevices : MutableList<IGDDevice> = mutableListOf()
@@ -380,7 +489,10 @@ class UpnpManager {
             return future
         }
 
-        fun DisableEnablePortMappingEntry(portMapping: PortMapping, enable : Boolean)
+        fun DisableEnablePortMappingEntry(
+            portMapping: PortMapping,
+            enable : Boolean,
+            onDisableEnableCompleteCallback : (UPnPCreateMappingResult) -> Unit) : Future<Any>
         {
             // AddPortMapping
             //  This action creates a new port mapping or overwrites an existing mapping with the same internal client. If
@@ -388,31 +500,7 @@ class UpnpManager {
             //  returned.  (On my Nokia, I can modify other devices rules no problem).
             // However, deleting a mapping it is only a recommendation that they be the same..
             //  so Edit = Delete and Add is more powerful?
-            fun callback(result : UPnPCreateMappingResult) {
 
-                RunUIThread {
-                    println("adding rule callback")
-                    if (result.Success!!) {
-                        result.ResultingMapping!!
-                        var device =
-                            UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
-                        var oldMappingIndex = device.portMappings.indexOf(portMapping)
-                        device.portMappings[oldMappingIndex] = result.ResultingMapping!!
-                        UpnpManager.UpdateUIFromData.invoke(null)
-                        Toast.makeText(
-                            PortForwardApplication.appContext,
-                            "Success",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Toast.makeText(
-                            PortForwardApplication.appContext,
-                            "Failure - ${result.FailureReason!!}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
 
             var portMappingRequest = PortMappingRequest(
                 portMapping.Description,
@@ -423,7 +511,21 @@ class UpnpManager {
                 portMapping.Protocol,
                 portMapping.LeaseDuration.toString(),
                 enable)
-            CreatePortMappingRule(portMappingRequest, ::callback)
+            return CreatePortMappingRule(portMappingRequest, false, onDisableEnableCompleteCallback)
+        }
+
+        fun enableDisableDefaultCallback(result : UPnPCreateMappingResult)
+        {
+            println("adding rule callback")
+            if (result.Success!!)
+            {
+                result.ResultingMapping!!
+                var device =
+                    UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
+                var oldMappingIndex = device.getMappingIndex(result.ResultingMapping!!.ExternalPort, result.ResultingMapping!!.Protocol) //.portMappings.indexOf(portMapping)
+                device.portMappings[oldMappingIndex] = result.ResultingMapping!!
+                UpnpManager.UpdateUIFromData.invoke(null)
+            }
         }
 
         fun DeletePortMappingEntry(portMapping : PortMapping) : Future<Any>
@@ -505,6 +607,7 @@ class UpnpManager {
         // this method creates a rule, then grabs it again to verify it.
         fun CreatePortMappingRule(
             portMappingRequest : PortMappingRequest,
+            skipReadingBack : Boolean,
             callback: (UPnPCreateMappingResult) -> Unit) : Future<Any>
         {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
@@ -528,9 +631,21 @@ class UpnpManager {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
                     println("Successfully added, now reading back")
-
-                    var specificFuture = GetSpecificPortMappingRule(externalIp, portMappingRequest.externalPort, portMappingRequest.protocol, callback)
-                    specificFuture.get()
+                    if(skipReadingBack)
+                    {
+                        var result = UPnPCreateMappingResult(true) //TODO : parameter on whether we read back + parameter on the original requested (in case its different)
+                        result.ResultingMapping = portMappingRequest.realize()
+                        callback(result)
+                    }
+                    else {
+                        var specificFuture = GetSpecificPortMappingRule(
+                            externalIp,
+                            portMappingRequest.externalPort,
+                            portMappingRequest.protocol,
+                            callback
+                        )
+                        specificFuture.get()
+                    }
 
                 }
 
@@ -592,6 +707,12 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
     }
 }
 data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+{
+    fun realize() : PortMapping
+    {
+        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp)
+    }
+}
 
 
 //CompletableFuture is api >=24
@@ -856,6 +977,11 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
     var portMappings : MutableList<PortMapping> = mutableListOf()
 //    var hasAddPortMappingAction : Boolean
 //    var hasDeletePortMappingAction : Boolean
+
+    fun getMappingIndex(externalPort : Int, protocol : String) : Int
+    {
+        return portMappings.indexOfFirst { it.ExternalPort == externalPort && it.Protocol == protocol }
+    }
 
     init {
         this.rootDevice = _rootDevice

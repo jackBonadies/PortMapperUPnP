@@ -9,10 +9,6 @@ import android.content.Context
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.wifi.SupplicantState
-import android.net.wifi.WifiManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -321,6 +317,8 @@ class MainActivity : ComponentActivity() {
                 val snackbarHostState = remember { SnackbarHostState() }
                 val scope = rememberCoroutineScope()
                 val coroutineScope: CoroutineScope = rememberCoroutineScope()
+                val anyIgdDevices = remember { mutableStateOf(!UpnpManager.IGDDevices.isEmpty()) }
+                UpnpManager.AnyIgdDevices = anyIgdDevices
 
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -328,34 +326,36 @@ class MainActivity : ComponentActivity() {
 
 
 
+                        if(anyIgdDevices.value)
+                        {
+                            FloatingActionButton(
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                onClick = {
 
-                        FloatingActionButton(
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            onClick = {
+                                    //showDialog = true
 
-                                //showDialog = true
-
-                                coroutineScope.launch {
-                                    println("show snackbar")
-                                    var snackbarResult = snackbarHostState.showSnackbar(
-                                        "testing",
-                                        "action",
-                                        true,
-                                        SnackbarDuration.Indefinite
-                                    )
-                                    println("shown")
-                                    when (snackbarResult) {
-                                        SnackbarResult.Dismissed -> TODO()
-                                        SnackbarResult.ActionPerformed -> TODO()
+                                    coroutineScope.launch {
+                                        println("show snackbar")
+                                        var snackbarResult = snackbarHostState.showSnackbar(
+                                            "testing",
+                                            "action",
+                                            true,
+                                            SnackbarDuration.Indefinite
+                                        )
+                                        println("shown")
+                                        when (snackbarResult) {
+                                            SnackbarResult.Dismissed -> TODO()
+                                            SnackbarResult.ActionPerformed -> TODO()
+                                        }
                                     }
-                                }
 
-                            }) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Localized description",
-                                tint = AdditionalColors.TextColor
-                            )
+                                }) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Localized description",
+                                    tint = AdditionalColors.TextColor,
+                                )
+                            }
                         }
                     },
                     topBar = {
@@ -415,7 +415,7 @@ class MainActivity : ComponentActivity() {
                                     val offset = boxHeight * 0.28f
                                     LoadingIcon("Searching for devices", Modifier.offset(y = offset))
                                 }
-                                else if(UpnpManager.IGDDevices.isEmpty())
+                                else if(!anyIgdDevices.value)
                                 {
                                     val offset = boxHeight * 0.28f
                                     Column(modifier = Modifier.offset(y = offset))
@@ -652,7 +652,28 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                             Pair<String, () -> Unit>(
                                 if (portMapping.Enabled) "Disable" else "Enable",
                                 {
-                                    var future = UpnpManager.DisableEnablePortMappingEntry(portMapping, !portMapping.Enabled)
+
+                                    fun enableDisableCallback(result : UPnPCreateMappingResult) {
+                                        //portMapping : PortMapping,
+                                        UpnpManager.enableDisableDefaultCallback(result)
+                                        RunUIThread {
+                                            if (result.Success!!) {
+                                                Toast.makeText(
+                                                    PortForwardApplication.appContext,
+                                                    "Success",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    PortForwardApplication.appContext,
+                                                    "Failure - ${result.FailureReason!!}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+
+                                    var future = UpnpManager.DisableEnablePortMappingEntry(portMapping, !portMapping.Enabled, ::enableDisableCallback)
                                     Toast.makeText(
                                         PortForwardApplication.appContext,
                                         "Disable clicked",
@@ -836,11 +857,13 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     else
                     {
 
-
-                        for (device in UpnpManager.IGDDevices) {
-                            gatewayIps.add(device.ipAddress)
-                            if (device.ipAddress == ourGatewayIp) {
-                                defaultGatewayIp = device.ipAddress
+                        synchronized(UpnpManager.lockIgdDevices)
+                        {
+                            for (device in UpnpManager.IGDDevices) {
+                                gatewayIps.add(device.ipAddress)
+                                if (device.ipAddress == ourGatewayIp) {
+                                    defaultGatewayIp = device.ipAddress
+                                }
                             }
                         }
 
@@ -1031,7 +1054,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     true
                                 )
                                 var future = UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
-
                                 showDialogMutable.value = false
                             },
                             shape = RoundedCornerShape(4),
@@ -1180,7 +1202,9 @@ fun DeviceRow(content: @Composable () -> Unit) {
 @Composable
 fun OverflowMenu(showDialog : MutableState<Boolean>) {
     var expanded by remember { mutableStateOf(false) }
-    val items = listOf("Item 1", "Item 2", "Item 3")
+
+
+
 
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Default.MoreVert, contentDescription = "menu")
@@ -1190,18 +1214,94 @@ fun OverflowMenu(showDialog : MutableState<Boolean>) {
         expanded = expanded,
         onDismissRequest = { expanded = false }
     ) {
+        // this gets called on expanded, so I dont think we need to monitor additional state.
+        val items : MutableList<String> = mutableListOf()
+        items.add("Refresh")
+        if(UpnpManager.IGDDevices.isNotEmpty())
+        {
+            var (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
+            if(anyEnabled) // also get info i.e. any enabled, any disabled
+            {
+                items.add("Disable All")
+            }
+            if (anyDisabled)
+            {
+                items.add("Enable All")
+            }
+            if(anyDisabled || anyEnabled)
+            {
+                items.add("Delete All")
+            }
+        }
+        items.add("View Log")
+        items.add("About")
         items.forEach { label ->
             DropdownMenuItem(text = { Text(label) }, onClick = {
                 // handle item click
                 expanded = false
-                showDialog.value = true
 
                 when (label) {
-                    "Item 1" -> {println("Item 1 pressed")}
+                    "Refresh" -> {println("Item 1 pressed")}
+                    "Disable All" ->
+                    {
+                        enableDisableAll(false)
+                    }
+                    "Enable All" ->
+                    {
+                        enableDisableAll(true)
+                    }
+                    "Delete All" ->
+                    {
+
+                    }
+                    "View Log" -> {println("Item 1 pressed")}
+                    "About" -> {println("Item 1 pressed")}
                 }
             })
         }
     }
+}
+
+fun enableDisableAll(enable : Boolean)
+{
+    fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
+
+        RunUIThread {
+
+            //debug
+            for (res in result)
+            {
+                res!!
+                print(res.Success)
+                print(res.FailureReason)
+                print(res.ResultingMapping?.Protocol)
+            }
+
+            var anyFailed = result.any {!it?.Success!!}
+
+            if(anyFailed) {
+                var res = result[0]
+                res!!
+                Toast.makeText(
+                    PortForwardApplication.appContext,
+                    "Failure - ${res.FailureReason!!}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            else
+            {
+                Toast.makeText(
+                    PortForwardApplication.appContext,
+                    "Success",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    // get all enabled
+    var rules = UpnpManager.GetEnabledDisabledRules(enable);
+    UpnpManager.DisableEnablePortMappingEntries(rules, !enable, ::batchCallback)
 }
 
 fun formatIpv4(ipAddr : Int) : String
