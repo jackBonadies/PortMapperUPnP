@@ -158,7 +158,10 @@ class UpnpManager {
 
         data class PortMappingFullResult(val description : String, val internalIp : String, val internalPort : String)
 
-        fun CreatePortMappingRules(portMappingUserInput : PortMappingUserInput, onCompleteBatchCallback: (MutableList<PortMappingRequest>) -> Unit) : FutureTask<MutableList<PortMappingRequest>>
+        fun CreatePortMappingRules(
+            portMappingUserInput: PortMappingUserInput,
+            onCompleteBatchCallback: (MutableList<UPnPCreateMappingResult?>) -> Unit
+        ) : FutureTask<MutableList<PortMappingRequest>>
         {
             val callable = Callable {
 
@@ -170,16 +173,15 @@ class UpnpManager {
 
                     fun callback(result: UPnPCreateMappingResult) {
 
-                        RunUIThread {
-                            listOfResults[i] = result
-                        }
+                        defaultRuleAddedCallback(result)
+                        listOfResults[i] = result
                     }
 
                     var future = CreatePortMappingRule(portMappingRequestRules[i], ::callback)
                     future.get()
                 }
 
-                onCompleteBatchCallback(portMappingRequestRules)
+                onCompleteBatchCallback(listOfResults)
 
                 portMappingRequestRules
             }
@@ -554,6 +556,23 @@ class UpnpManager {
 
 
         //fun List<IGDDevice>
+    }
+}
+
+fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
+    println("default adding rule callback")
+    if (result.Success!!)
+    {
+        result.ResultingMapping!!
+        var device =
+            UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
+        device.portMappings.add(result.ResultingMapping!!)
+        UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
+
+    }
+    else
+    {
+
     }
 }
 

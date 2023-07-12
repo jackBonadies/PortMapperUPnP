@@ -137,26 +137,6 @@ class PortForwardApplication : Application() {
 
     override fun onCreate() {
 
-        val num = 42  // The argument to capture
-
-        val callable = Callable {
-            Thread.sleep(10000)
-            num * 2  // Double the captured argument
-            "HELLO"
-        }
-
-        val task = FutureTask(callable)
-
-        Thread(task).start()
-
-        try {
-            val result = task.get()
-            println("Result: $result")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-
 
         super.onCreate()
         PortForwardApplication.appContext = applicationContext
@@ -972,32 +952,43 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             onClick = {
                                 Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
-                                fun callback(result : UPnPCreateMappingResult) {
+                                fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
 
                                     RunUIThread {
-                                        println("adding rule callback")
-                                        if (result.Success!!) {
-                                            result.ResultingMapping!!
-                                            var device =
-                                                UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
-                                            device.portMappings.add(result.ResultingMapping!!)
-                                            UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
+
+
+                                        //debug
+                                        for (res in result)
+                                        {
+                                            res!!
+                                            print(res.Success)
+                                            print(res.FailureReason)
+                                            print(res.ResultingMapping?.Protocol)
+                                        }
+
+                                        var anyFailed = result.any {!it?.Success!!}
+
+                                        if(anyFailed) {
+                                            var res = result[0]
+                                            res!!
+                                            Toast.makeText(
+                                                PortForwardApplication.appContext,
+                                                "Failure - ${res.FailureReason!!}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                        else
+                                        {
                                             Toast.makeText(
                                                 PortForwardApplication.appContext,
                                                 "Success",
                                                 Toast.LENGTH_SHORT
                                             ).show()
-                                        } else {
-                                            Toast.makeText(
-                                                PortForwardApplication.appContext,
-                                                "Failure - ${result.FailureReason!!}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
                                         }
                                     }
                                 }
 
-                                var portMappingRequest = PortMappingRequest(
+                                var portMappingRequestInput = PortMappingUserInput(
                                     description.value,
                                     internalIp.value,
                                     internalPortText.value,
@@ -1007,7 +998,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     leaseDuration.value,
                                     true
                                 )
-                                var future = UpnpManager.CreatePortMappingRule(portMappingRequest, ::callback)
+                                var future = UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
 
                                 showDialogMutable.value = false
                             },
