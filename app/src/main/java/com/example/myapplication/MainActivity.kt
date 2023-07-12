@@ -19,6 +19,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +45,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -68,6 +71,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -111,12 +116,13 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.ui.theme.AdditionalColors
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
-import java.lang.Exception
+import org.fourthline.cling.model.meta.RemoteDeviceIdentity
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -124,8 +130,6 @@ import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Collections
-import java.util.concurrent.Callable
-import java.util.concurrent.FutureTask
 import kotlin.random.Random
 
 
@@ -256,7 +260,7 @@ class MainActivity : ComponentActivity() {
         getConnectionType(this)
         getLocalIpAddress()
 
-        var wm : WifiManager = (this.getSystemService(Context.WIFI_SERVICE)) as WifiManager;
+        var wm : WifiManager = (this.applicationContext.getSystemService(Context.WIFI_SERVICE)) as WifiManager;
         if (wm.wifiState == WifiManager.WIFI_STATE_DISABLED) //if just mobile is on and wifi is off.
         {
             //wifi is disabled.
@@ -350,78 +354,116 @@ class MainActivity : ComponentActivity() {
 //                        }
                 }
 
-                    Scaffold(
-                        floatingActionButton = {
-                            FloatingActionButton(
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                onClick = { showDialog = true }) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Localized description"
-                                )
-                            }
-                        },
-                        topBar = {
-                            TopAppBar(
-//                                modifier = Modifier.height(40.dp),
-                                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-                                title = { Text(text = "hello world") },
-                                actions = { OverflowMenu(showDialogMutable) }
-                            )
-                        },
-                        content = {it  ->
 
-                            val refreshScope = rememberCoroutineScope()
-                            var refreshState = remember { mutableStateOf(false) }
-                            var refreshing by refreshState
+                val snackbarHostState = remember { SnackbarHostState() }
+                val scope = rememberCoroutineScope()
+                val coroutineScope: CoroutineScope = rememberCoroutineScope()
+
+                Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    floatingActionButton = {
+
+
+
+
+                        FloatingActionButton(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            onClick = {
+
+                                //showDialog = true
+
+                                coroutineScope.launch {
+                                    println("show snackbar")
+                                    var snackbarResult = snackbarHostState.showSnackbar(
+                                        "testing",
+                                        "action",
+                                        true,
+                                        SnackbarDuration.Indefinite
+                                    )
+                                    println("shown")
+                                    when (snackbarResult) {
+                                        SnackbarResult.Dismissed -> TODO()
+                                        SnackbarResult.ActionPerformed -> TODO()
+                                    }
+                                }
+
+                            }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Localized description",
+                                tint = AdditionalColors.TextColor
+                            )
+                        }
+                    },
+                    topBar = {
+                        TopAppBar(
+//                                modifier = Modifier.height(40.dp),
+                            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                            title = { Text(text = "Port Pilot", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
+                            actions = { OverflowMenu(showDialogMutable) }
+                        )
+                    },
+                    content = {it  ->
+
+                        val refreshScope = rememberCoroutineScope()
+                        var refreshState = remember { mutableStateOf(false) }
+                        var refreshing by refreshState
+
+
 
 //                            val refreshScope = rememberCoroutineScope()
 //                            var refreshing by remember { refreshState }
 
-                            fun refresh() = refreshScope.launch {
-                                refreshing = true
-                                //UpnpManager.Search(false)
-                                delay(6000)
-                                println("finish refreshing $refreshing")
-                                refreshing = false
+                        fun refresh() = refreshScope.launch {
+                            refreshing = true
+                            //UpnpManager.Search(false)
+                            delay(6000)
+                            println("finish refreshing $refreshing")
+                            refreshing = false
+                        }
+
+
+                        val state = rememberPullRefreshState(refreshing, ::refresh)
+
+                        //
+
+                        BoxWithConstraints(
+                            Modifier
+                                .pullRefresh(state)
+                                .fillMaxHeight()
+                                .fillMaxWidth())
+                        {
+
+                            val boxHeight = with(LocalDensity.current) { constraints.maxHeight.toDp() }
+                            val offset = boxHeight * 0.35f
+
+                            if(mainSearchInProgress.value)
+                            {
+                                LoadingIcon("Searching for devices", Modifier.offset(y = offset))
                             }
 
-
-                            val state = rememberPullRefreshState(refreshing, ::refresh)
-
-                            //
-
-                            BoxWithConstraints(
+                            Column(
                                 Modifier
-                                    .pullRefresh(state).fillMaxHeight().fillMaxWidth())
-                            {
-
-                                val boxHeight = with(LocalDensity.current) { constraints.maxHeight.toDp() }
-                                val offset = boxHeight * 0.35f
-
-                                if(mainSearchInProgress.value)
-                                {
-                                    LoadingIcon("Searching for devices", Modifier.offset(y = offset))
-                                }
-
-                                Column(Modifier.padding(it).fillMaxHeight().fillMaxWidth()) {
+                                    .padding(it)
+                                    .fillMaxHeight()
+                                    .fillMaxWidth()) {
 //                                    for (i in 1..10)
 //                                    {
 //                                        Text("test")
 //                                    }
 
-                                    ConversationEntryPoint(upnpElementsViewModel)
+                                ConversationEntryPoint(upnpElementsViewModel)
 //                                MyScreen(viewModel)
 //                                Greeting("Android")
 //                                Text("hello")
 //                                MessageCard("hello", "message content", true)
-                                }
-
-                                PullRefreshIndicator(refreshing, state, Modifier.align(Alignment.TopCenter))
                             }
 
+                            PullRefreshIndicator(refreshing, state, Modifier.align(Alignment.TopCenter))
                         }
-                    )
+
+                    }
+                )
 //                Surface(
 //                    modifier = Modifier
 //                        .fillMaxSize()
@@ -1296,7 +1338,10 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
         LazyColumn(
             //modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            modifier = Modifier.background(MaterialTheme.colorScheme.background).fillMaxHeight().fillMaxWidth(),
+            modifier = Modifier
+                .background(AdditionalColors.Background)
+                .fillMaxHeight()
+                .fillMaxWidth(),
             contentPadding = PaddingValues(0.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
 
@@ -1545,9 +1590,11 @@ fun DeviceHeader(device : IGDDevice)
         Text(
             device.displayName,
             fontWeight = FontWeight.SemiBold,
-            fontSize = TextUnit(24f, TextUnitType.Sp)
+            fontSize = TextUnit(24f, TextUnitType.Sp),
+            color = AdditionalColors.TextColor
+
         )
-        Text(device.ipAddress)
+        Text(device.ipAddress, color = AdditionalColors.TextColor)
     }
     Spacer(modifier = Modifier.padding(2.dp))
 }
@@ -1563,8 +1610,12 @@ fun LoadingIcon()
 fun LoadingIcon(label : String, modifier : Modifier)
 {
     Column(modifier = modifier.fillMaxWidth()) {
-        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
-        Text("Searching for devices", modifier = Modifier.align(Alignment.CenterHorizontally).padding(0.dp, 16.dp, 0.dp, 0.dp))
+        CircularProgressIndicator(modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
+        Text("Searching for devices", modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(0.dp, 16.dp, 0.dp, 0.dp))
     }
 
 }
@@ -1697,11 +1748,24 @@ fun PortMappingCard(portMapping: PortMapping)
             .fillMaxWidth()
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .clickable { PortForwardApplication.currentSingleSelectedObject.value = portMapping },
-        elevation = CardDefaults.cardElevation(),
-        colors = CardDefaults.cardColors(
-            containerColor = AdditionalColors.CardSurface,
-        ),
+            .clickable {
+
+
+//                Snackbar
+//                    .make(parentlayout, "This is main activity", Snackbar.LENGTH_LONG)
+//                    .setAction("CLOSE", object : OnClickListener() {
+//                        fun onClick(view: View?) {}
+//                    })
+//                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
+//                    .show()
+
+                PortForwardApplication.currentSingleSelectedObject.value = portMapping
+            },
+            elevation = CardDefaults.cardElevation(),
+            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
+            colors = CardDefaults.cardColors(
+                containerColor = AdditionalColors.CardContainerColor,
+            ),
 
     ) {
 
@@ -1716,9 +1780,10 @@ fun PortMappingCard(portMapping: PortMapping)
                 Text(
                     portMapping.Description,
                     fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = AdditionalColors.TextColor
                 )
-                Text("${portMapping.LocalIP}")
+                Text("${portMapping.LocalIP}", color = AdditionalColors.TextColor)
 
                 val text = buildAnnotatedString {
                     withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
@@ -1730,7 +1795,7 @@ fun PortMappingCard(portMapping: PortMapping)
                 }
 
 
-                Text(text)
+                Text(text, color = AdditionalColors.TextColor)
             }
 
 
@@ -1745,9 +1810,10 @@ fun PortMappingCard(portMapping: PortMapping)
                 Text(
                     "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
                     fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = AdditionalColors.TextColor
                 )
-                Text("${portMapping.Protocol}")
+                Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
 
             }
         }

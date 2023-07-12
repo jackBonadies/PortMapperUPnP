@@ -764,7 +764,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
             var actionInvocation = ActionInvocation(getPortMapping)
             println("requesting slot $slotIndex")
             actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
-            UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
@@ -800,7 +800,16 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                     println("GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
                     // Handle failure
                 }
-            }).get() // SYNCHRONOUS (note this can, and does, throw)
+            })
+
+            try {
+                future.get() // SYNCHRONOUS (note this can, and does, throw)
+            }
+            catch(e : Exception)
+            {
+                print("VERY BAD") // TODO
+            }
+
 
             if (!success)
             {

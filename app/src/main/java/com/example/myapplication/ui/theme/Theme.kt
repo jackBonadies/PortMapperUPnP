@@ -1,31 +1,34 @@
 package com.example.myapplication.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+val Blue40 = Color(0xff014C69)
+val Blue80 = Color(0xff93C3F4)
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = Blue40,
+    secondary = Blue40,
+    tertiary = Pink80,
+
+    onSurface = AdditionalColors.AdditionalColorsDark.TextColor
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AdditionalColors.PrimaryDarkerBlue,
-    secondary = AdditionalColors.PrimaryBlue,
+    primary =  Blue80, //AAdditionalColors.PrimaryDarkerBlue,
+    secondary = Blue80, //AdditionalColors.PrimaryBlue,
     tertiary = Pink40,
+    // used in places where the background color isnt explicitly changed
+    onSurface = AdditionalColors.AdditionalColorsLight.TextColor
 //    background = Color.Red,
 //    surface = Color.Red,
 //    onPrimary = Color.Red,
@@ -53,6 +56,50 @@ object AdditionalColors {
 
     var PrimaryDarkerBlue = Color(0xFF11366B)
     var PrimaryBlue = Color(0xFF3076CC)
+
+
+    var CardContainerColor = AdditionalColorsLight.CardContainerColor
+    var Background = AdditionalColorsLight.Background
+    var TextColorStrong = AdditionalColorsLight.TextColorStrong
+    var TextColor = AdditionalColorsLight.TextColor
+    var TextColorWeak = AdditionalColorsLight.TextColorWeak
+    var SubtleBorder = AdditionalColorsLight.SubtleBorder
+
+
+    interface IAdditionalColors {
+        val Background: Color
+        val SubtleBorder: Color
+        val CardContainerColor: Color
+        val TextColorStrong: Color
+        val TextColor: Color
+        val TextColorWeak: Color
+    }
+
+    object AdditionalColorsLight : IAdditionalColors
+    {
+        override var Background = Color(0xffF0F0F2)
+        override var SubtleBorder = Color(0xffE2E2E4)
+        override var CardContainerColor = Color(0xffFCFCFE)
+
+
+        override var TextColorStrong = Color(0xff1B1B1F)
+        override var TextColor = Color(0xff303037)
+        override var TextColorWeak = Color(0xff45464F)
+
+    }
+
+    object AdditionalColorsDark : IAdditionalColors
+    {
+        override var Background = Color(0xff181C1F)
+        override var SubtleBorder = Color(0xff3A3E41)
+        override var CardContainerColor = Color(0xff2D3134)
+
+        override var TextColorStrong = Color(0xffffffff)
+        override var TextColor = Color(0xffd8dad9)
+        override var TextColorWeak = Color(0xffa3a8a6)
+
+    }
+
 }
 
 
@@ -64,7 +111,17 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
     // TODO remove
-    val colorScheme = LightColorScheme
+    val useDark = true
+
+    var darkLightAdditionalColors : AdditionalColors.IAdditionalColors = if (useDark) AdditionalColors.AdditionalColorsDark else AdditionalColors.AdditionalColorsLight
+    AdditionalColors.Background = darkLightAdditionalColors.Background
+    AdditionalColors.SubtleBorder = darkLightAdditionalColors.SubtleBorder
+    AdditionalColors.CardContainerColor = darkLightAdditionalColors.CardContainerColor
+    AdditionalColors.TextColorWeak = darkLightAdditionalColors.TextColorWeak
+    AdditionalColors.TextColor = darkLightAdditionalColors.TextColor
+    AdditionalColors.TextColorStrong = darkLightAdditionalColors.TextColorStrong
+
+    val colorScheme = DarkColorScheme
 //    val colorScheme = when {
 //        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
 //            val context = LocalContext.current
@@ -74,6 +131,7 @@ fun MyApplicationTheme(
 //        darkTheme -> DarkColorScheme
 //        else -> LightColorScheme
 //    }
+
 
     val test = "HELLO"
     val view = LocalView.current
