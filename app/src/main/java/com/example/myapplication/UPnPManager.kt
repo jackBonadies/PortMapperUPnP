@@ -1,7 +1,12 @@
 package com.example.myapplication
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.widget.Toast
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
@@ -75,6 +80,7 @@ class UpnpManager {
         // used if we finish and there are no ports to show the "no devices" card
         var FinishedListingPortsEvent = Event<IGDDevice>()
         var UpdateUIFromData = Event<Any?>()
+        var NetworkInfoAtTimeOfSearch : OurNetworkInfoBundle? = null
 
         fun Search(onlyIfNotYetSearched : Boolean) : Boolean
         {
@@ -83,6 +89,7 @@ class UpnpManager {
                 return false
             }
             ClearOldData()
+            NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
             HasSearched = true
             // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
             // 0-1 second response time intentional delay from devices
@@ -151,7 +158,7 @@ class UpnpManager {
         fun getProtocols(protocol : String) : List<String>
         {
             return when (protocol) {
-                "BOTH" -> listOf("TCP", "UDP")
+                Protocol.BOTH.str() -> listOf("TCP", "UDP")
                 else -> listOf(protocol)
             }
         }
@@ -648,14 +655,33 @@ open class UPnPResult constructor(success : Boolean)
     }
 }
 
+data class OurNetworkInfoBundle(val networkType: NetworkType, val ourIp: String?, val gatewayIp : String?)
+
 class OurNetworkInfo {
     companion object { //singleton
 
         var retrieved : Boolean = false
         var ourIp : String? = null
         var gatewayIp : String? = null
+        var networkType : NetworkType? = null
 
-        fun GetLocalAndGatewayIpAddr(context: Context, forceRefresh : Boolean): Pair<String?,String?> {
+        fun GetNetworkInfo(context: Context, forceRefresh : Boolean) : OurNetworkInfoBundle
+        {
+            GetConnectionType(context, forceRefresh)
+            if(networkType == NetworkType.WIFI)
+            {
+                GetLocalAndGatewayIpAddrWifi(context, forceRefresh)
+            }
+            else
+            {
+                ourIp = null
+                gatewayIp = null
+            }
+
+            return OurNetworkInfoBundle(networkType!!, ourIp, gatewayIp)
+        }
+
+        fun GetLocalAndGatewayIpAddrWifi(context: Context, forceRefresh : Boolean): Pair<String?,String?> {
             if(!forceRefresh && retrieved)
             {
                 return Pair(ourIp, gatewayIp)
@@ -663,6 +689,7 @@ class OurNetworkInfo {
 
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             var ipAddress = wifiManager.connectionInfo.ipAddress
+
             //var macAddress = wifiManager.connectionInfo.macAddress
             val gatewayIpAddress = wifiManager.dhcpInfo.gateway
 
@@ -700,8 +727,119 @@ class OurNetworkInfo {
 //    }
 //    return null
         }
+        fun GetConnectionType(context: Context, forceRefresh : Boolean): NetworkType {
+
+            if(!forceRefresh && networkType != null)
+            {
+                return networkType!!
+            }
+
+            var result = NetworkType.NONE
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                cm.getNetworkCapabilities(cm.activeNetwork)?.run {
+                    when {
+                        hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                            result = NetworkType.WIFI
+                        }
+                        hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                            result = NetworkType.DATA
+                        }
+                        else -> {
+                            result = NetworkType.NONE
+                        }
+                    }
+                }
+            } else {
+                cm.activeNetworkInfo?.run {
+                    when (type) {
+                        ConnectivityManager.TYPE_WIFI -> {
+                            result = NetworkType.WIFI
+                        }
+                        ConnectivityManager.TYPE_MOBILE -> {
+                            result = NetworkType.DATA
+                        }
+                        else -> {
+                            result = NetworkType.NONE
+                        }
+                    }
+                }
+            }
+            networkType = result
+            return result
+        }
+
+
+    }
+
+
+//    fun getLocalIpAddress(): String? {
+//        try {
+//            for (networkInterface in Collections.list(NetworkInterface.getNetworkInterfaces())) {
+//                for (inetAddress in Collections.list(networkInterface.inetAddresses)) {
+//                    if (!inetAddress.isLoopbackAddress && inetAddress is Inet4Address) {
+//                        return inetAddress.hostAddress
+//                    }
+//                }
+//            }
+//        } catch (ex: SocketException) {
+//            Log.e("IP Address", "Failed getting IP address", ex)
+//        }
+//        return null
+//    }
+}
+
+
+class ConnectionReceiver : BroadcastReceiver() {
+    override fun onReceive(p0: Context?, p1: Intent?) {
+
+        p0!!
+        val cm = p0.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        if (cm.activeNetworkInfo != null && cm.activeNetworkInfo!!.isConnected) {
+            println("info: " + cm.activeNetworkInfo!!.detailedState.toString())
+
+            //TODO: multiple transports
+            var isWifi = cm.activeNetworkInfo!!.type == ConnectivityManager.TYPE_WIFI
+            if (isWifi) {
+                PortForwardApplication.ShowToast("Is Connected Wifi", Toast.LENGTH_LONG)
+            }
+
+            var isData = cm.activeNetworkInfo!!.type == ConnectivityManager.TYPE_MOBILE
+            if (isData) {
+                PortForwardApplication.ShowToast("Is Connected Data", Toast.LENGTH_LONG)
+            }
+
+            //networkInfo = connectivityManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            //if (networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected()) return networkInfo;
+
+//            if (info.IsConnected) {
+//                PortForwardApplication.ShowToast("Is Connected", Toast.LENGTH_LONG)
+//                SeekerApplication.ShowToast("Is Connected Wifi", ToastLength.Long)
+//            }
+//            info = cm.GetNetworkInfo(ConnectivityType.Mobile)
+//            if (info.IsConnected) {
+//                SeekerApplication.ShowToast("Is Connected Mobile", ToastLength.Long)
+//            }
+//        } else {
+//            if (cm.activeNetworkInfo != null) {
+//                MainActivity.LogDebug("info: " + cm.ActiveNetworkInfo.GetDetailedState().ToString())
+//                SeekerApplication.ShowToast("Is Disconnected", ToastLength.Long)
+//            } else {
+//                MainActivity.LogDebug("info: Is Disconnected(null)")
+//                SeekerApplication.ShowToast("Is Disconnected (null)", ToastLength.Long)
+//            }
+//        }
+        }
     }
 }
+
+enum class NetworkType(val networkType: String) {
+    NONE("None"),
+    WIFI("Wifi"),
+    DATA("Data");
+}
+
 
 class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteService)
 {

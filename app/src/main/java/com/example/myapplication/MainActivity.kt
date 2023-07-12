@@ -6,6 +6,7 @@ package com.example.myapplication
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -15,7 +16,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,8 +45,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -71,8 +69,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -122,14 +122,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
-import org.fourthline.cling.model.meta.RemoteDeviceIdentity
-import java.net.Inet4Address
 import java.net.InetAddress
-import java.net.NetworkInterface
-import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Collections
 import kotlin.random.Random
 
 
@@ -144,6 +139,10 @@ class PortForwardApplication : Application() {
 
         super.onCreate()
         PortForwardApplication.appContext = applicationContext
+        this.registerReceiver(
+            ConnectionReceiver(),
+            IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
+        )
     }
 
     companion object {
@@ -152,6 +151,30 @@ class PortForwardApplication : Application() {
 //        lateinit var showPopup : MutableState<Boolean>
         lateinit var currentSingleSelectedObject : MutableState<Any?>
         var PaddingBetweenCreateNewRuleRows = 4.dp
+
+        fun ShowToast( msg : String,  toastLength : Int)
+        {
+            if(PortForwardApplication.CurrentActivity == null)
+            {
+
+            }
+            else
+            {
+                PortForwardApplication.CurrentActivity.runOnUiThread { Toast.makeText(PortForwardApplication.CurrentActivity, msg, toastLength).show(); }
+            }
+        }
+    }
+
+
+}
+
+enum class Protocol(val protocol: String) {
+    TCP("TCP"),
+    UDP("UDP"),
+    BOTH("BOTH");
+    fun str() : String
+    {
+        return protocol
     }
 }
 
@@ -200,55 +223,9 @@ class MainActivity : ComponentActivity() {
     var upnpElementsViewModel = UPnPElementViewModel()
     var searchInProgressJob : Job? = null
 
-    fun getConnectionType(context: Context): Int {
-        var result = 0 // Returns connection type. 0: none; 1: mobile data; 2: wifi
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            cm.getNetworkCapabilities(cm.activeNetwork)?.run {
-                when {
-                    hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
-                        result = 2
-                    }
-                    hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
-                        result = 1
-                    }
-                    else -> {
-                        result = 0
-                    }
-                }
-            }
-        } else {
-            cm.activeNetworkInfo?.run {
-                when (type) {
-                    ConnectivityManager.TYPE_WIFI -> {
-                        result = 2
-                    }
-                    ConnectivityManager.TYPE_MOBILE -> {
-                        result = 1
-                    }
-                    else -> {
-                        result = 0
-                    }
-                }
-            }
-        }
-        return result
-    }
 
-    fun getLocalIpAddress(): String? {
-        try {
-            for (networkInterface in Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                for (inetAddress in Collections.list(networkInterface.inetAddresses)) {
-                    if (!inetAddress.isLoopbackAddress && inetAddress is Inet4Address) {
-                        return inetAddress.hostAddress
-                    }
-                }
-            }
-        } catch (ex: SocketException) {
-            Log.e("IP Address", "Failed getting IP address", ex)
-        }
-        return null
-    }
+
+
 
 
 
@@ -257,25 +234,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);
 
-        getConnectionType(this)
-        getLocalIpAddress()
+        PortForwardApplication.CurrentActivity = this
 
-        var wm : WifiManager = (this.applicationContext.getSystemService(Context.WIFI_SERVICE)) as WifiManager;
-        if (wm.wifiState == WifiManager.WIFI_STATE_DISABLED) //if just mobile is on and wifi is off.
-        {
-            //wifi is disabled.
-        }
-
-
-
-        // SupplicantState.UNINITIALIZED == off as well.
-        if (wm.connectionInfo.supplicantState == SupplicantState.DISCONNECTED || wm.connectionInfo.ipAddress == 0)
-        {
-            //wifi is disabled.
-            //return;
-        }
-        var ipAddressString = android.text.format.Formatter.formatIpAddress(wm.connectionInfo.ipAddress);
-
+        //getConnectionType(this)
+        //getLocalIpAddress()
 
         //android router set wifi enabled
 
@@ -298,6 +260,7 @@ class MainActivity : ComponentActivity() {
                 mainSearchInProgress.value = false
             }
         }
+
         var searchStarted = UpnpManager.Search(true) // by default STAll
         //var refreshState = mutableStateOf(false)
 
@@ -435,12 +398,8 @@ class MainActivity : ComponentActivity() {
                         {
 
                             val boxHeight = with(LocalDensity.current) { constraints.maxHeight.toDp() }
-                            val offset = boxHeight * 0.35f
 
-                            if(mainSearchInProgress.value)
-                            {
-                                LoadingIcon("Searching for devices", Modifier.offset(y = offset))
-                            }
+
 
                             Column(
                                 Modifier
@@ -451,8 +410,39 @@ class MainActivity : ComponentActivity() {
 //                                    {
 //                                        Text("test")
 //                                    }
+                                if(mainSearchInProgress.value)
+                                {
+                                    val offset = boxHeight * 0.28f
+                                    LoadingIcon("Searching for devices", Modifier.offset(y = offset))
+                                }
+                                else if(UpnpManager.IGDDevices.isEmpty())
+                                {
+                                    val offset = boxHeight * 0.28f
+                                    Column(modifier = Modifier.offset(y = offset))
+                                    {
+                                        Text("No UPnP enabled internet gateway devices found.",
+                                            modifier = Modifier.padding(0.dp, 10.dp)
+                                                .align(Alignment.CenterHorizontally),
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text("Network Info: Data",
+                                            modifier = Modifier.padding(0.dp, 10.dp)
+                                                .align(Alignment.CenterHorizontally),
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text("Switch to WiFi and search again",
+                                            modifier = Modifier.padding(0.dp, 10.dp)
+                                                .align(Alignment.CenterHorizontally),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                                else
+                                {
+                                    ConversationEntryPoint(upnpElementsViewModel)
+                                }
 
-                                ConversationEntryPoint(upnpElementsViewModel)
+
 //                                MyScreen(viewModel)
 //                                Greeting("Android")
 //                                Text("hello")
@@ -746,7 +736,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
     val leaseDuration = remember { mutableStateOf("0") }
     val description = remember { mutableStateOf("") }
 
-    var (ourIp, ourGatewayIp) = if (isPreview) Pair<String, String>("192.168.0.1","") else OurNetworkInfo.GetLocalAndGatewayIpAddr(
+    var (ourIp, ourGatewayIp) = if (isPreview) Pair<String, String>("192.168.0.1","") else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
         PortForwardApplication.appContext,
         false
     )
@@ -926,7 +916,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 //                        }
 //                    }
 
-                    var selectedProtocolMutable = remember { mutableStateOf("TCP") }
+                    var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
                     var selectedPort by selectedProtocolMutable
 
                     Row(
@@ -939,7 +929,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
                         DropDownOutline(defaultModifier,//Size(500f, textfieldSize.height),
                             selectedText = selectedProtocolMutable,
-                            suggestions = listOf("TCP", "UDP", "Both"),
+                            suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
                             "Protocol")
 
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1615,7 +1605,7 @@ fun LoadingIcon(label : String, modifier : Modifier)
             .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
         Text("Searching for devices", modifier = Modifier
             .align(Alignment.CenterHorizontally)
-            .padding(0.dp, 16.dp, 0.dp, 0.dp))
+            .padding(0.dp, 30.dp, 0.dp, 0.dp))
     }
 
 }
