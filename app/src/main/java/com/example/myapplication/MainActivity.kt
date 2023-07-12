@@ -268,7 +268,7 @@ class MainActivity : ComponentActivity() {
         if (wm.connectionInfo.supplicantState == SupplicantState.DISCONNECTED || wm.connectionInfo.ipAddress == 0)
         {
             //wifi is disabled.
-            return;
+            //return;
         }
         var ipAddressString = android.text.format.Formatter.formatIpAddress(wm.connectionInfo.ipAddress);
 
