@@ -55,7 +55,7 @@ class LogViewActivity : ComponentActivity() {
                             colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                             title = {
                                 Text(
-                                    text = "Settings",
+                                    text = "Logs",
                                     color = AdditionalColors.TextColorStrong,
                                     fontWeight = FontWeight.Normal
                                 )
