@@ -96,6 +96,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.toLowerCase
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
@@ -110,13 +111,16 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.example.myapplication.OurNetworkInfo.Companion.GetTypeFromInterfaceName
 import com.example.myapplication.ui.theme.AdditionalColors
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.net.InetAddress
 import java.nio.ByteBuffer
@@ -127,6 +131,23 @@ import kotlin.random.Random
 //object UpnpManager {
 //    va UpnpService? : UpnpService = null
 //}
+
+fun test1()
+{
+    // gets blocked for the duration of the call, until all the coroutines inside runBlocking { ... } complete their execution
+    // launch is declared only in the coroutine scope
+    runBlocking { // this: CoroutineScope this also causes it to wait for the other async coroutine to be done
+        launch {
+            extracted()
+        }
+        println("Hello") // main coroutine continues while a previous one is delayed
+    }
+}
+
+suspend fun extracted() {
+    delay(4000L) // non-blocking delay for 1 second (default time unit is ms)
+    println("World!") // print after delay
+}
 
 class PortForwardApplication : Application() {
 
@@ -139,24 +160,30 @@ class PortForwardApplication : Application() {
             ConnectionReceiver(),
             IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
         )
+
+        var test = NetworkType.DATA.toString()
+
+        //test1()
+        println("done")
     }
 
     companion object {
         lateinit var appContext: Context
-        lateinit var CurrentActivity: ComponentActivity
+        var CurrentActivity: ComponentActivity? = null
 //        lateinit var showPopup : MutableState<Boolean>
         lateinit var currentSingleSelectedObject : MutableState<Any?>
         var PaddingBetweenCreateNewRuleRows = 4.dp
 
         fun ShowToast( msg : String,  toastLength : Int)
         {
-            if(PortForwardApplication.CurrentActivity == null)
-            {
-
-            }
-            else
-            {
-                PortForwardApplication.CurrentActivity.runOnUiThread { Toast.makeText(PortForwardApplication.CurrentActivity, msg, toastLength).show(); }
+            GlobalScope.launch(Dispatchers.Main) {
+                PortForwardApplication.CurrentActivity?.runOnUiThread {
+                    Toast.makeText(
+                        PortForwardApplication.appContext,
+                        msg,
+                        toastLength
+                    ).show();
+                }
             }
         }
     }
@@ -179,6 +206,7 @@ class MainActivity : ComponentActivity() {
 
     fun deviceFoundHandler(remoteDevice: IGDDevice) {
         runOnUiThread {
+            mainSearchInProgressAndNothingFoundYet?.value = false
             upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice)) // calls LiveData.setValue i.e. must be done on UI thread
         }
     }
@@ -195,6 +223,20 @@ class MainActivity : ComponentActivity() {
         {
             runOnUiThread {
                 upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice, true)) // calls LiveData.setValue i.e. must be done on UI thread
+            }
+        }
+    }
+
+    fun searchStarted(o : Any?)
+    {
+        runOnUiThread {
+            mainSearchInProgressAndNothingFoundYet!!.value = true
+            searchInProgressJob?.cancel() // cancel old search timer
+            if (mainSearchInProgressAndNothingFoundYet!!.value) {
+                searchInProgressJob = GlobalScope.launch {
+                    delay(20000) //TODO change back to 6s or less
+                    mainSearchInProgressAndNothingFoundYet!!.value = false
+                }
             }
         }
     }
@@ -223,7 +265,7 @@ class MainActivity : ComponentActivity() {
 
 
 
-
+    var mainSearchInProgressAndNothingFoundYet : MutableState<Boolean>? = null
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -231,7 +273,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState);
 
         PortForwardApplication.CurrentActivity = this
-
+        //OurNetworkInfo.GetNameTypeMappings(this)
         //getConnectionType(this)
         //getLocalIpAddress()
 
@@ -242,22 +284,23 @@ class MainActivity : ComponentActivity() {
 //        var result = future.get()
 
         //AndroidRouter().enableWiFi()
-        UpnpManager.Initialize()
+        var success = UpnpManager.Initialize(this, false)
+        // TODO: if we were previously destroyed we need to update the ui from data again
         UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
         UpnpManager.PortFoundEvent += ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
         UpnpManager.UpdateUIFromData += ::updateUIFromData
+        UpnpManager.SearchStarted += ::searchStarted
 
-        var mainSearchInProgress = mutableStateOf(!UpnpManager.HasSearched)
-        if(mainSearchInProgress.value)
+        if (UpnpManager.FailedToInitialize)
         {
-            searchInProgressJob = GlobalScope.launch {
-                delay(6000)
-                mainSearchInProgress.value = false
-            }
+            mainSearchInProgressAndNothingFoundYet = mutableStateOf(false)
         }
-
-        var searchStarted = UpnpManager.Search(true) // by default STAll
+        else
+        {
+            mainSearchInProgressAndNothingFoundYet = mutableStateOf(!UpnpManager.HasSearched)
+            var searchStarted = UpnpManager.Search(true) // by default STAll
+        }
         //var refreshState = mutableStateOf(false)
 
 
@@ -332,22 +375,23 @@ class MainActivity : ComponentActivity() {
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 onClick = {
 
-                                    //showDialog = true
+                                    showDialog = true
 
-                                    coroutineScope.launch {
-                                        println("show snackbar")
-                                        var snackbarResult = snackbarHostState.showSnackbar(
-                                            "testing",
-                                            "action",
-                                            true,
-                                            SnackbarDuration.Indefinite
-                                        )
-                                        println("shown")
-                                        when (snackbarResult) {
-                                            SnackbarResult.Dismissed -> TODO()
-                                            SnackbarResult.ActionPerformed -> TODO()
-                                        }
-                                    }
+                                    //this works
+//                                    coroutineScope.launch {
+//                                        println("show snackbar")
+//                                        var snackbarResult = snackbarHostState.showSnackbar(
+//                                            "testing",
+//                                            "action",
+//                                            true,
+//                                            SnackbarDuration.Indefinite
+//                                        )
+//                                        println("shown")
+//                                        when (snackbarResult) {
+//                                            SnackbarResult.Dismissed -> TODO()
+//                                            SnackbarResult.ActionPerformed -> TODO()
+//                                        }
+//                                    }
 
                                 }) {
                                 Icon(
@@ -410,7 +454,7 @@ class MainActivity : ComponentActivity() {
 //                                    {
 //                                        Text("test")
 //                                    }
-                                if(mainSearchInProgress.value)
+                                if(mainSearchInProgressAndNothingFoundYet!!.value)
                                 {
                                     val offset = boxHeight * 0.28f
                                     LoadingIcon("Searching for devices", Modifier.offset(y = offset))
@@ -420,21 +464,75 @@ class MainActivity : ComponentActivity() {
                                     val offset = boxHeight * 0.28f
                                     Column(modifier = Modifier.offset(y = offset))
                                     {
-                                        Text("No UPnP enabled internet gateway devices found.",
+                                        Text("No UPnP enabled internet gateway devices found",
                                             modifier = Modifier.padding(0.dp, 10.dp)
                                                 .align(Alignment.CenterHorizontally),
                                             textAlign = TextAlign.Center
                                         )
-                                        Text("Network Info: Data",
+
+                                        var interfacesUsedInSearch =
+                                            (UpnpManager.GetUPnPService().configuration as AndroidConfig).NetworkInterfacesUsedInfos
+                                        var anyInterfaces = UpnpManager.GetUPnPService().router.isEnabled
+                                        if(!anyInterfaces)
+                                        {
+                                            Text(
+                                                "No valid interfaces",
+                                                modifier = Modifier.padding(0.dp, 10.dp)
+                                                    .align(Alignment.CenterHorizontally),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                        else {
+
+                                            Text(
+                                                "Interfaces Searched:",
+                                                modifier = Modifier.padding(0.dp, 10.dp, 0.dp, 0.dp)
+                                                    .align(Alignment.CenterHorizontally),
+                                                textAlign = TextAlign.Center
+                                            )
+
+
+                                            for (interfaceUsed in interfacesUsedInSearch!!) {
+                                                Text(
+                                                    "${interfaceUsed.first.displayName} (${interfaceUsed.second.networkTypeString.lowercase()})",
+                                                    modifier = Modifier.padding(0.dp, 0.dp)
+                                                        .align(Alignment.CenterHorizontally),
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+
+                                        // if no wifi
+                                        if(interfacesUsedInSearch == null ||
+                                            !interfacesUsedInSearch!!.any {it.second == NetworkType.WIFI})
+                                        {
+                                            Text(
+                                                "Enable WiFi and retry",
+                                                modifier = Modifier.padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                    .align(Alignment.CenterHorizontally),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                        else
+                                        {
+                                            Text(
+                                                "Ensure a valid UPnP enabled internet gateway device is on the network and retry",
+                                                modifier = Modifier.padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                    .align(Alignment.CenterHorizontally),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                        Button(
+                                            onClick = {
+                                                UpnpManager.Initialize(PortForwardApplication.appContext,true)
+                                                UpnpManager.Search(false)
+                                            },
                                             modifier = Modifier.padding(0.dp, 10.dp)
                                                 .align(Alignment.CenterHorizontally),
-                                            textAlign = TextAlign.Center
-                                        )
-                                        Text("Switch to WiFi and search again",
-                                            modifier = Modifier.padding(0.dp, 10.dp)
-                                                .align(Alignment.CenterHorizontally),
-                                            textAlign = TextAlign.Center
-                                        )
+                                            shape = RoundedCornerShape(4),
+                                        ) {
+                                            Text("Retry", color = AdditionalColors.TextColorStrong)
+                                        }
                                     }
                                 }
                                 else
@@ -1234,6 +1332,7 @@ fun OverflowMenu(showDialog : MutableState<Boolean>) {
             }
         }
         items.add("View Log")
+        items.add("Settings")
         items.add("About")
         items.forEach { label ->
             DropdownMenuItem(text = { Text(label) }, onClick = {
@@ -1241,7 +1340,11 @@ fun OverflowMenu(showDialog : MutableState<Boolean>) {
                 expanded = false
 
                 when (label) {
-                    "Refresh" -> {println("Item 1 pressed")}
+                    "Refresh" ->
+                    {
+                        UpnpManager.Initialize(PortForwardApplication.appContext,true)
+                        UpnpManager.Search(false)
+                    }
                     "Disable All" ->
                     {
                         enableDisableAll(false)
@@ -1252,14 +1355,66 @@ fun OverflowMenu(showDialog : MutableState<Boolean>) {
                     }
                     "Delete All" ->
                     {
-
+                        deleteAll()
                     }
-                    "View Log" -> {println("Item 1 pressed")}
-                    "About" -> {println("Item 1 pressed")}
+                    "View Log" ->
+                    {
+                        println("Item 1 pressed")
+                    }
+                    "Settings" ->
+                    {
+                        println("Item 1 pressed")
+                    }
+                    "About" ->
+                    {
+                        println("Item 1 pressed")
+                    }
                 }
             })
         }
     }
+}
+
+fun deleteAll()
+{
+    fun batchCallback(result : MutableList<UPnPResult?>) {
+
+        RunUIThread {
+
+            //debug
+            for (res in result)
+            {
+                res!!
+                print(res.Success)
+                print(res.FailureReason)
+                print(res.RequestInfo?.Description)
+            }
+
+            var anyFailed = result.any {!it?.Success!!}
+
+            if(anyFailed) {
+                var res = result[0]
+                res!!
+                Toast.makeText(
+                    PortForwardApplication.appContext,
+                    "Failure - ${res.FailureReason!!}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            else
+            {
+                Toast.makeText(
+                    PortForwardApplication.appContext,
+                    "Success",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    // get all enabled
+    var rules = UpnpManager.GetAllRules();
+    UpnpManager.DeletePortMappingsEntry(rules, ::batchCallback)
 }
 
 fun enableDisableAll(enable : Boolean)
@@ -1299,9 +1454,8 @@ fun enableDisableAll(enable : Boolean)
         }
     }
 
-    // get all enabled
-    var rules = UpnpManager.GetEnabledDisabledRules(enable);
-    UpnpManager.DisableEnablePortMappingEntries(rules, !enable, ::batchCallback)
+    var rules = UpnpManager.GetEnabledDisabledRules(!enable);
+    UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
 }
 
 fun formatIpv4(ipAddr : Int) : String
@@ -1736,14 +1890,14 @@ fun NoMappingsCard()
                 },
             elevation = CardDefaults.cardElevation(),
             colors = CardDefaults.cardColors(
-                containerColor = AdditionalColors.CardSurfaceNoMappings,
+                containerColor = AdditionalColors.CardContainerColor,
             ),
 
             ) {
 
             Row(
                 modifier = Modifier
-                    .padding(15.dp, 20.dp),//.background(Color(0xffc5dceb)),
+                    .padding(15.dp, 36.dp),//.background(Color(0xffc5dceb)),
                 //.background(MaterialTheme.colorScheme.secondaryContainer),
                 verticalAlignment = Alignment.CenterVertically
 
@@ -1751,7 +1905,9 @@ fun NoMappingsCard()
                 Column(modifier = Modifier.weight(1f)) {
 
 
-
+                    // this one is awkward if one intentionally removes all port mappings
+                    //var deviceHasNoPortMappings = "No port mappings found \nfor this device"
+                    var deviceHasNoPortMappings = "Device has no UPnP port mappings"
 
                     Text(
                         "No port mappings found \nfor this device",
@@ -1760,7 +1916,8 @@ fun NoMappingsCard()
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
                             .padding(0.dp, 0.dp, 0.dp, 8.dp),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        color = AdditionalColors.TextColor
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1769,18 +1926,19 @@ fun NoMappingsCard()
                     ) {
                         Text(
                             text = "Tap ",
-
+                            color = AdditionalColors.TextColor
                             //color = MaterialTheme.colors.onSurface
                         )
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add icon",
+                            tint = AdditionalColors.TextColor
                             //tint = MaterialTheme.colors.secondary
                         )
                         Text(
                             text = " to add new rules",
                             //style = MaterialTheme.typography.body1,
-                            //color = MaterialTheme.colors.onSurface
+                            color = AdditionalColors.TextColor
                         )
                     }
 //                    Text("${portMapping.LocalIP}")

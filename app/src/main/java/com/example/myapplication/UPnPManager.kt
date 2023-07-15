@@ -4,13 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
+import org.fourthline.cling.android.AndroidNetworkAddressFactory
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
 import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
 import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
@@ -23,9 +26,11 @@ import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
+import org.fourthline.cling.transport.spi.NetworkAddressFactory
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
+
 
 class UpnpManager {
 
@@ -82,6 +87,7 @@ class UpnpManager {
         // used if we finish and there are no ports to show the "no devices" card
         var FinishedListingPortsEvent = Event<IGDDevice>()
         var UpdateUIFromData = Event<Any?>()
+        var SearchStarted = Event<Any?>()
         var NetworkInfoAtTimeOfSearch : OurNetworkInfoBundle? = null
 
         fun Search(onlyIfNotYetSearched : Boolean) : Boolean
@@ -90,6 +96,7 @@ class UpnpManager {
             {
                 return false
             }
+            SearchStarted?.invoke(null)
             ClearOldData()
             NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
             HasSearched = true
@@ -219,7 +226,7 @@ class UpnpManager {
 
                     fun callback(result: UPnPCreateMappingResult) {
 
-                        defaultRuleAddedCallback(result)
+                        enableDisableDefaultCallback(result)
                         listOfResults[i] = result
                     }
 
@@ -236,19 +243,43 @@ class UpnpManager {
             return task // a FutureTask is a Future
         }
 
-        fun Initialize()
+        var FailedToInitialize : Boolean = false
+
+        fun Initialize(context : Context, force : Boolean) : Boolean
         {
-            if(_initialized)
+            if(_initialized && !force)
             {
-                return
+                return true
             }
 
-            class AndroidConfig : AndroidUpnpServiceConfiguration() {
-                override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder {
-                    return UDA10ServiceDescriptorBinderImpl()
-                }
+//            class AndroidNetworkFactory2(streamListenPort : Int) : AndroidNetworkAddressFactory(streamListenPort)
+//            {
+//                @Throws(InitializationException::class)
+//                override fun discoverNetworkInterfaces() {
+//                    try {
+//
+////                        val prop: LinkProperties = manager.getLinkProperties(network)
+////                        val iface = NetworkInterface.getByName(prop.interfaceName)
+//
+//                        super.discoverNetworkInterfaces()
+//                    } catch (ex: java.lang.Exception) {
+//                        // TODO: ICS bug on some models with network interface disappearing while enumerated
+//                        // http://code.google.com/p/android/issues/detail?id=33661
+//                        //log.warning("Exception while enumerating network interfaces, trying once more: $ex")
+//                        super.discoverNetworkInterfaces()
+//                    }
+//                }
+//            }
+
+
+            _upnpService = UpnpServiceImpl(AndroidConfig(context))
+            // initialization failed. no point in trying as even if we later get service, we
+            //   do not re-intialize automatically
+            FailedToInitialize = !(_upnpService!!.router.isEnabled)
+            if(FailedToInitialize)
+            {
+                return false
             }
-            _upnpService = UpnpServiceImpl(AndroidConfig())
 
             // Add a listener for device registration events
             _upnpService!!.registry?.addListener(object : RegistryListener {
@@ -341,10 +372,11 @@ class UpnpManager {
             });
 
             _initialized = true
+            return true
         }
 
         fun AddDevice(igdDevice: IGDDevice) {
-            AnyIgdDevices?.value = true
+            AnyIgdDevices?.value = true //Reading a state that was created after the snapshot was taken or in a snapshot that has not yet been applied
             synchronized(lockIgdDevices)
             {
                 IGDDevices.add(igdDevice)
@@ -402,7 +434,7 @@ class UpnpManager {
         // returns anyEnabled, anyDisabled
         fun GetEnabledDisabledRules(enabledRules : Boolean) : MutableList<PortMapping>
         {
-            var enablePortMapping : MutableList<PortMapping> = mutableListOf();
+            var enableDisabledPortMappings : MutableList<PortMapping> = mutableListOf();
             synchronized(lockIgdDevices)
             {
                 for (device in IGDDevices)
@@ -411,12 +443,25 @@ class UpnpManager {
                     {
                         if(portMapping.Enabled == enabledRules)
                         {
-                            enablePortMapping.add(portMapping)
+                            enableDisabledPortMappings.add(portMapping)
                         }
                     }
                 }
             }
-            return enablePortMapping
+            return enableDisabledPortMappings
+        }
+
+        fun GetAllRules() : MutableList<PortMapping>
+        {
+            var allRules : MutableList<PortMapping> = mutableListOf();
+            synchronized(lockIgdDevices)
+            {
+                for (device in IGDDevices)
+                {
+                    allRules.addAll(device.portMappings)
+                }
+            }
+            return allRules
         }
 
         var IGDDevices : MutableList<IGDDevice> = mutableListOf()
@@ -528,18 +573,16 @@ class UpnpManager {
             }
         }
 
+        // DeletePortMappingRange is only available in v2.0 (also it can only delete
+        //   a contiguous range)
         fun DeletePortMappingEntry(portMapping : PortMapping) : Future<Any>
         {
 
             fun callback(result : UPnPResult) {
-
+                defaultRuleDeletedCallback(result)
                 RunUIThread {
                     println("delete callback")
                     if (result.Success!!) {
-                        var device =
-                            UpnpManager.getIGDDevice(portMapping.ActualExternalIP)
-                        device.portMappings.remove(portMapping)
-                        UpnpManager.UpdateUIFromData.invoke(null)
                         Toast.makeText(
                             PortForwardApplication.appContext,
                             "Success",
@@ -560,6 +603,38 @@ class UpnpManager {
             return future
         }
 
+        fun DeletePortMappingsEntry(portMappings : MutableList<PortMapping>,
+                                    onCompleteBatchCallback: (MutableList<UPnPResult?>) -> Unit) : Future<MutableList<PortMapping>>
+        {
+            val callable = Callable {
+
+                var listOfResults: MutableList<UPnPResult?> =
+                    MutableList(portMappings.size) { null }
+
+                for (i in 0 until portMappings.size) {
+
+                    fun callback(result: UPnPResult) {
+
+                        defaultRuleDeletedCallback(result)
+                        listOfResults[i] = result
+                    }
+
+                    var future = DeletePortMapping(portMappings[i], ::callback)
+                    future.get()
+                }
+
+                onCompleteBatchCallback(listOfResults)
+
+                portMappings
+            }
+
+            val task = FutureTask(callable)
+            Thread(task).start()
+            return task // a FutureTask is a Future
+        }
+
+        //TODO: if List all port mappings exists, that should be used instead of getgeneric.
+
         fun DeletePortMapping(portMapping : PortMapping, callback : (UPnPResult) -> Unit) : Future<Any>
         {
             var device : IGDDevice = getIGDDevice(portMapping.ExternalIP)
@@ -576,6 +651,7 @@ class UpnpManager {
                     println("Successfully deleted")
 
                     var result = UPnPResult(true)
+                    result.RequestInfo = portMapping
                     callback(result)
 
                 }
@@ -698,6 +774,22 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
     }
 }
 
+fun defaultRuleDeletedCallback(result : UPnPResult) {
+    println("default adding rule callback")
+    if (result.Success!!)
+    {
+        result.RequestInfo!!
+        var device =
+            UpnpManager.getIGDDevice(result.RequestInfo!!.ActualExternalIP)
+        device.portMappings.remove(result.RequestInfo)
+        UpnpManager.UpdateUIFromData.invoke(null)
+    }
+    else
+    {
+
+    }
+}
+
 
 data class PortMappingUserInput(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
 {
@@ -769,6 +861,7 @@ open class UPnPResult constructor(success : Boolean)
     var Success : Boolean
     var FailureReason : String? = null
     var UPnPFailureResponse : UpnpResponse? = null
+    var RequestInfo : PortMapping? = null
 
     init
     {
@@ -781,20 +874,16 @@ data class OurNetworkInfoBundle(val networkType: NetworkType, val ourIp: String?
 class OurNetworkInfo {
     companion object { //singleton
 
-        var retrieved : Boolean = false
-        var ourIp : String? = null
-        var gatewayIp : String? = null
-        var networkType : NetworkType? = null
+        var retrieved: Boolean = false
+        var ourIp: String? = null
+        var gatewayIp: String? = null
+        var networkType: NetworkType? = null
 
-        fun GetNetworkInfo(context: Context, forceRefresh : Boolean) : OurNetworkInfoBundle
-        {
+        fun GetNetworkInfo(context: Context, forceRefresh: Boolean): OurNetworkInfoBundle {
             GetConnectionType(context, forceRefresh)
-            if(networkType == NetworkType.WIFI)
-            {
+            if (networkType == NetworkType.WIFI) {
                 GetLocalAndGatewayIpAddrWifi(context, forceRefresh)
-            }
-            else
-            {
+            } else {
                 ourIp = null
                 gatewayIp = null
             }
@@ -802,13 +891,16 @@ class OurNetworkInfo {
             return OurNetworkInfoBundle(networkType!!, ourIp, gatewayIp)
         }
 
-        fun GetLocalAndGatewayIpAddrWifi(context: Context, forceRefresh : Boolean): Pair<String?,String?> {
-            if(!forceRefresh && retrieved)
-            {
+        fun GetLocalAndGatewayIpAddrWifi(
+            context: Context,
+            forceRefresh: Boolean
+        ): Pair<String?, String?> {
+            if (!forceRefresh && retrieved) {
                 return Pair(ourIp, gatewayIp)
             }
 
-            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val wifiManager =
+                context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             var ipAddress = wifiManager.connectionInfo.ipAddress
 
             //var macAddress = wifiManager.connectionInfo.macAddress
@@ -848,53 +940,112 @@ class OurNetworkInfo {
 //    }
 //    return null
         }
-        fun GetConnectionType(context: Context, forceRefresh : Boolean): NetworkType {
 
-            if(!forceRefresh && networkType != null)
+        fun GetNameTypeMappings(context: Context) : MutableMap<String, NetworkType> {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            var mappings : MutableMap<String, NetworkType> = mutableMapOf<String, NetworkType>()
+            for (net1 in cm.getAllNetworks()) {
+                var netInfo = cm.getNetworkInfo(net1)
+                var name = cm.getLinkProperties(net1)?.interfaceName
+                if(name == null)
+                {
+                    continue
+                }
+                var type = getNetworkType(cm, net1, netInfo)
+                mappings[name] = type
+            }
+            return mappings
+        }
+
+        fun GetTypeFromInterfaceName(_mappings : MutableMap<String, NetworkType>?, interfaceName : String) : NetworkType
+        {
+            var mappings = _mappings
+            if (mappings == null)
             {
+                mappings = GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
+            }
+            mappings
+            if (mappings.containsKey(interfaceName))
+            {
+                return mappings[interfaceName] ?: NetworkType.NONE
+            }
+            else {
+                if (interfaceName.contains("wlan"))
+                {
+                    return NetworkType.WIFI
+                }
+                else if(interfaceName.contains("rmnet") || interfaceName.contains("data"))
+                {
+                    return NetworkType.DATA
+                }
+            }
+            return NetworkType.NONE
+        }
+
+        fun GetConnectionType(context: Context, forceRefresh: Boolean): NetworkType {
+
+            if (!forceRefresh && networkType != null) {
                 return networkType!!
             }
 
-            var result = NetworkType.NONE
+
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+
+            //get type
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+            {
+                networkType = getNetworkType(cm, cm.activeNetwork, cm.activeNetworkInfo)
+            }
+            else
+            {
+                networkType = getNetworkType(cm, null, cm.activeNetworkInfo)
+            }
+            return networkType as NetworkType
+        }
+
+        fun getNetworkType(cm: ConnectivityManager, network : Network?, networkInfo : NetworkInfo?) : NetworkType {
+            var result = NetworkType.NONE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                cm.getNetworkCapabilities(cm.activeNetwork)?.run {
+                cm.getNetworkCapabilities(network)?.run {
                     when {
                         hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
                             result = NetworkType.WIFI
                         }
+
                         hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
                             result = NetworkType.DATA
                         }
+
                         else -> {
                             result = NetworkType.NONE
                         }
                     }
                 }
             } else {
-                cm.activeNetworkInfo?.run {
+                networkInfo?.run {
                     when (type) {
                         ConnectivityManager.TYPE_WIFI -> {
                             result = NetworkType.WIFI
                         }
+
                         ConnectivityManager.TYPE_MOBILE -> {
                             result = NetworkType.DATA
                         }
+
                         else -> {
                             result = NetworkType.NONE
                         }
                     }
                 }
             }
-            networkType = result
             return result
         }
 
-
     }
 
-
-//    fun getLocalIpAddress(): String? {
+    // java.net.networkinterface does not have .type etc.
+//    fun test1(): String? {
 //        try {
 //            for (networkInterface in Collections.list(NetworkInterface.getNetworkInterfaces())) {
 //                for (inetAddress in Collections.list(networkInterface.inetAddresses)) {
@@ -955,10 +1106,14 @@ class ConnectionReceiver : BroadcastReceiver() {
     }
 }
 
-enum class NetworkType(val networkType: String) {
+enum class NetworkType(val networkTypeString: String) {
     NONE("None"),
     WIFI("Wifi"),
     DATA("Data");
+
+    override fun toString(): String {
+        return networkTypeString
+    }
 }
 
 
@@ -1174,4 +1329,49 @@ class PortMapping constructor(
         this.Description = _Description
         this.ActualExternalIP = _ActionExternalIP
     }
+}
+
+class AndroidConfig(context : Context) : AndroidUpnpServiceConfiguration() {
+
+    var Context : Context
+    init {
+        Context = context
+    }
+
+    override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder {
+        return UDA10ServiceDescriptorBinderImpl()
+    }
+
+    // in case you want to get additional info from initialization
+    // we can then maybe check if they support multicast (i.e. data typically does not)
+    // and throw away.  also we can use connectionmanager to enumerate interfaces
+    // by default this returns new AndroidNetworkAddressFactory
+    // AndroidNetworkAddressFactory has a method discoverNetworkInterfaces() which
+    //   calls the java NetworkInterface.getNetworkInterfaces();
+
+    override fun createNetworkAddressFactory(streamListenPort: Int): NetworkAddressFactory? {
+        //return NetworkAddressFactoryImpl(streamListenPort)
+        var addressFactory = AndroidNetworkAddressFactory(streamListenPort);
+
+        // the final set of usable interfaces and bind addresses
+        var iterator = addressFactory.networkInterfaces
+        val networkInterfaces: MutableList<java.net.NetworkInterface> = ArrayList()
+        while (iterator.hasNext()) {
+            networkInterfaces.add(iterator.next())
+        }
+        NetworkInterfacesUsed = networkInterfaces
+        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(Context)
+
+        NetworkInterfacesUsedInfos = mutableListOf()
+        for (netInterface in networkInterfaces)
+        {
+            NetworkInterfacesUsedInfos?.add(Pair<java.net.NetworkInterface, NetworkType>(netInterface, OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)))
+        }
+
+        return addressFactory
+    }
+
+    var NetworkInterfacesUsed : MutableList<java.net.NetworkInterface>? = null
+    var NetworkMappings : MutableMap<String, NetworkType>? = null
+    var NetworkInterfacesUsedInfos : MutableList<Pair<java.net.NetworkInterface, NetworkType>>? = null
 }

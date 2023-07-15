@@ -52,7 +52,10 @@ object AdditionalColors {
     var Disabled_Red = Color(0xffB23131)
     var OrangePastel = Color(0xfff0d5c2)
     var CardSurface = Color(0xFFC2DDF0) //0xFFC2DDF0
+
+
     var CardSurfaceNoMappings = Color(0xFFC7D1D8)
+
 
     var PrimaryDarkerBlue = Color(0xFF11366B)
     var PrimaryBlue = Color(0xFF3076CC)
