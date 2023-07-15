@@ -1,17 +1,21 @@
 @file:OptIn(ExperimentalMaterialApi::class)
 
-package com.example.myapplication
+package com.shinjiIndustrial.portmanager
 
 
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
-import android.content.IntentFilter
+import android.content.Intent
 import android.content.res.Configuration
-import android.net.ConnectivityManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Spanned
+import android.text.SpannedString
+import android.util.DisplayMetrics
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -51,6 +55,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -65,10 +70,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -88,6 +91,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
@@ -96,7 +100,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.toLowerCase
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
@@ -105,15 +108,16 @@ import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.example.myapplication.OurNetworkInfo.Companion.GetTypeFromInterfaceName
-import com.example.myapplication.ui.theme.AdditionalColors
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.example.myapplication.R
+import com.shinjiIndustrial.portmanager.ui.theme.AdditionalColors
+import com.shinjiIndustrial.portmanager.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -156,10 +160,10 @@ class PortForwardApplication : Application() {
 
         super.onCreate()
         PortForwardApplication.appContext = applicationContext
-        this.registerReceiver(
-            ConnectionReceiver(),
-            IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
-        )
+//        this.registerReceiver(
+//            ConnectionReceiver(),
+//            IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
+//        )
 
         var test = NetworkType.DATA.toString()
 
@@ -234,7 +238,7 @@ class MainActivity : ComponentActivity() {
             searchInProgressJob?.cancel() // cancel old search timer
             if (mainSearchInProgressAndNothingFoundYet!!.value) {
                 searchInProgressJob = GlobalScope.launch {
-                    delay(20000) //TODO change back to 6s or less
+                    delay(6000) //TODO change back to 6s or less
                     mainSearchInProgressAndNothingFoundYet!!.value = false
                 }
             }
@@ -308,8 +312,10 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 // A surface container using the 'background' color from the theme
                 val scrollState = rememberScrollState()
-                var showDialogMutable = remember { mutableStateOf(false) }
-                var showDialog by showDialogMutable //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+                var showAddRuleDialogState = remember { mutableStateOf(false) }
+                var showAboutDialogState = remember { mutableStateOf(false) }
+                var showAddRuleDialog by showAddRuleDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+                var showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
 
 //                var showMainLoading = remember { mutableStateOf(searchStarted) }
 //
@@ -342,9 +348,9 @@ class MainActivity : ComponentActivity() {
                 }
 
 
-                if (showDialog) {
+                if (showAddRuleDialog) {
 
-                    EnterPortDialog(showDialogMutable)
+                    EnterPortDialog(showAddRuleDialogState)
 
 //                    Dialog(onDismissRequest = {
 //                        println("dismiss request")
@@ -354,6 +360,53 @@ class MainActivity : ComponentActivity() {
 //                            Box(modifier = Modifier.background(Color.White)) {
 //                            Text("Hello, Dialog!")
 //                        }
+                }
+                
+                if(showAboutDialog)
+                {
+                    AlertDialog(
+                        onDismissRequest = { showAboutDialogState.value = false },
+                        title = { Text("About") },
+                        text = {
+
+                            Column()
+                            {
+                                var aboutString : String = PortForwardApplication.appContext.getString(R.string.about_body);
+                                var packageInfo = PortForwardApplication.appContext.packageManager.getPackageInfo(PortForwardApplication.appContext.packageName, 0)
+
+                                aboutString = String.format(aboutString, packageInfo.versionName)
+                                var spannedString : Spanned? = null
+                                if (Build.VERSION.SDK_INT >= 24)
+                                {
+                                    spannedString = android.text.Html.fromHtml(aboutString, android.text.Html.FROM_HTML_MODE_LEGACY)
+                                }
+                                else
+                                {
+                                    spannedString = android.text.Html.fromHtml(aboutString)
+                                }
+
+                                // compose doesn't allow spannable nor link movement method
+                                AndroidView(factory = { context ->
+                                    TextView(context).apply {
+                                        setTextColor(AdditionalColors.TextColor.toArgb());
+                                        setTextSize(16f);
+                                        text = spannedString;
+                                        movementMethod = android.text.method.LinkMovementMethod.getInstance()
+                                        // you can apply other TextView properties here
+                                    }
+                                })
+
+                                //Text(aboutString)
+                            }
+
+
+
+                               },
+                        confirmButton = {
+                            Button(onClick = { showAboutDialogState.value = false}) {
+                                Text("OK")
+                            }
+                        })
                 }
 
 
@@ -375,7 +428,7 @@ class MainActivity : ComponentActivity() {
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 onClick = {
 
-                                    showDialog = true
+                                    showAddRuleDialog = true
 
                                     //this works
 //                                    coroutineScope.launch {
@@ -407,7 +460,7 @@ class MainActivity : ComponentActivity() {
 //                                modifier = Modifier.height(40.dp),
                             colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                             title = { Text(text = "Port Pilot", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
-                            actions = { OverflowMenu(showDialogMutable) }
+                            actions = { OverflowMenu(showAddRuleDialogState, showAboutDialogState) }
                         )
                     },
                     content = {it  ->
@@ -465,7 +518,8 @@ class MainActivity : ComponentActivity() {
                                     Column(modifier = Modifier.offset(y = offset))
                                     {
                                         Text("No UPnP enabled internet gateway devices found",
-                                            modifier = Modifier.padding(0.dp, 10.dp)
+                                            modifier = Modifier
+                                                .padding(0.dp, 10.dp)
                                                 .align(Alignment.CenterHorizontally),
                                             textAlign = TextAlign.Center
                                         )
@@ -477,7 +531,8 @@ class MainActivity : ComponentActivity() {
                                         {
                                             Text(
                                                 "No valid interfaces",
-                                                modifier = Modifier.padding(0.dp, 10.dp)
+                                                modifier = Modifier
+                                                    .padding(0.dp, 10.dp)
                                                     .align(Alignment.CenterHorizontally),
                                                 textAlign = TextAlign.Center
                                             )
@@ -486,7 +541,8 @@ class MainActivity : ComponentActivity() {
 
                                             Text(
                                                 "Interfaces Searched:",
-                                                modifier = Modifier.padding(0.dp, 10.dp, 0.dp, 0.dp)
+                                                modifier = Modifier
+                                                    .padding(0.dp, 10.dp, 0.dp, 0.dp)
                                                     .align(Alignment.CenterHorizontally),
                                                 textAlign = TextAlign.Center
                                             )
@@ -495,7 +551,8 @@ class MainActivity : ComponentActivity() {
                                             for (interfaceUsed in interfacesUsedInSearch!!) {
                                                 Text(
                                                     "${interfaceUsed.first.displayName} (${interfaceUsed.second.networkTypeString.lowercase()})",
-                                                    modifier = Modifier.padding(0.dp, 0.dp)
+                                                    modifier = Modifier
+                                                        .padding(0.dp, 0.dp)
                                                         .align(Alignment.CenterHorizontally),
                                                     textAlign = TextAlign.Center
                                                 )
@@ -504,11 +561,12 @@ class MainActivity : ComponentActivity() {
 
                                         // if no wifi
                                         if(interfacesUsedInSearch == null ||
-                                            !interfacesUsedInSearch!!.any {it.second == NetworkType.WIFI})
+                                            !interfacesUsedInSearch.any {it.second == NetworkType.WIFI})
                                         {
                                             Text(
                                                 "Enable WiFi and retry",
-                                                modifier = Modifier.padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                modifier = Modifier
+                                                    .padding(0.dp, 20.dp, 0.dp, 10.dp)
                                                     .align(Alignment.CenterHorizontally),
                                                 textAlign = TextAlign.Center
                                             )
@@ -517,7 +575,8 @@ class MainActivity : ComponentActivity() {
                                         {
                                             Text(
                                                 "Ensure a valid UPnP enabled internet gateway device is on the network and retry",
-                                                modifier = Modifier.padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                modifier = Modifier
+                                                    .padding(0.dp, 20.dp, 0.dp, 10.dp)
                                                     .align(Alignment.CenterHorizontally),
                                                 textAlign = TextAlign.Center
                                             )
@@ -527,7 +586,8 @@ class MainActivity : ComponentActivity() {
                                                 UpnpManager.Initialize(PortForwardApplication.appContext,true)
                                                 UpnpManager.Search(false)
                                             },
-                                            modifier = Modifier.padding(0.dp, 10.dp)
+                                            modifier = Modifier
+                                                .padding(0.dp, 10.dp)
                                                 .align(Alignment.CenterHorizontally),
                                             shape = RoundedCornerShape(4),
                                         ) {
@@ -604,7 +664,7 @@ fun ourBar()
                 Icon(Icons.Default.Delete, contentDescription = "Clear Selection")
             }
 
-            OverflowMenu(showDialogMutable) 
+            OverflowMenu(showDialogMutable, showDialogMutable)
         }
     )
 }
@@ -925,6 +985,17 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                 .onGloballyPositioned { coordinates ->
                                     //This value is used to assign to the DropDown the same width
                                     println("OurInternalDevice: " + coordinates.size.toSize())
+                                    // Get density.
+
+
+                                    fun pxToDp(context: Context, px: Float): Float {
+                                        return px / (context.resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
+                                    }
+
+                                    val density = pxToDp(
+                                        PortForwardApplication.appContext,
+                                        (coordinates.size.height.toFloat())
+                                    )
                                     textfieldSize = coordinates.size.toSize()
                                 }
                         )
@@ -1124,6 +1195,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                         if(anyFailed) {
                                             var res = result[0]
                                             res!!
+                                            // this will always be too long (text length) for a toast.
                                             Toast.makeText(
                                                 PortForwardApplication.appContext,
                                                 "Failure - ${res.FailureReason!!}",
@@ -1298,7 +1370,7 @@ fun DeviceRow(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun OverflowMenu(showDialog : MutableState<Boolean>) {
+fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : MutableState<Boolean>) {
     var expanded by remember { mutableStateOf(false) }
 
 
@@ -1363,10 +1435,13 @@ fun OverflowMenu(showDialog : MutableState<Boolean>) {
                     }
                     "Settings" ->
                     {
-                        println("Item 1 pressed")
+                        val intent =
+                            Intent(PortForwardApplication.CurrentActivity, SettingsActivity::class.java)
+                        PortForwardApplication.CurrentActivity?.startActivity(intent)
                     }
                     "About" ->
                     {
+                        showAboutDialogState.value = true
                         println("Item 1 pressed")
                     }
                 }

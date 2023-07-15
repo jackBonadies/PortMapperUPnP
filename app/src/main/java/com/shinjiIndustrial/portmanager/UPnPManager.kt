@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.shinjiIndustrial.portmanager
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -88,7 +88,7 @@ class UpnpManager {
         var FinishedListingPortsEvent = Event<IGDDevice>()
         var UpdateUIFromData = Event<Any?>()
         var SearchStarted = Event<Any?>()
-        var NetworkInfoAtTimeOfSearch : OurNetworkInfoBundle? = null
+        //var NetworkInfoAtTimeOfSearch : OurNetworkInfoBundle? = null
 
         fun Search(onlyIfNotYetSearched : Boolean) : Boolean
         {
@@ -98,7 +98,7 @@ class UpnpManager {
             }
             SearchStarted?.invoke(null)
             ClearOldData()
-            NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
+            //NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
             HasSearched = true
             // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
             // 0-1 second response time intentional delay from devices

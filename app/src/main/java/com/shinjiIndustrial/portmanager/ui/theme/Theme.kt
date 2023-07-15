@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.theme
+package com.shinjiIndustrial.portmanager.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,7 +20,8 @@ private val DarkColorScheme = darkColorScheme(
     secondary = Blue40,
     tertiary = Pink80,
 
-    onSurface = AdditionalColors.AdditionalColorsDark.TextColor
+    onSurface = AdditionalColors.AdditionalColorsDark.TextColor,
+    onPrimary = AdditionalColors.AdditionalColorsDark.TextColorStrong
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -28,7 +29,8 @@ private val LightColorScheme = lightColorScheme(
     secondary = Blue80, //AdditionalColors.PrimaryBlue,
     tertiary = Pink40,
     // used in places where the background color isnt explicitly changed
-    onSurface = AdditionalColors.AdditionalColorsLight.TextColor
+    onSurface = AdditionalColors.AdditionalColorsLight.TextColor,
+    onPrimary = AdditionalColors.AdditionalColorsLight.TextColorStrong
 //    background = Color.Red,
 //    surface = Color.Red,
 //    onPrimary = Color.Red,

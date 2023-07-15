@@ -16,5 +16,5 @@ dependencyResolutionManagement {
         }
     }
 }
-rootProject.name = "My Application"
+rootProject.name = "Port Manager"
 include ':app'

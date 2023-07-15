@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.shinjiIndustrial.portmanager
 
 import org.junit.Test
 
