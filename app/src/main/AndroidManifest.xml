@@ -33,6 +33,10 @@
             android:name="com.shinjiIndustrial.portmanager.SettingsActivity"
             android:parentActivityName="com.shinjiIndustrial.portmanager.MainActivity">
         </activity>
+        <activity
+            android:name="com.shinjiIndustrial.portmanager.LogViewActivity"
+            android:parentActivityName="com.shinjiIndustrial.portmanager.MainActivity">
+        </activity>
 
     </application>
 

@@ -11,6 +11,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
+import com.shinjiIndustrial.portmanager.PortForwardApplication.Companion.OurLogger
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.android.AndroidNetworkAddressFactory
@@ -27,9 +28,13 @@ import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
+import org.xml.sax.InputSource
+import java.io.StringReader
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
+import java.util.logging.Level
+import kotlin.system.measureTimeMillis
 
 
 class UpnpManager {
@@ -300,11 +305,11 @@ class UpnpManager {
                 // complete metadata
                 override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
 
-                    println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
+                    //println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
 
                     if (rootDevice.type.type.equals(UpnpManager.Companion.UPnPNames.InternetGatewayDevice)) // version agnostic
                     {
-                        println("Device ${rootDevice.displayString} is of interest, type is ${rootDevice.type}")
+                        OurLogger.log(Level.INFO, "Device ${rootDevice.displayString} is of interest, type is ${rootDevice.type}")
 
                         // http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v1-Service.pdf
                         // Device Tree: InternetGatewayDevice > WANDevice > WANConnectionDevice
@@ -328,22 +333,22 @@ class UpnpManager {
                                 }
                                 else
                                 {
-                                    println("WanConnectionDevice does not have WanIPConnection service")
+                                    OurLogger.log(Level.SEVERE, "WanConnectionDevice does not have WanIPConnection service")
                                 }
                             }
                             else
                             {
-                                println("WanConnectionDevice not found under WanDevice")
+                                OurLogger.log(Level.SEVERE, "WanConnectionDevice not found under WanDevice")
                             }
                         }
                         else
                         {
-                            println("WanDevice not found under InternetGatewayDevice")
+                            OurLogger.log(Level.SEVERE, "WanDevice not found under InternetGatewayDevice")
                         }
                     }
                     else
                     {
-                        println("Device ${rootDevice.displayString} is NOT of interest, type is ${rootDevice.type}")
+                        OurLogger.log(Level.INFO, "Device ${rootDevice.displayString} is NOT of interest, type is ${rootDevice.type}")
                     }
 
                 }
@@ -1166,19 +1171,145 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
         // we enumerate port mappings later
         portMappings = mutableListOf()
         var finishedEnumeratingPortMappings = false
+
+        val timeTakenMillis = measureTimeMillis {
+
+//        if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings))
+//        {
+//            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetListOfPortMappings")
+//            var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings]!!
+//            getAllPortMappingsUsingListPortMappings(getPortMapping)
+//        }
         if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry))
         {
+            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
             var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry]!!
             getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping)
         }
+        else{
+            OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
+        }
+
+        }
+        OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
+
+
         finishedEnumeratingPortMappings = true
         UpnpManager.FinishedListingPortsEvent.invoke(this)
     }
 
+//    private fun getAllPortMappingsUsingListPortMappings(getPortMapping : Action<RemoteService>) {
+//
+//        // this method doesnt work.
+//        // if I specify a small range it returns
+//        // but anything more than 100 entries it gives 500
+//
+//
+//        var slotIndex : Int = 0;
+//        var retryCount : Int = 0
+//        while(true)
+//        {
+//            var shouldRetry : Boolean = false
+//            var success : Boolean = false;
+//            var actionInvocation = ActionInvocation(getPortMapping)
+//            println("requesting slot $slotIndex")
+//
+//            actionInvocation.setInput("NewStartPort", "$MIN_PORT");
+//            actionInvocation.setInput("NewEndPort", "$MAX_PORT");
+//            actionInvocation.setInput("NewProtocol", "TCP");
+//            actionInvocation.setInput("NewManage", "1");
+//            actionInvocation.setInput("NewNumberOfPorts", "0");
+//            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+//                override fun success(invocation: ActionInvocation<*>?) {
+//                    invocation!!
+//
+//                    var dbFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+//                    val dBuilder = dbFactory.newDocumentBuilder()
+//                    val inputSource = InputSource(StringReader(actionInvocation.getOutput("A_ARG_TYPE_PortListing").toString()))
+//                    val doc = dBuilder.parse(inputSource)
+//                    doc.documentElement.normalize()
+//
+//                    retryCount = 0
+//                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
+//
+//                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
+//                    var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
+//                    var internalClient = invocation.getOutput("NewInternalClient") //string datatype
+//                    var internalPort = invocation.getOutput("NewInternalPort")
+//                    var protocol = invocation.getOutput("NewProtocol")
+//                    var description = invocation.getOutput("NewPortMappingDescription")
+//                    var enabled = invocation.getOutput("NewEnabled")
+//                    var leaseDuration = invocation.getOutput("NewLeaseDuration")
+//                    var portMapping = PortMapping(
+//                        description.toString(),
+//                        remoteHost.toString(),
+//                        internalClient.toString(),
+//                        externalPort.toString().toInt(),
+//                        internalPort.toString().toInt(),
+//                        protocol.toString(),
+//                        enabled.toString().toInt() == 1,
+//                        leaseDuration.toString().toInt(),
+//                        ipAddress)
+//                    portMappings.add(portMapping)
+//                    // TODO: new port mapping added event
+//                    UpnpManager.PortFoundEvent.invoke(portMapping)
+//                    success = true
+//                }
+//
+//                override fun failure(
+//                    invocation: ActionInvocation<*>?,
+//                    operation: UpnpResponse,
+//                    defaultMsg: String
+//                ) {
+//                    retryCount = 0
+//                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
+//                    // Handle failure
+//                }
+//            })
+//
+//            try {
+//                future.get() // SYNCHRONOUS (note this can, and does, throw)
+//            }
+//            catch(e : Exception)
+//            {
+//                if(retryCount == 0) // if two exceptions in a row then stop.
+//                {
+//                    shouldRetry = true // network issue.. retrying does work.
+//                    retryCount++
+//                }
+//                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
+//            }
+//
+//            if(shouldRetry)
+//            {
+//                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
+//                continue
+//            }
+//
+//
+//            if (!success)
+//            {
+//                break
+//            }
+//
+//            slotIndex++
+//
+//            if (slotIndex > MAX_PORT)
+//            {
+//                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
+//            }
+//        }
+//    }
+
+    val MIN_PORT = 1 // 0 is invalid port. wildcard port i.e. let the system choose.
+    val MAX_PORT = 65535
+
     private fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
         var slotIndex : Int = 0;
+        var retryCount : Int = 0
         while(true)
         {
+            var shouldRetry : Boolean = false
             var success : Boolean = false;
             var actionInvocation = ActionInvocation(getPortMapping)
             println("requesting slot $slotIndex")
@@ -1186,6 +1317,8 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
             var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
+                    retryCount = 0
+                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
                     var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
                     var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
@@ -1216,7 +1349,8 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                     operation: UpnpResponse,
                     defaultMsg: String
                 ) {
-                    println("GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
+                    retryCount = 0
+                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
                     // Handle failure
                 }
             })
@@ -1226,24 +1360,34 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
             }
             catch(e : Exception)
             {
-                print("VERY BAD") // TODO
+                if(retryCount == 0) // if two exceptions in a row then stop.
+                {
+                    shouldRetry = true // network issue.. retrying does work.
+                    retryCount++
+                }
+                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
+            }
+
+            if(shouldRetry)
+            {
+                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
+                continue
             }
 
 
             if (!success)
             {
-                break;
+                break
             }
 
             slotIndex++
 
             if (slotIndex > 65535)
             {
-                println("CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
+                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
             }
         }
     }
-
 }
 
 class Event<T> {

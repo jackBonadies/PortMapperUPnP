@@ -10,8 +10,10 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.text.Spanned
 import android.text.SpannedString
 import android.util.DisplayMetrics
@@ -126,11 +128,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
+import java.io.IOException
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.random.Random
-
+import java.util.logging.*
 
 //object UpnpManager {
 //    va UpnpService? : UpnpService = null
@@ -165,6 +168,11 @@ class PortForwardApplication : Application() {
 //            IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
 //        )
 
+
+        val logger = Logger.getLogger("")
+        Logs = StringBuilder()
+        logger.addHandler(StringBuilderHandler(Logs))
+
         var test = NetworkType.DATA.toString()
 
         //test1()
@@ -177,6 +185,8 @@ class PortForwardApplication : Application() {
 //        lateinit var showPopup : MutableState<Boolean>
         lateinit var currentSingleSelectedObject : MutableState<Any?>
         var PaddingBetweenCreateNewRuleRows = 4.dp
+        var Logs : StringBuilder = StringBuilder()
+        var OurLogger : Logger = Logger.getLogger("PortManager")
 
         fun ShowToast( msg : String,  toastLength : Int)
         {
@@ -194,6 +204,51 @@ class PortForwardApplication : Application() {
 
 
 }
+
+class StringBuilderHandler(private val stringBuilder: StringBuilder) : java.util.logging.Handler() {
+
+//    override fun handleMessage(msg: Message) {
+//        super.handleMessage(msg)
+//    }
+      override fun publish(record: LogRecord?) {
+          record?.let {
+              stringBuilder.append(it.message).append("\n")
+          }
+      }
+//
+      override fun flush() {
+          // Nothing to do here since StringBuilder doesn't need to be flushed
+      }
+
+      override fun close() {
+          // Nothing to do here since StringBuilder doesn't need to be closed
+      }
+}
+
+class FileHandlerExample {
+
+    fun setupLogger() {
+        val logger = Logger.getLogger("")
+        val fh: FileHandler
+
+        try {
+            // This block configure the logger with handler and formatter
+            fh = FileHandler("MyLogFile.log")
+            logger.addHandler(fh)
+            val formatter = SimpleFormatter()
+            fh.formatter = formatter
+
+            // the following statement is used to log any messages
+            logger.info("My first log")
+
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+}
+
 
 enum class Protocol(val protocol: String) {
     TCP("TCP"),
@@ -1190,7 +1245,9 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                             print(res.ResultingMapping?.Protocol)
                                         }
 
-                                        var anyFailed = result.any {!it?.Success!!}
+                                        var numFailed = result.count {!it?.Success!!}
+
+                                        var anyFailed = numFailed > 0
 
                                         if(anyFailed) {
                                             var res = result[0]
@@ -1431,7 +1488,9 @@ fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : Muta
                     }
                     "View Log" ->
                     {
-                        println("Item 1 pressed")
+                        val intent =
+                            Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
+                        PortForwardApplication.CurrentActivity?.startActivity(intent)
                     }
                     "Settings" ->
                     {
