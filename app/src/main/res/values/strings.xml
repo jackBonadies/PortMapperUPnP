@@ -1,9 +1,9 @@
 <resources>
-    <string name="app_name">Port Mapper</string>
+    <string name="app_name">PortMapper</string>
 
     <string name="about_body">
 <![CDATA[
-Port Mapper is a free and open source app for Android.  Its function is to set up port forwarding via UPnP.
+PortMapper is a free and open source app for Android.  Its function is to set up port forwarding via UPnP.
 <br><br>Source code is <a href="https://github.com/jackBonadies/PortMapperUPnP">here</a>.
 <br><br>Version: %s.
 ]]>

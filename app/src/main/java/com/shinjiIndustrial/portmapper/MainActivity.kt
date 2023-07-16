@@ -643,7 +643,7 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
 //                                modifier = Modifier.height(40.dp),
                             colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-                            title = { Text(text = "Port Mapper", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
+                            title = { Text(text = "PortMapper", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
                             actions = { OverflowMenu(showAddRuleDialogState, showAboutDialogState) }
                         )
                     },
