@@ -1,4 +1,4 @@
-package com.shinjiIndustrial.portmanager
+package com.shinjiIndustrial.portmapper
 
 import org.junit.Test
 

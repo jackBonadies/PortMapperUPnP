@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">Port Manager</string>
+    <string name="app_name">Port Mapper</string>
 
     <string name="about_body">
 <![CDATA[
-Port Manager is a free and open source app for Android.  Its function is to set up port forwarding via UPnP.
-<br><br>Source code is <a href="https://github.com/jackBonadies/PortManagerUPnP">here</a>.
+Port Mapper is a free and open source app for Android.  Its function is to set up port forwarding via UPnP.
+<br><br>Source code is <a href="https://github.com/jackBonadies/PortMapperUPnP">here</a>.
 <br><br>Version: %s.
 ]]>
   </string>

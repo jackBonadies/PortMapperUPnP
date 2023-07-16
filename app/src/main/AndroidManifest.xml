@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
-        android:name="com.shinjiIndustrial.portmanager.PortForwardApplication"
+        android:name="com.shinjiIndustrial.portmapper.PortForwardApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -18,7 +18,7 @@
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
         <activity
-            android:name="com.shinjiIndustrial.portmanager.MainActivity"
+            android:name="com.shinjiIndustrial.portmapper.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication">
@@ -30,12 +30,12 @@
         </activity>
 
         <activity
-            android:name="com.shinjiIndustrial.portmanager.SettingsActivity"
-            android:parentActivityName="com.shinjiIndustrial.portmanager.MainActivity">
+            android:name="com.shinjiIndustrial.portmapper.SettingsActivity"
+            android:parentActivityName="com.shinjiIndustrial.portmapper.MainActivity">
         </activity>
         <activity
-            android:name="com.shinjiIndustrial.portmanager.LogViewActivity"
-            android:parentActivityName="com.shinjiIndustrial.portmanager.MainActivity">
+            android:name="com.shinjiIndustrial.portmapper.LogViewActivity"
+            android:parentActivityName="com.shinjiIndustrial.portmapper.MainActivity">
         </activity>
 
     </application>

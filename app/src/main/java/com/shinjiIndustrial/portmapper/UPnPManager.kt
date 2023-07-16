@@ -1,4 +1,4 @@
-package com.shinjiIndustrial.portmanager
+package com.shinjiIndustrial.portmapper
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,7 +11,10 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
-import com.shinjiIndustrial.portmanager.PortForwardApplication.Companion.OurLogger
+import com.shinjiIndustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.android.AndroidNetworkAddressFactory
@@ -28,8 +31,6 @@ import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
-import org.xml.sax.InputSource
-import java.io.StringReader
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
@@ -88,7 +89,8 @@ class UpnpManager {
         )
 
         var DeviceFoundEvent = Event<IGDDevice>()
-        var PortFoundEvent = Event<PortMapping>()
+        var PortAddedEvent = Event<PortMapping>()
+        var PortInitialFoundEvent = Event<PortMapping>()
         // used if we finish and there are no ports to show the "no devices" card
         var FinishedListingPortsEvent = Event<IGDDevice>()
         var UpdateUIFromData = Event<Any?>()
@@ -131,7 +133,7 @@ class UpnpManager {
         {
             var portMappingRequests : MutableList<PortMappingRequest> = mutableListOf()
             val (inStart, inEnd) = getRange(portMappingUserInput.internalPort)
-            val (outStart, outEnd) = getRange(portMappingUserInput.internalPort)
+            val (outStart, outEnd) = getRange(portMappingUserInput.externalPort)
             val protocols = getProtocols(portMappingUserInput.protocol)
 
             // many 1 to 1 makes sense
@@ -202,7 +204,7 @@ class UpnpManager {
                         listOfResults[i] = result
                     }
 
-                    var future = CreatePortMappingRule(portMappingRequestRules[i], true, ::callback)
+                    var future = CreatePortMappingRule(portMappingRequestRules[i], false, ::callback)
                     future.get()
                 }
 
@@ -381,7 +383,11 @@ class UpnpManager {
         }
 
         fun AddDevice(igdDevice: IGDDevice) {
-            AnyIgdDevices?.value = true //Reading a state that was created after the snapshot was taken or in a snapshot that has not yet been applied
+            // if not UI thread: Reading a state that was created after the snapshot was taken or in a snapshot that has not yet been applied
+            GlobalScope.launch(Dispatchers.Main)
+            {
+                AnyIgdDevices?.value = true
+            }
             synchronized(lockIgdDevices)
             {
                 IGDDevices.add(igdDevice)
@@ -492,7 +498,7 @@ class UpnpManager {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
-                    println("Successfully readback our new rule")
+
 
                     var internalPort = actionInvocation.getOutput("NewInternalPort")
                     var internalClient = actionInvocation.getOutput("NewInternalClient")
@@ -511,7 +517,9 @@ class UpnpManager {
                         leaseDuration.toString().toInt(),
                         remoteIp)
 
-                    var result = UPnPCreateMappingResult(true)
+                    PortForwardApplication.OurLogger.log(Level.INFO, "Successfully read back our new rule (${pm.shortName()})")
+
+                    var result = UPnPCreateMappingResult(true, true)
                     result.ResultingMapping = pm
                     callback(result)
                 }
@@ -528,7 +536,11 @@ class UpnpManager {
                     println(operation.statusCode)
                     println(operation.isFailed)
 
-                    var result = UPnPCreateMappingResult(false)
+                    var rule = formatShortName(protocol, remoteIp, remotePort)
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "Failed to read back our new rule ($rule).")
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+
+                    var result = UPnPCreateMappingResult(false, true)
                     result.UPnPFailureResponse = operation
                     result.FailureReason = defaultMsg
                     callback(result)
@@ -561,7 +573,7 @@ class UpnpManager {
                 portMapping.Protocol,
                 portMapping.LeaseDuration.toString(),
                 enable)
-            return CreatePortMappingRule(portMappingRequest, false, onDisableEnableCompleteCallback)
+            return CreatePortMappingRule(portMappingRequest, true, onDisableEnableCompleteCallback)
         }
 
         fun enableDisableDefaultCallback(result : UPnPCreateMappingResult)
@@ -579,7 +591,7 @@ class UpnpManager {
         }
 
         // DeletePortMappingRange is only available in v2.0 (also it can only delete
-        //   a contiguous range)
+        //   a contiguous range) TODO: use for delete all
         fun DeletePortMappingEntry(portMapping : PortMapping) : Future<Any>
         {
 
@@ -588,17 +600,13 @@ class UpnpManager {
                 RunUIThread {
                     println("delete callback")
                     if (result.Success!!) {
-                        Toast.makeText(
-                            PortForwardApplication.appContext,
-                            "Success",
-                            Toast.LENGTH_SHORT
-                        ).show()
+
+                        MainActivity.showSnackBarShortNoAction("Success!")
+
                     } else {
-                        Toast.makeText(
-                            PortForwardApplication.appContext,
-                            "Failure - ${result.FailureReason!!}",
-                            Toast.LENGTH_LONG
-                        ).show()
+
+                        MainActivity.showSnackBarViewLog("Failed to delete entry.")
+
                     }
                 }
             }
@@ -655,6 +663,8 @@ class UpnpManager {
                     invocation!!
                     println("Successfully deleted")
 
+                    PortForwardApplication.OurLogger.log(Level.INFO, "Successfully deleted rule (${portMapping.shortName()}).")
+
                     var result = UPnPResult(true)
                     result.RequestInfo = portMapping
                     callback(result)
@@ -673,6 +683,9 @@ class UpnpManager {
                     println(operation.responseDetails)
                     println(operation.statusCode)
                     println(operation.isFailed)
+
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "Failed to delete rule (${portMapping.shortName()}).")
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
                     var result = UPnPResult(false)
                     result.FailureReason = defaultMsg
@@ -711,10 +724,12 @@ class UpnpManager {
             var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
+
+                    PortForwardApplication.OurLogger.log(Level.INFO, "Successfully created rule (${portMappingRequest.realize().shortName()}).")
                     println("Successfully added, now reading back")
                     if(skipReadingBack)
                     {
-                        var result = UPnPCreateMappingResult(true) //TODO : parameter on whether we read back + parameter on the original requested (in case its different)
+                        var result = UPnPCreateMappingResult(true, false)
                         result.ResultingMapping = portMappingRequest.realize()
                         callback(result)
                     }
@@ -743,7 +758,10 @@ class UpnpManager {
                     println(operation.statusCode)
                     println(operation.isFailed)
 
-                    var result = UPnPCreateMappingResult(false)
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "Failed to create rule (${portMappingRequest.realize().shortName()}).")
+                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+
+                    var result = UPnPCreateMappingResult(false, false)
                     result.FailureReason = defaultMsg
                     result.UPnPFailureResponse = operation
                     callback(result)
@@ -769,9 +787,17 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
         result.ResultingMapping!!
         var device =
             UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
-        device.portMappings.add(result.ResultingMapping!!)
-        UpnpManager.PortFoundEvent.invoke(result.ResultingMapping!!)
-
+        var firstRule = device.portMappings.isEmpty()
+        device.portMappings.add(0, result.ResultingMapping!!) // add at beginning..
+        if(firstRule)
+        {
+            // full refresh since we have to remove the old "no port mappings"
+            UpnpManager.UpdateUIFromData.invoke(null)
+        }
+        else
+        {
+            UpnpManager.PortAddedEvent.invoke(result.ResultingMapping!!)
+        }
     }
     else
     {
@@ -847,12 +873,13 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 ////    }
 //}
 
-
-
-class UPnPCreateMappingResult : UPnPResult
+class UPnPCreateMappingResult(success: Boolean, wasReadBack : Boolean) : UPnPResult(success)
 {
-    constructor(success: Boolean) : super(success)
     var ResultingMapping : PortMapping? = null
+    var WasReadBack = false
+    init{
+        WasReadBack = wasReadBack
+    }
 }
 
 class UPnPGetSpecificMappingResult : UPnPResult
@@ -1340,7 +1367,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                         ipAddress)
                     portMappings.add(portMapping)
                     // TODO: new port mapping added event
-                    UpnpManager.PortFoundEvent.invoke(portMapping)
+                    UpnpManager.PortInitialFoundEvent.invoke(portMapping)
                     success = true
                 }
 
@@ -1350,7 +1377,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                     defaultMsg: String
                 ) {
                     retryCount = 0
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
+                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg.  NOTE: This is normal.")
                     // Handle failure
                 }
             })
@@ -1473,6 +1500,16 @@ class PortMapping constructor(
         this.Description = _Description
         this.ActualExternalIP = _ActionExternalIP
     }
+
+    fun shortName() : String
+    {
+        return formatShortName(Protocol,ActualExternalIP,ExternalPort.toString())
+    }
+}
+
+fun formatShortName(protocol: String, externalIp: String, externalPort: String) : String
+{
+    return "$protocol rule at $externalIp:$externalPort"
 }
 
 class AndroidConfig(context : Context) : AndroidUpnpServiceConfiguration() {

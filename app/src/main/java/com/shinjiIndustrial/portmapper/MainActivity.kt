@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterialApi::class)
 
-package com.shinjiIndustrial.portmanager
+package com.shinjiIndustrial.portmapper
 
 
 import android.annotation.SuppressLint
@@ -10,12 +10,11 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.Message
+import android.text.Html
 import android.text.Spanned
-import android.text.SpannedString
+import android.text.method.LinkMovementMethod
 import android.util.DisplayMetrics
 import android.widget.TextView
 import android.widget.Toast
@@ -72,8 +71,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -114,12 +116,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.R
-import com.shinjiIndustrial.portmanager.ui.theme.AdditionalColors
-import com.shinjiIndustrial.portmanager.ui.theme.MyApplicationTheme
+import com.shinjiIndustrial.portmapper.ui.theme.AdditionalColors
+import com.shinjiIndustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -134,6 +137,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.random.Random
 import java.util.logging.*
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
+
+private val Context.dataStore by preferencesDataStore("preferences")
 
 //object UpnpManager {
 //    va UpnpService? : UpnpService = null
@@ -156,18 +163,43 @@ suspend fun extracted() {
     println("World!") // print after delay
 }
 
+object SharedPrefKeys
+{
+    val dayNightPref = "DayNightPref"
+}
+
+object SharedPrefValues
+{
+    lateinit var DayNightPref : DayNightMode
+}
+
+enum class DayNightMode(val intVal : Int) {
+    FOLLOW_SYSTEM(0),
+    FORCE_DAY(1),
+    FORCE_NIGHT(2);
+
+    companion object {
+        fun from(findValue: Int): DayNightMode = DayNightMode.values().first { it.intVal == findValue }
+    }
+}
+
+
+
 class PortForwardApplication : Application() {
 
     override fun onCreate() {
 
 
         super.onCreate()
-        PortForwardApplication.appContext = applicationContext
+
+        RestoreSharedPrefs()
+
+        instance = this
+        appContext = applicationContext
 //        this.registerReceiver(
 //            ConnectionReceiver(),
 //            IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
 //        )
-
 
         val logger = Logger.getLogger("")
         Logs = StringBuilder()
@@ -179,21 +211,43 @@ class PortForwardApplication : Application() {
         println("done")
     }
 
+    fun RestoreSharedPrefs()
+    {
+        runBlocking {
+            var preferences = dataStore.data.first()
+            val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
+            SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
+        }
+    }
+
+    fun SaveSharedPrefs() {
+        GlobalScope.launch(Dispatchers.IO) {
+            dataStore.edit { preferences ->
+                val nightModeKey =
+                    androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
+                preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
+            }
+        }
+    }
+
+
     companion object {
         lateinit var appContext: Context
+        lateinit var instance: PortForwardApplication
         var CurrentActivity: ComponentActivity? = null
 //        lateinit var showPopup : MutableState<Boolean>
         lateinit var currentSingleSelectedObject : MutableState<Any?>
         var PaddingBetweenCreateNewRuleRows = 4.dp
         var Logs : StringBuilder = StringBuilder()
-        var OurLogger : Logger = Logger.getLogger("PortManager")
+        var OurLogger : Logger = Logger.getLogger("PortMapper")
+        val ScrollToBottom = "ScrollToBottom"
 
         fun ShowToast( msg : String,  toastLength : Int)
         {
             GlobalScope.launch(Dispatchers.Main) {
-                PortForwardApplication.CurrentActivity?.runOnUiThread {
+                CurrentActivity?.runOnUiThread {
                     Toast.makeText(
-                        PortForwardApplication.appContext,
+                        appContext,
                         msg,
                         toastLength
                     ).show();
@@ -212,7 +266,14 @@ class StringBuilderHandler(private val stringBuilder: StringBuilder) : java.util
 //    }
       override fun publish(record: LogRecord?) {
           record?.let {
-              stringBuilder.append(it.message).append("\n")
+              val prefix = when (it.level)
+              {
+                  Level.INFO -> "I: "
+                  Level.WARNING -> "W: "
+                  Level.SEVERE -> "E: "
+                  else -> return // i.e. do not log
+              }
+              stringBuilder.append(prefix + it.message).append("\n")
           }
       }
 //
@@ -270,6 +331,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun portMappingAddedHandler(portMapping : PortMapping)
+    {
+        // we dont know if this rule already exists. and so we dont want to add it twice.
+        updateUIFromData(null)
+    }
+
     fun portMappingFoundHandler(portMapping: PortMapping) {
         runOnUiThread {
             upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
@@ -300,11 +367,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun updateUIFromData(o : Any?)
+    fun updateUIFromData(o : Any? = null)
     {
         runOnUiThread {
             var data : MutableList<UPnPViewElement> = mutableListOf()
-            for(device in UpnpManager.Companion.IGDDevices)
+            for(device in UpnpManager.IGDDevices)
             {
                 data.add(UPnPViewElement(device))
 
@@ -317,6 +384,56 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    companion object {
+
+        fun viewLogCallback()
+        {
+            val intent =
+                Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
+            intent.putExtra(PortForwardApplication.ScrollToBottom, true);
+            PortForwardApplication.CurrentActivity?.startActivity(intent)
+        }
+
+        fun showSnackBarViewLog(message : String)
+        {
+            showSnackBar(message, "View Log", SnackbarDuration.Long, ::viewLogCallback)
+        }
+
+        fun showSnackBarShortNoAction(message : String)
+        {
+            showSnackBar(message, null, SnackbarDuration.Short)
+        }
+
+        fun showSnackBar(
+            message: String,
+            action: String?,
+            duration: SnackbarDuration,
+            onAction: () -> Unit = { })
+         {
+            if (OurSnackbarHostState == null) {
+                PortForwardApplication.ShowToast(
+                    message,
+                    if ((duration == SnackbarDuration.Long || duration == SnackbarDuration.Indefinite)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                )
+            }
+            GlobalScope.launch(Dispatchers.Main) {
+
+                var snackbarResult = OurSnackbarHostState!!.showSnackbar(
+                    message,
+                    action,
+                    (duration == SnackbarDuration.Indefinite),
+                    duration
+                )
+                println("shown")
+                when (snackbarResult) {
+                    SnackbarResult.Dismissed -> {}
+                    SnackbarResult.ActionPerformed -> onAction()
+                }
+            }
+        }
+
+        var OurSnackbarHostState: SnackbarHostState? = null
+    }
     var upnpElementsViewModel = UPnPElementViewModel()
     var searchInProgressJob : Job? = null
 
@@ -344,9 +461,10 @@ class MainActivity : ComponentActivity() {
 
         //AndroidRouter().enableWiFi()
         var success = UpnpManager.Initialize(this, false)
-        // TODO: if we were previously destroyed we need to update the ui from data again
+        updateUIFromData()
         UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
-        UpnpManager.PortFoundEvent += ::portMappingFoundHandler
+        UpnpManager.PortAddedEvent += ::portMappingAddedHandler
+        UpnpManager.PortInitialFoundEvent += ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
         UpnpManager.UpdateUIFromData += ::updateUIFromData
         UpnpManager.SearchStarted += ::searchStarted
@@ -433,11 +551,11 @@ class MainActivity : ComponentActivity() {
                                 var spannedString : Spanned? = null
                                 if (Build.VERSION.SDK_INT >= 24)
                                 {
-                                    spannedString = android.text.Html.fromHtml(aboutString, android.text.Html.FROM_HTML_MODE_LEGACY)
+                                    spannedString = Html.fromHtml(aboutString, Html.FROM_HTML_MODE_LEGACY)
                                 }
                                 else
                                 {
-                                    spannedString = android.text.Html.fromHtml(aboutString)
+                                    spannedString = Html.fromHtml(aboutString)
                                 }
 
                                 // compose doesn't allow spannable nor link movement method
@@ -446,7 +564,7 @@ class MainActivity : ComponentActivity() {
                                         setTextColor(AdditionalColors.TextColor.toArgb());
                                         setTextSize(16f);
                                         text = spannedString;
-                                        movementMethod = android.text.method.LinkMovementMethod.getInstance()
+                                        movementMethod = LinkMovementMethod.getInstance()
                                         // you can apply other TextView properties here
                                     }
                                 })
@@ -465,17 +583,28 @@ class MainActivity : ComponentActivity() {
                 }
 
 
-                val snackbarHostState = remember { SnackbarHostState() }
+                OurSnackbarHostState = remember { SnackbarHostState() }
                 val scope = rememberCoroutineScope()
                 val coroutineScope: CoroutineScope = rememberCoroutineScope()
                 val anyIgdDevices = remember { mutableStateOf(!UpnpManager.IGDDevices.isEmpty()) }
                 UpnpManager.AnyIgdDevices = anyIgdDevices
 
                 Scaffold(
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    snackbarHost = { SnackbarHost(OurSnackbarHostState!!) {
+                            data ->
+                                // custom snackbar with the custom colors
+                                Snackbar(
+                                    data,
+                                    actionColor = AdditionalColors.PrimaryDarkerBlue
+                                    // according to https://m2.material.io/design/color/dark-theme.html
+                                    // light snackbar in darkmode is good.
+//                                    containerColor = AdditionalColors.CardContainerColor,
+//                                    contentColor = AdditionalColors.TextColor
+//                                    //contentColor = ...,
+                                )
+                            }
+                        },
                     floatingActionButton = {
-
-
 
                         if(anyIgdDevices.value)
                         {
@@ -514,7 +643,7 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
 //                                modifier = Modifier.height(40.dp),
                             colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-                            title = { Text(text = "Port Pilot", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
+                            title = { Text(text = "Port Mapper", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
                             actions = { OverflowMenu(showAddRuleDialogState, showAboutDialogState) }
                         )
                     },
@@ -691,7 +820,7 @@ class MainActivity : ComponentActivity() {
     {
         super.onDestroy();
         UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
-        UpnpManager.PortFoundEvent -= ::portMappingFoundHandler
+        UpnpManager.PortAddedEvent -= ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent -= ::deviceFinishedListingPortsHandler
         UpnpManager.UpdateUIFromData -= ::updateUIFromData
     }
@@ -1229,7 +1358,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
                         Button(
                             onClick = {
-                                Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
+
+                                //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
                                 fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
 
@@ -1250,22 +1380,37 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                         var anyFailed = numFailed > 0
 
                                         if(anyFailed) {
-                                            var res = result[0]
-                                            res!!
-                                            // this will always be too long (text length) for a toast.
-                                            Toast.makeText(
-                                                PortForwardApplication.appContext,
-                                                "Failure - ${res.FailureReason!!}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+
+                                            // all failed
+                                            if(numFailed == result.size)
+                                            {
+                                                if(result.size == 1)
+                                                {
+                                                    MainActivity.showSnackBarViewLog("Failed to create rule.")
+                                                }
+                                                else
+                                                {
+                                                    MainActivity.showSnackBarViewLog("Failed to create rules.")
+                                                }
+                                            }
+                                            else
+                                            {
+                                                MainActivity.showSnackBarViewLog("Failed to create some rules.")
+                                            }
+
+
+//                                            var res = result[0]
+//                                            res!!
+//                                            // this will always be too long (text length) for a toast.
+//                                            Toast.makeText(
+//                                                PortForwardApplication.appContext,
+//                                                "Failure - ${res.FailureReason!!}",
+//                                                Toast.LENGTH_LONG
+//                                            ).show()
                                         }
                                         else
                                         {
-                                            Toast.makeText(
-                                                PortForwardApplication.appContext,
-                                                "Success",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                            MainActivity.showSnackBarShortNoAction("Success!")
                                         }
                                     }
                                 }
