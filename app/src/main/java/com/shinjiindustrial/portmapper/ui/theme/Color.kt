@@ -1,4 +1,4 @@
-package com.shinjiIndustrial.portmapper.ui.theme
+package com.shinjiindustrial.portmapper.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

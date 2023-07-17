@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterialApi::class)
 
-package com.shinjiIndustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 
 import android.annotation.SuppressLint
@@ -80,6 +80,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -121,8 +122,8 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.myapplication.R
-import com.shinjiIndustrial.portmapper.ui.theme.AdditionalColors
-import com.shinjiIndustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -165,12 +166,14 @@ suspend fun extracted() {
 
 object SharedPrefKeys
 {
-    val dayNightPref = "DayNightPref"
+    val dayNightPref = "dayNightPref"
+    val materialYouPref = "materialYouPref"
 }
 
 object SharedPrefValues
 {
     lateinit var DayNightPref : DayNightMode
+    var MaterialYouTheme : Boolean = false
 }
 
 enum class DayNightMode(val intVal : Int) {
@@ -217,15 +220,19 @@ class PortForwardApplication : Application() {
             var preferences = dataStore.data.first()
             val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
             SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
+            val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
+            SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
+
         }
     }
 
     fun SaveSharedPrefs() {
         GlobalScope.launch(Dispatchers.IO) {
             dataStore.edit { preferences ->
-                val nightModeKey =
-                    androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
+                val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
                 preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
+                val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
+                preferences[materialYouKey] = SharedPrefValues.MaterialYouTheme
             }
         }
     }
@@ -609,9 +616,9 @@ class MainActivity : ComponentActivity() {
                         if(anyIgdDevices.value)
                         {
                             FloatingActionButton(
-                                containerColor = MaterialTheme.colorScheme.secondary,
+                                // uses MaterialTheme.colorScheme.secondaryContainer
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
                                 onClick = {
-
                                     showAddRuleDialog = true
 
                                     //this works
@@ -642,7 +649,8 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         TopAppBar(
 //                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
+                            //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                             title = { Text(text = "PortMapper", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
                             actions = { OverflowMenu(showAddRuleDialogState, showAboutDialogState) }
                         )
@@ -2293,7 +2301,6 @@ fun PortMappingCard(portMapping: PortMapping)
             colors = CardDefaults.cardColors(
                 containerColor = AdditionalColors.CardContainerColor,
             ),
-
     ) {
 
         Row(

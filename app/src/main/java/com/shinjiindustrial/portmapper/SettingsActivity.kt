@@ -1,6 +1,7 @@
-package com.shinjiIndustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
@@ -22,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -34,8 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.shinjiIndustrial.portmapper.ui.theme.AdditionalColors
-import com.shinjiIndustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 
 
 class SettingsActivity : ComponentActivity() {
@@ -54,11 +57,11 @@ class SettingsActivity : ComponentActivity() {
                                 IconButton(onClick = {
                                     this.finish()
                                 }) {
-                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = AdditionalColors.TextColorStrong)
                                 }
                             },
 //                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
                             title = {
                                 Text(
                                     text = "Settings",
@@ -80,6 +83,14 @@ class SettingsActivity : ComponentActivity() {
 
 @Composable
 @Preview
+fun SettingsPreview()
+{
+    SetupPreview()
+    Settings()
+}
+
+
+@Composable
 fun Settings(modifier : Modifier = Modifier)
 {
     MyApplicationTheme()
@@ -130,6 +141,7 @@ fun Settings(modifier : Modifier = Modifier)
                     })
                     .fillMaxWidth())
             {
+
                 Text("Theme", fontSize = 26.sp, color = AdditionalColors.TextColorStrong, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
                 var pref = when(AdditionalColors.ThemeSetting.value){
                     0 -> followSystem
@@ -137,10 +149,45 @@ fun Settings(modifier : Modifier = Modifier)
                     2 -> dark
                     else -> followSystem
                 }
-                Text(pref, fontSize = 16.sp, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 4.dp).offset(0.dp, (-4).dp
-                ), color = AdditionalColors.TextColorWeak)
+                Text(pref, fontSize = 16.sp, modifier = Modifier
+                    .padding(12.dp, 0.dp, 0.dp, 4.dp)
+                    .offset(
+                        0.dp, (-4).dp
+                    ), color = AdditionalColors.TextColorWeak)
             }
             Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
+
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically)
+                    {
+                        //Icon(Icons.Filled.Palette, "Material You", tint=MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
+                        Text(
+                            "Material You",
+                            fontSize = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .padding(12.dp, 18.dp, 0.dp, 18.dp)
+                                .weight(1.0f)
+                        )
+                        Switch(
+                            AdditionalColors.ThemeSettingMaterialYou.value,
+                            onCheckedChange = {
+
+                                AdditionalColors.ThemeSettingMaterialYou.value = it
+                                SharedPrefValues.MaterialYouTheme = it
+
+                            },
+                            modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                        )
+                    }
+                }
+                Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
+            }
 
 //            Column(
 //                modifier = Modifier.clickable(onClick = {
@@ -150,7 +197,7 @@ fun Settings(modifier : Modifier = Modifier)
 //
 //                }))
 //            {
-//                Text("Theme", fontSize = 26.sp, color = AdditionalColors.TextColorStrong, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
+//                Text("Theme", fontSize = 26.sp, color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
 //                var pref = when(AdditionalColors.ThemeSetting.value){
 //                    0 -> followSystem
 //                    1 -> light
@@ -180,7 +227,6 @@ val light = "Light"
 val dark = "Dark"
 
 @Composable
-@Preview
 fun RadioGroupExample() {
         val options = listOf(followSystem, light, dark)
         var selectedOption = remember { mutableStateOf(options[AdditionalColors.ThemeSetting.value]) }
@@ -210,4 +256,19 @@ fun RadioGroupExample() {
                 }
             }
         }
+}
+
+@Composable
+@Preview
+fun SetupPreview()
+{
+    SharedPrefValues.DayNightPref = DayNightMode.FORCE_NIGHT
+}
+
+@Composable
+@Preview
+fun RadioGroupPreview()
+{
+    SetupPreview()
+    RadioGroupExample()
 }

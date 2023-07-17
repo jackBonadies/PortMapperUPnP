@@ -1,4 +1,4 @@
-package com.shinjiIndustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,7 +11,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
-import com.shinjiIndustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -1184,7 +1184,6 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
         {
             if(UpnpManager.ActionNames.contains(action.name))
             {
-                // TODO: convert "actions" into strongly typed functions so they
                 // are easy to call and parse output
                 actionsMap[action.name] = action
             }

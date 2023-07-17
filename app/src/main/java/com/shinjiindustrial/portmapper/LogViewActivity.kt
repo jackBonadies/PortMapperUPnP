@@ -1,4 +1,4 @@
-package com.shinjiIndustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -36,8 +36,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.shinjiIndustrial.portmapper.ui.theme.AdditionalColors
-import com.shinjiIndustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 
 class LogViewActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -63,7 +63,7 @@ class LogViewActivity : ComponentActivity() {
                                 }
                             },
 //                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
                             title = {
                                 Text(
                                     text = "Logs",
@@ -101,7 +101,7 @@ class LogViewActivity : ComponentActivity() {
                         LazyColumn( state = listState,
                             //modifier = Modifier.background(MaterialTheme.colorScheme.background),
                             modifier = Modifier
-                                .background(AdditionalColors.Background)
+                                .background(MaterialTheme.colorScheme.background)
                                 .padding(it)
                                 .fillMaxHeight()
                                 .fillMaxWidth(),

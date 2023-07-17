@@ -1,19 +1,36 @@
-package com.shinjiIndustrial.portmapper.ui.theme
+package com.shinjiindustrial.portmapper.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
+
 import androidx.core.view.WindowCompat
-import com.shinjiIndustrial.portmapper.DayNightMode
-import com.shinjiIndustrial.portmapper.SharedPrefValues
+import com.shinjiindustrial.portmapper.DayNightMode
+import com.shinjiindustrial.portmapper.SharedPrefValues
+
+fun getBlend(first : Color, second : Color, ratio : Double) : Color
+{
+    val newRed = first.red.toDouble() * (1f-ratio) + second.red.toDouble()  * (ratio)
+    val newGreen = first.green.toDouble() * (1f-ratio) + second.green.toDouble()  * (ratio)
+    val newBlue = first.blue.toDouble() * (1f-ratio) + second.blue.toDouble()  * (ratio)
+    return Color(newRed.toFloat(), newGreen.toFloat(), newBlue.toFloat(), 1f)
+}
+
 
 val Blue40 = Color(0xff014C69)
 val Blue40_Ligher = Color(0xff0A7B9C)
@@ -26,7 +43,10 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Pink80,
 
     onSurface = AdditionalColors.AdditionalColorsDark.TextColor,
-    onPrimary = AdditionalColors.AdditionalColorsDark.TextColorStrong
+    onPrimary = AdditionalColors.AdditionalColorsDark.TextColorStrong,
+    secondaryContainer = Blue40,
+    background = Color(0xff181C1F),
+
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -35,8 +55,9 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Pink40,
     // used in places where the background color isnt explicitly changed
     onSurface = AdditionalColors.AdditionalColorsLight.TextColor,
-    onPrimary = AdditionalColors.AdditionalColorsLight.TextColorStrong
-//    background = Color.Red,
+    onPrimary = AdditionalColors.AdditionalColorsLight.TextColorStrong,
+    secondaryContainer = Blue80,
+    background = Color(0xffF0F0F2),
 //    surface = Color.Red,
 //    onPrimary = Color.Red,
 //    onSecondary = Color.Red,
@@ -73,6 +94,7 @@ object AdditionalColors {
     var TextColorStrong = AdditionalColorsLight.TextColorStrong
     var TextColor = AdditionalColorsLight.TextColor
     var TextColorWeak = AdditionalColorsLight.TextColorWeak
+    var TopAppBarColor = AdditionalColorsLight.TextColorWeak
     var SubtleBorder = AdditionalColorsLight.SubtleBorder
 
     var LogErrorText = AdditionalColorsLight.LogErrorText
@@ -121,8 +143,9 @@ object AdditionalColors {
         override var LogWarningText =  Color(0xffBBB529)
 
     }
-    var ThemeSetting = mutableStateOf(SharedPrefValues.DayNightPref.intVal)
 
+    var ThemeSetting = mutableStateOf(SharedPrefValues.DayNightPref.intVal)
+    var ThemeSettingMaterialYou = mutableStateOf(SharedPrefValues.MaterialYouTheme)
 }
 
 
@@ -136,15 +159,6 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
 
-//    val useDark = when {
-//        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-//            val context = LocalContext.current
-//            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-//        }
-//
-//        darkTheme -> DarkColorScheme
-//        else -> LightColorScheme
-//    }
     var dayNightMode = DayNightMode.from(AdditionalColors.ThemeSetting.value)
 
     var useDark = darkTheme
@@ -157,17 +171,48 @@ fun MyApplicationTheme(
         useDark = true
     }
 
-    var darkLightAdditionalColors : AdditionalColors.IAdditionalColors = if (useDark) AdditionalColors.AdditionalColorsDark else AdditionalColors.AdditionalColorsLight
-    AdditionalColors.Background = darkLightAdditionalColors.Background
-    AdditionalColors.SubtleBorder = darkLightAdditionalColors.SubtleBorder
-    AdditionalColors.CardContainerColor = darkLightAdditionalColors.CardContainerColor
-    AdditionalColors.TextColorWeak = darkLightAdditionalColors.TextColorWeak
-    AdditionalColors.TextColor = darkLightAdditionalColors.TextColor
-    AdditionalColors.TextColorStrong = darkLightAdditionalColors.TextColorStrong
-    AdditionalColors.LogErrorText = darkLightAdditionalColors.LogErrorText
-    AdditionalColors.LogWarningText = darkLightAdditionalColors.LogWarningText
+    var useMaterialYou = AdditionalColors.ThemeSettingMaterialYou.value
+    key(useMaterialYou, dayNightMode)
+    {
+        val colorSchemeToUse = when {
+            useMaterialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val context = LocalContext.current
+                if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
 
-    val colorScheme = if(useDark) DarkColorScheme else LightColorScheme
+            useDark -> DarkColorScheme
+            else -> LightColorScheme
+        }
+
+        var darkLightAdditionalColors: AdditionalColors.IAdditionalColors =
+            if (useDark) AdditionalColors.AdditionalColorsDark else AdditionalColors.AdditionalColorsLight
+        AdditionalColors.Background = darkLightAdditionalColors.Background
+        AdditionalColors.SubtleBorder = darkLightAdditionalColors.SubtleBorder
+        AdditionalColors.CardContainerColor = darkLightAdditionalColors.CardContainerColor
+        AdditionalColors.TextColorWeak = darkLightAdditionalColors.TextColorWeak
+        AdditionalColors.TextColor = darkLightAdditionalColors.TextColor
+        AdditionalColors.TextColorStrong = darkLightAdditionalColors.TextColorStrong
+        AdditionalColors.LogErrorText = darkLightAdditionalColors.LogErrorText
+        AdditionalColors.LogWarningText = darkLightAdditionalColors.LogWarningText
+        AdditionalColors.TopAppBarColor = colorSchemeToUse.secondary
+
+
+        if (useMaterialYou) {
+            AdditionalColors.TextColorStrong = colorSchemeToUse.onSurface
+            AdditionalColors.TextColor = colorSchemeToUse.onSurfaceVariant
+            AdditionalColors.TextColorWeak = colorSchemeToUse.onSurfaceVariant
+            //AdditionalColors.Background = colorSchemeToUse.background //TODO: just set background for non material
+            AdditionalColors.CardContainerColor = colorSchemeToUse.surfaceColorAtElevation(
+                5.dp
+            )
+            AdditionalColors.TopAppBarColor = colorSchemeToUse.surfaceColorAtElevation(
+                4.dp
+            )
+
+            AdditionalColors.SubtleBorder = getBlend(colorSchemeToUse.surface, colorSchemeToUse.onSurface, 0.2)
+        }
+
+        //val colorScheme = if(colorSchemeToUse) DarkColorScheme else LightColorScheme
 //    val colorScheme = when {
 //        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
 //            val context = LocalContext.current
@@ -178,31 +223,30 @@ fun MyApplicationTheme(
 //        else -> LightColorScheme
 //    }
 
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.secondary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+        val view = LocalView.current
+        if (!view.isInEditMode) {
+            SideEffect {
+                val window = (view.context as Activity).window
+                window.statusBarColor = AdditionalColors.TopAppBarColor.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
+                    darkTheme
+            }
         }
-    }
 
-    // both clauses are the same. this is a hack to get
-    // theme to recompose.
-    if(AdditionalColors.ThemeSetting.value == 0)
-    {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = Typography,
-            content = content
-        )
-    }
-    else
-    {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = Typography,
-            content = content
-        )
+        // both clauses are the same. this is a hack to get
+        // theme to recompose.
+        //if (AdditionalColors.ThemeSetting.value == 0) {
+            MaterialTheme(
+                colorScheme = colorSchemeToUse,
+                typography = Typography,
+                content = content
+            )
+//        } else {
+//            MaterialTheme(
+//                colorScheme = colorSchemeToUse,
+//                typography = Typography,
+//                content = content
+//            )
+//        }
     }
 }
