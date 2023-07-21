@@ -515,7 +515,8 @@ class UpnpManager {
                         protocol.toString(),
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt(),
-                        remoteIp)
+                        remoteIp,
+                        System.currentTimeMillis()) // best bet for DateTime.UtcNow
 
                     PortForwardApplication.OurLogger.log(Level.INFO, "Successfully read back our new rule (${pm.shortName()})")
 
@@ -788,7 +789,7 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
         var device =
             UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
         var firstRule = device.portMappings.isEmpty()
-        device.portMappings.add(0, result.ResultingMapping!!) // add at beginning..
+        device.portMappings.add(result.ResultingMapping!!)
         if(firstRule)
         {
             // full refresh since we have to remove the old "no port mappings"
@@ -1476,33 +1477,61 @@ class PortMapping constructor(
     val _Protocol: String,
     val _Enabled: Boolean,
     val _LeaseDuration: Int,
-    val _ActionExternalIP : String)
+    val _ActionExternalIP : String,
+    val _timeReadLeaseDurationMs : Long)
 {
-    var ExternalIP : String // the returned ip from get port mapping
-    var LocalIP : String
-    var ExternalPort : Int
-    var InternalPort : Int
-    var Protocol : String
-    var Enabled : Boolean
-    var LeaseDuration : Int
-    var Description : String
-    var ActualExternalIP : String // the actual ip of the IGD device
-
-    init {
-        this.ExternalIP = _ExternalIP
-        this.LocalIP = _LocalIP
-        this.ExternalPort = _ExternalPort
-        this.InternalPort = _InternalPort
-        this.Protocol = _Protocol
-        this.Enabled = _Enabled
-        this.LeaseDuration = _LeaseDuration
-        this.Description = _Description
-        this.ActualExternalIP = _ActionExternalIP
-    }
+    var ExternalIP : String = _ExternalIP // the returned ip from get port mapping
+    var LocalIP : String = _LocalIP
+    var ExternalPort : Int = _ExternalPort
+    var InternalPort : Int= _InternalPort
+    var Protocol : String = _Protocol
+    var Enabled : Boolean = _Enabled
+    var LeaseDuration : Int  = _LeaseDuration
+    var Description : String = _Description
+    var ActualExternalIP : String = _ActionExternalIP // the actual ip of the IGD device
+    var TimeReadLeaseDurationMs : Long = _timeReadLeaseDurationMs
 
     fun shortName() : String
     {
         return formatShortName(Protocol,ActualExternalIP,ExternalPort.toString())
+    }
+
+    fun getRemainingLeaseTime() : Int
+    {
+        val secondsPassed = (System.currentTimeMillis() - TimeReadLeaseDurationMs)/1000L
+        val timeToExpiration = (LeaseDuration.toLong() - secondsPassed)
+        return timeToExpiration.toInt()
+    }
+
+    fun getRemainingLeaseTimeString() : String
+    {
+        // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
+        val totalSecs = getRemainingLeaseTime()
+        val hasDays = totalSecs / (24*3600) >= 1
+        val hasHours = totalSecs / (3600) >= 1
+        val hasMinutes = totalSecs / (60) >= 1
+        val hasSeconds = totalSecs >= 1
+
+        if (hasDays)
+        {
+            return "${totalSecs / (24*3600)} days, ${(totalSecs % (24*3600)) / 3600} hours"
+        }
+        else if(hasHours)
+        {
+            return "${totalSecs / (3600)} hours, ${(totalSecs % (3600)) / 60} minutes"
+        }
+        else if(hasMinutes)
+        {
+            return "${totalSecs / (60)} minutes, ${(totalSecs % (60))} seconds"
+        }
+        else if(hasSeconds)
+        {
+            return "$totalSecs seconds"
+        }
+        else
+        {
+            return "Expired"
+        }
     }
 }
 

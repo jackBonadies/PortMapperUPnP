@@ -20,6 +20,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -80,7 +82,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -92,6 +93,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
@@ -118,6 +120,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -129,6 +132,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
@@ -136,10 +140,10 @@ import java.io.IOException
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.random.Random
+import java.time.Instant
 import java.util.logging.*
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.first
+import kotlin.random.Random
+
 
 private val Context.dataStore by preferencesDataStore("preferences")
 
@@ -194,6 +198,7 @@ class PortForwardApplication : Application() {
 
 
         super.onCreate()
+
 
         RestoreSharedPrefs()
 
@@ -835,6 +840,49 @@ class MainActivity : ComponentActivity() {
     
 }
 
+//caused weird visual artifacts at runtime
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//@Preview
+//fun Picker()
+//{
+//    SetupPreview()
+//
+//        Row()
+//        {
+//
+//            for (i in 0..4) {
+//                AndroidView(
+//                    modifier = Modifier
+//                        .weight(1.0f)
+//                        .padding(10.dp),
+////                    update = { view ->
+////                        // Apply color and typography directly
+////                        view.findViewById<TextView>(R.id.myTextView).apply {
+////                            setTextColor(color.toArgb())
+////                            setTextAppearance(textAppearance)
+////                        }
+////                    },
+//                    factory = { context ->
+//                        var np = NumberPicker(context)
+//                        //np.textColor = MaterialTheme.colorScheme.primary
+//                        np.setDisplayedValues(
+//                            listOf(
+//                                "1 hour",
+//                                "2 hour",
+//                                "3 hour"
+//                            ).toTypedArray()
+//                        )
+//                        np.apply {
+//                            setOnValueChangedListener { numberPicker, i, i2 -> }
+//                            minValue = 0
+//                            maxValue = 2
+//
+//                        }
+//            }
+//        }
+//}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
@@ -1097,6 +1145,12 @@ fun EnterPortDialog()
     var showDialogMutable = remember { mutableStateOf(false) }
     EnterPortDialog(showDialogMutable, true)
 }
+
+//In IGD release 1.0, a value of 0 was used to create a static port mapping. In version 2.0, it is no longer
+//possible to create static port mappings via UPnP actions. Instead, an out-of-band mechanism is REQUIRED
+//to do so (cf. WWW-administration, remote management or local management). In order to be backward
+//compatible with legacy control points, the value of 0 MUST be interpreted as the maximum value (e.g.
+//604800 seconds, which corresponds to one week).
 
 @OptIn(ExperimentalComposeUiApi::class)
 @ExperimentalMaterial3Api
@@ -1885,7 +1939,7 @@ fun Conversation(messages: List<UPnPViewElement>) {
 //            }
 //        }
 
-            itemsIndexed(messages) { index, message ->
+            itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
 
                 if(message.IsSpecialEmpty)
                 {
@@ -1897,7 +1951,7 @@ fun Conversation(messages: List<UPnPViewElement>) {
                 }
                 else
                 {
-                    PortMappingCard(message.GetUnderlyingPortMapping())
+                    PortMappingCard(message.GetUnderlyingPortMapping(), Modifier.animateItemPlacement())
                 }
 
 
@@ -2170,15 +2224,18 @@ fun NoMappingsCard()
 //                  },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(4.dp, 4.dp)
+                .padding(4.dp, 4.dp),
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
-                .clickable {
-                    //PortForwardApplication.currentSingleSelectedObject.value = portMapping
-                },
+//                .clickable {
+//
+//                    showAddRuleDialogState.value =
+//                    //PortForwardApplication.currentSingleSelectedObject.value = portMapping
+//                },
             elevation = CardDefaults.cardElevation(),
             colors = CardDefaults.cardColors(
                 containerColor = AdditionalColors.CardContainerColor,
             ),
+            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
 
             ) {
 
@@ -2267,11 +2324,15 @@ fun NoMappingsCard()
 
 @OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun PortMappingCard(portMapping: PortMapping)
+fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier)
 {
     println("external ip test ${portMapping.ExternalIP}")
 
     MyApplicationTheme(){
+
+        var isRound by remember { mutableStateOf(true)}
+        val borderRadius by animateIntAsState(targetValue = if(isRound) 100 else 0, animationSpec = tween(durationMillis = 2000))
+
     Card(
 //        onClick = {
 //            if(PortForwardApplication.showPopup != null)
@@ -2279,8 +2340,9 @@ fun PortMappingCard(portMapping: PortMapping)
 //                PortForwardApplication.showPopup.value = true
 //            }
 //                  },
-        modifier = Modifier
+        modifier = additionalModifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(borderRadius))
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
             .clickable {
@@ -2293,7 +2355,7 @@ fun PortMappingCard(portMapping: PortMapping)
 //                    })
 //                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
 //                    .show()
-
+                //isRound = !isRound
                 PortForwardApplication.currentSingleSelectedObject.value = portMapping
             },
             elevation = CardDefaults.cardElevation(),

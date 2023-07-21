@@ -169,7 +169,7 @@ fun Settings(modifier : Modifier = Modifier)
                         Text(
                             "Material You",
                             fontSize = 26.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = AdditionalColors.TextColorStrong,
                             modifier = Modifier
                                 .padding(12.dp, 18.dp, 0.dp, 18.dp)
                                 .weight(1.0f)
