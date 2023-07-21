@@ -920,7 +920,7 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 var index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1")),index)
+                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())),index)
             }
 
         }
@@ -1875,7 +1875,7 @@ fun PreviewConversation() {
 
     //ComposeTutorialTheme {
     val msgs = mutableListOf<UPnPViewElement>()
-    var pm = PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1")
+    var pm = PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())
     var upnpViewEl = UPnPViewElement(pm)
     msgs.add(upnpViewEl)
     msgs.add(upnpViewEl)
@@ -2031,7 +2031,8 @@ fun PortMappingCard()
                 "UDP",
                 true,
                 0,
-                "192.168.18.1"
+                "192.168.18.1",
+                System.currentTimeMillis()
             )
         )
 }
@@ -2052,7 +2053,8 @@ fun PortMappingCardAlt()
             "UDP",
             true,
             0,
-            "192.168.18.1"
+            "192.168.18.1",
+            System.currentTimeMillis()
         )
     )
 

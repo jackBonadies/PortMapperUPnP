@@ -834,7 +834,7 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 {
     fun realize() : PortMapping
     {
-        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp)
+        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis())
     }
 }
 
@@ -1364,7 +1364,8 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
                         protocol.toString(),
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt(),
-                        ipAddress)
+                        ipAddress,
+                        System.currentTimeMillis())
                     portMappings.add(portMapping)
                     // TODO: new port mapping added event
                     UpnpManager.PortInitialFoundEvent.invoke(portMapping)
