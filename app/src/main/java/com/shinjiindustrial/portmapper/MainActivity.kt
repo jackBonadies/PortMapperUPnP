@@ -16,6 +16,7 @@ import android.text.Html
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.util.DisplayMetrics
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -129,6 +130,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -137,7 +139,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
@@ -176,12 +181,16 @@ object SharedPrefKeys
 {
     val dayNightPref = "dayNightPref"
     val materialYouPref = "materialYouPref"
+    val sortOrderPref = "sortOrderPref"
+    val descAscPref = "descAscPref"
 }
 
 object SharedPrefValues
 {
     lateinit var DayNightPref : DayNightMode
     var MaterialYouTheme : Boolean = false
+    var SortByPortMapping : SortBy = SortBy.Slot
+    var Ascending : Boolean = true
 }
 
 enum class DayNightMode(val intVal : Int) {
@@ -231,7 +240,10 @@ class PortForwardApplication : Application() {
             SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
             val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
             SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
-
+            val sortOrderKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
+            SharedPrefValues.SortByPortMapping = SortBy.from(preferences[sortOrderKey] ?: 0)
+            val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
+            SharedPrefValues.Ascending = preferences[descAsc] ?: true
         }
     }
 
@@ -242,6 +254,10 @@ class PortForwardApplication : Application() {
                 preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
                 val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
                 preferences[materialYouKey] = SharedPrefValues.MaterialYouTheme
+                val sortKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
+                preferences[sortKey] = SharedPrefValues.SortByPortMapping.sortByValue
+                val descAscKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
+                preferences[descAscKey] = SharedPrefValues.Ascending
             }
         }
     }
@@ -344,30 +360,42 @@ class MainActivity : ComponentActivity() {
     fun deviceFoundHandler(remoteDevice: IGDDevice) {
         runOnUiThread {
             mainSearchInProgressAndNothingFoundYet?.value = false
-            upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice)) // calls LiveData.setValue i.e. must be done on UI thread
         }
+        UpnpManager.invokeUpdateUIFromData()
+        //updateUIFromData()
+//        runOnUiThread {
+//            mainSearchInProgressAndNothingFoundYet?.value = false
+//            Log.i("portmapperUI", "deviceFoundHandler add device")
+//            upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice)) // calls LiveData.setValue i.e. must be done on UI thread
+//        }
     }
 
     fun portMappingAddedHandler(portMapping : PortMapping)
     {
+//        runOnUiThread {
+//            upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
+//        }
+        UpnpManager.invokeUpdateUIFromData()
         // we dont know if this rule already exists. and so we dont want to add it twice.
-        updateUIFromData(null)
+        //updateUIFromData(null)
     }
 
     fun portMappingFoundHandler(portMapping: PortMapping) {
-        runOnUiThread {
-            upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
-        }
+        UpnpManager.invokeUpdateUIFromData()
+        //updateUIFromData()
+//        runOnUiThread {
+//            upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
+//        }
     }
 
     fun deviceFinishedListingPortsHandler(remoteDevice : IGDDevice)
     {
         if(remoteDevice.portMappings.isEmpty())
         {
-            runOnUiThread {
-                upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice, true)) // calls LiveData.setValue i.e. must be done on UI thread
-            }
+            UpnpManager.invokeUpdateUIFromData()
         }
+        //updateUIFromData()
+
     }
 
     fun searchStarted(o : Any?)
@@ -384,17 +412,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // todo need smart update method. rather than O(n)
     fun updateUIFromData(o : Any? = null)
     {
+        Log.i("portmapperUI", "updateUIFromData non ui thread")
         runOnUiThread {
+
+            Log.i("portmapperUI", "updateUIFromData")
+
             var data : MutableList<UPnPViewElement> = mutableListOf()
             for(device in UpnpManager.IGDDevices)
             {
                 data.add(UPnPViewElement(device))
 
-                for(mapping in device.portMappings)
+                if(device.portMappings.isEmpty())
                 {
-                    data.add(UPnPViewElement(mapping))
+                    data.add(UPnPViewElement(device, true)) // calls LiveData.setValue i.e. must be done on UI thread
+                }
+                else
+                {
+                    for(mapping in device.portMappings)
+                    {
+                        data.add(UPnPViewElement(mapping))
+                    }
                 }
             }
             upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
@@ -487,11 +527,24 @@ class MainActivity : ComponentActivity() {
         var success = UpnpManager.Initialize(this, false)
         upnpElementsViewModel = ViewModelProvider(this).get(UPnPElementViewModel::class.java)
         //updateUIFromData() // no longer needed with ViewModelProvided ViewModel
+
         UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
         UpnpManager.PortAddedEvent += ::portMappingAddedHandler
         UpnpManager.PortInitialFoundEvent += ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
-        UpnpManager.UpdateUIFromData += ::updateUIFromData
+
+        UpnpManager.SubscibeToUpdateData(lifecycleScope){
+            Log.i("portmapper","ui update data handler")
+            updateUIFromData(null)
+        }
+//
+//        UpnpManager.UpdateUIFromDataCollating.conflate().onEach {
+//
+//                Log.i("portmapper","ui update data handler")
+//                updateUIFromData(null)
+//
+//            }.launchIn(lifecycleScope)
+
         UpnpManager.SearchStarted += ::searchStarted
 
         if (UpnpManager.FailedToInitialize)
@@ -906,7 +959,7 @@ class MainActivity : ComponentActivity() {
     {
         super.onDestroy();
         UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
-        UpnpManager.PortAddedEvent -= ::portMappingFoundHandler
+        UpnpManager.PortAddedEvent -= ::portMappingAddedHandler
         UpnpManager.FinishedListingPortsEvent -= ::deviceFinishedListingPortsHandler
         UpnpManager.UpdateUIFromData -= ::updateUIFromData
     }
@@ -985,8 +1038,7 @@ fun ourBar()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
-fun BottomSheetSortBy()
-{
+fun BottomSheetSortBy() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -996,24 +1048,38 @@ fun BottomSheetSortBy()
             text = "Sort By",
             fontWeight = FontWeight.SemiBold,
             fontSize = 20.sp,
+            color = AdditionalColors.TextColorStrong,
             modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
         )
 
         Column()
         {
+            val numRow = 2
+            val numCol = 3
+            val curIndex = remember { mutableStateOf(SharedPrefValues.SortByPortMapping.sortByValue) }
 
-            for (i in 0..2) {
+            for (i in 0 until numRow) {
                 Row(modifier = Modifier.fillMaxWidth()) {
 //                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                     //FilterField.values().forEach {
-                    FilterButton(
-                        text = "test",//FilterField.from(i).name,
-                        isSelected = i ==2,
-                        onClick = { })
-                    FilterButton(
-                        text = FilterField.from(i).name,
-                        isSelected = i ==2,
-                        onClick = { })
+                    for (j in 0 until numCol) {
+                        val index = i * numCol + j
+                        SortSelectButton(
+                            modifier = Modifier.weight(1.0f),
+                            text = SortBy.from(index).getName(),//FilterField.from(i).name,
+                            isSelected = index == curIndex.value,
+                            onClick = {
+
+                                curIndex.value = index
+                                SharedPrefValues.SortByPortMapping = SortBy.from(index)
+                                UpnpManager.UpdateSorting()
+                                UpnpManager.invokeUpdateUIFromData()
+
+                                // TODO save prefs on close..
+                                // TODO when rules get added you cant just add for end, since default slot may not be sort.
+
+                            })
+                    }
                     //}
                 }
 //                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
@@ -1025,27 +1091,49 @@ fun BottomSheetSortBy()
 //                    }
 //                }
             }
-    }
-
+        }
     }
 }
 
-enum class FilterField(val intVal : Int) {
-    Index(0),
+enum class SortBy(val sortByValue : Int) {
+    Slot(0),
     Description(1),
-    ExternalPort(2),
-    InternalPort(3),
+    InternalPort(2),
+    ExternalPort(3),
     Device(4),
     Expiration(5);
 
     companion object {
-        fun from(findValue: Int): FilterField = FilterField.values().first { it.intVal == findValue }
+        fun from(findValue: Int): SortBy = SortBy.values().first { it.sortByValue == findValue }
+    }
+
+    fun getName() : String
+    {
+        return if(this == InternalPort) {
+            "Internal Port"
+        } else if(this == ExternalPort) {
+            "External Port"
+        } else {
+            name
+        }
+    }
+
+    fun getComparer(): PortMapperComparatorBase {
+        return when(this)
+        {
+            Slot -> PortMapperComparatorExternalPort() //TODO
+            Description -> PortMapperComparatorDescription()
+            InternalPort -> PortMapperComparatorInternalPort()
+            ExternalPort -> PortMapperComparatorExternalPort()
+            Device -> PortMapperComparatorDevice()
+            Expiration -> PortMapperComparatorExpiration()
+        }
     }
 }
 
 @ExperimentalMaterial3Api
 @Composable
-fun FilterButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onClick: () -> Unit) {
     val buttonColor: Color
     val textColor: Color
     if (isSelected) {
@@ -1057,10 +1145,9 @@ fun FilterButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier.then(Modifier
             .height(60.dp)
-            .width(100.dp)
-            .padding(6.dp),
+            .padding(6.dp)),
         colors = CardDefaults.cardColors(containerColor = buttonColor),
         shape = RoundedCornerShape(14.dp),
         onClick = onClick
@@ -2131,6 +2218,10 @@ fun Conversation(messages: List<UPnPViewElement>) {
 //            }
 
 
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(80.dp)) // so FAB doesnt get in way
             }
 
 

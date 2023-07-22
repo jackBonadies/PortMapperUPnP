@@ -3,17 +3,27 @@ package com.shinjiindustrial.portmapper
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkInfo
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
+import androidx.compose.ui.text.toLowerCase
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
@@ -31,6 +41,8 @@ import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
+import java.util.SortedSet
+import java.util.TreeSet
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
@@ -95,6 +107,14 @@ class UpnpManager {
         var FinishedListingPortsEvent = Event<IGDDevice>()
         var UpdateUIFromData = Event<Any?>()
         var SearchStarted = Event<Any?>()
+
+        var UpdateUIFromDataCollating : MutableSharedFlow<Any?> = MutableSharedFlow(extraBufferCapacity = 1,  onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        fun SubscibeToUpdateData(coroutineScope: CoroutineScope, eventHandler : ()->Unit)
+        {
+            UpnpManager.UpdateUIFromDataCollating.conflate().onEach {
+                eventHandler()
+            }.launchIn(coroutineScope)
+        }
         //var NetworkInfoAtTimeOfSearch : OurNetworkInfoBundle? = null
 
         fun Search(onlyIfNotYetSearched : Boolean) : Boolean
@@ -122,7 +142,7 @@ class UpnpManager {
             {
                 IGDDevices.clear()
             }
-            UpdateUIFromData.invoke(null)
+            invokeUpdateUIFromData()
         }
 
         fun GetUPnPService() : UpnpService {
@@ -204,7 +224,7 @@ class UpnpManager {
                         listOfResults[i] = result
                     }
 
-                    var future = CreatePortMappingRule(portMappingRequestRules[i], false, ::callback)
+                    var future = CreatePortMappingRule(portMappingRequestRules[i], false, "created", ::callback)
                     future.get()
                 }
 
@@ -388,6 +408,7 @@ class UpnpManager {
             {
                 AnyIgdDevices?.value = true
             }
+            Log.i("portmapperUI", "IGD device added")
             synchronized(lockIgdDevices)
             {
                 IGDDevices.add(igdDevice)
@@ -460,6 +481,19 @@ class UpnpManager {
                 }
             }
             return enableDisabledPortMappings
+        }
+
+        fun UpdateSorting()
+        {
+            synchronized(lockIgdDevices)
+            {
+                for (device in IGDDevices)
+                {
+                    var newMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
+                    newMappings.addAll(device.portMappings)
+                    device.portMappings = newMappings
+                }
+            }
         }
 
         fun GetAllRules() : MutableList<PortMapping>
@@ -574,7 +608,12 @@ class UpnpManager {
                 portMapping.Protocol,
                 portMapping.LeaseDuration.toString(),
                 enable)
-            return CreatePortMappingRule(portMappingRequest, true, onDisableEnableCompleteCallback)
+            return CreatePortMappingRule(portMappingRequest, true, getEnabledDisabledString(enable).lowercase(), onDisableEnableCompleteCallback)
+        }
+
+        fun getEnabledDisabledString(enabled : Boolean) : String
+        {
+            return if(enabled) "enabled" else "disabled"
         }
 
         fun enableDisableDefaultCallback(result : UPnPCreateMappingResult)
@@ -586,8 +625,8 @@ class UpnpManager {
                 var device =
                     UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
                 var oldMappingIndex = device.getMappingIndex(result.ResultingMapping!!.ExternalPort, result.ResultingMapping!!.Protocol) //.portMappings.indexOf(portMapping)
-                device.portMappings[oldMappingIndex] = result.ResultingMapping!!
-                UpnpManager.UpdateUIFromData.invoke(null)
+                //device.portMappings[oldMappingIndex] = result.ResultingMapping!! //TODO TODO
+                invokeUpdateUIFromData()
             }
         }
 
@@ -703,6 +742,7 @@ class UpnpManager {
         fun CreatePortMappingRule(
             portMappingRequest : PortMappingRequest,
             skipReadingBack : Boolean,
+            createContext : String,
             callback: (UPnPCreateMappingResult) -> Unit) : Future<Any>
         {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
@@ -726,7 +766,7 @@ class UpnpManager {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
-                    PortForwardApplication.OurLogger.log(Level.INFO, "Successfully created rule (${portMappingRequest.realize().shortName()}).")
+                    PortForwardApplication.OurLogger.log(Level.INFO, "Successfully $createContext rule (${portMappingRequest.realize().shortName()}).")
                     println("Successfully added, now reading back")
                     if(skipReadingBack)
                     {
@@ -778,8 +818,20 @@ class UpnpManager {
 
 
         //fun List<IGDDevice>
+
+        fun invokeUpdateUIFromData()
+        {
+             //UpnpManager.UpdateUIFromData.invoke(null)
+             GlobalScope.launch {
+                 Log.i("","tell ui to update collating")
+                 UpdateUIFromDataCollating.emit(null)
+             }
+        }
+
     }
 }
+
+
 
 fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
     println("default adding rule callback")
@@ -793,7 +845,7 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
         if(firstRule)
         {
             // full refresh since we have to remove the old "no port mappings"
-            UpnpManager.UpdateUIFromData.invoke(null)
+            UpnpManager.invokeUpdateUIFromData()
         }
         else
         {
@@ -814,7 +866,7 @@ fun defaultRuleDeletedCallback(result : UPnPResult) {
         var device =
             UpnpManager.getIGDDevice(result.RequestInfo!!.ActualExternalIP)
         device.portMappings.remove(result.RequestInfo)
-        UpnpManager.UpdateUIFromData.invoke(null)
+        invokeUpdateUIFromData()
     }
     else
     {
@@ -1162,7 +1214,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     var upnpType : String //i.e. InternetGatewayDevice
     var upnpTypeVersion : Int //i.e. 2
     var actionsMap : MutableMap<String, Action<RemoteService>>
-    var portMappings : MutableList<PortMapping> = mutableListOf()
+    var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
 //    var hasAddPortMappingAction : Boolean
 //    var hasDeletePortMappingAction : Boolean
 
@@ -1209,7 +1261,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     fun EnumeratePortMappings()
     {
         // we enumerate port mappings later
-        portMappings = mutableListOf()
+        portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
         var finishedEnumeratingPortMappings = false
 
         val timeTakenMillis = measureTimeMillis {
