@@ -204,7 +204,10 @@ enum class DayNightMode(val intVal : Int) {
 }
 
 
-
+//TODO clean up create (picker for duration, indication that 0 is max), port range, full screen (?)
+//TODO group by algorithm. way to convert from grouped port mappings to individial
+//TODO are "slots" ordering important?
+//TODO swipe to refresh still broken...
 class PortForwardApplication : Application() {
 
     override fun onCreate() {
@@ -405,14 +408,13 @@ class MainActivity : ComponentActivity() {
             searchInProgressJob?.cancel() // cancel old search timer
             if (mainSearchInProgressAndNothingFoundYet!!.value) {
                 searchInProgressJob = GlobalScope.launch {
-                    delay(6000) //TODO change back to 6s or less
+                    delay(6000)
                     mainSearchInProgressAndNothingFoundYet!!.value = false
                 }
             }
         }
     }
 
-    // todo need smart update method. rather than O(n)
     fun updateUIFromData(o : Any? = null)
     {
         Log.i("portmapperUI", "updateUIFromData non ui thread")
@@ -724,20 +726,6 @@ class MainActivity : ComponentActivity() {
                                         showAddRuleDialog = true
 
                                         //this works
-//                                    coroutineScope.launch {
-//                                        println("show snackbar")
-//                                        var snackbarResult = snackbarHostState.showSnackbar(
-//                                            "testing",
-//                                            "action",
-//                                            true,
-//                                            SnackbarDuration.Indefinite
-//                                        )
-//                                        println("shown")
-//                                        when (snackbarResult) {
-//                                            SnackbarResult.Dismissed -> TODO()
-//                                            SnackbarResult.ActionPerformed -> TODO()
-//                                        }
-//                                    }
 
                                     }) {
                                     Icon(
@@ -1064,9 +1052,10 @@ fun BottomSheetSortBy() {
                     //FilterField.values().forEach {
                     for (j in 0 until numCol) {
                         val index = i * numCol + j
+                        //todo if index is out of range of sortby.values then produce an empty
                         SortSelectButton(
                             modifier = Modifier.weight(1.0f),
-                            text = SortBy.from(index).getName(),//FilterField.from(i).name,
+                            text = SortBy.from(index).getShortName(),//FilterField.from(i).name,
                             isSelected = index == curIndex.value,
                             onClick = {
 
@@ -1074,9 +1063,7 @@ fun BottomSheetSortBy() {
                                 SharedPrefValues.SortByPortMapping = SortBy.from(index)
                                 UpnpManager.UpdateSorting()
                                 UpnpManager.invokeUpdateUIFromData()
-
-                                // TODO save prefs on close..
-                                // TODO when rules get added you cant just add for end, since default slot may not be sort.
+                                PortForwardApplication.instance.SaveSharedPrefs()
 
                             })
                     }
@@ -1113,6 +1100,17 @@ enum class SortBy(val sortByValue : Int) {
             "Internal Port"
         } else if(this == ExternalPort) {
             "External Port"
+        } else {
+            name
+        }
+    }
+
+    fun getShortName() : String
+    {
+        return if(this == InternalPort) {
+            "Int. Port"
+        } else if(this == ExternalPort) {
+            "Ext. Port"
         } else {
             name
         }

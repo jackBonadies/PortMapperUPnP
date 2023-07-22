@@ -491,6 +491,10 @@ class UpnpManager {
                 {
                     var newMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
                     newMappings.addAll(device.portMappings)
+                    for(pm in newMappings)
+                    {
+                        device.lookUpExisting[pm.getKey()] = pm
+                    }
                     device.portMappings = newMappings
                 }
             }
@@ -624,8 +628,7 @@ class UpnpManager {
                 result.ResultingMapping!!
                 var device =
                     UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
-                var oldMappingIndex = device.getMappingIndex(result.ResultingMapping!!.ExternalPort, result.ResultingMapping!!.Protocol) //.portMappings.indexOf(portMapping)
-                //device.portMappings[oldMappingIndex] = result.ResultingMapping!! //TODO TODO
+                device.addOrUpdate(result.ResultingMapping!!)
                 invokeUpdateUIFromData()
             }
         }
@@ -841,7 +844,7 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
         var device =
             UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
         var firstRule = device.portMappings.isEmpty()
-        device.portMappings.add(result.ResultingMapping!!)
+        device.addOrUpdate(result.ResultingMapping!!)
         if(firstRule)
         {
             // full refresh since we have to remove the old "no port mappings"
@@ -865,7 +868,7 @@ fun defaultRuleDeletedCallback(result : UPnPResult) {
         result.RequestInfo!!
         var device =
             UpnpManager.getIGDDevice(result.RequestInfo!!.ActualExternalIP)
-        device.portMappings.remove(result.RequestInfo)
+        device.removeMapping(result.RequestInfo!!)
         invokeUpdateUIFromData()
     }
     else
@@ -1215,17 +1218,19 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     var upnpTypeVersion : Int //i.e. 2
     var actionsMap : MutableMap<String, Action<RemoteService>>
     var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
+    var lookUpExisting : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
 //    var hasAddPortMappingAction : Boolean
 //    var hasDeletePortMappingAction : Boolean
 
-    fun getMappingIndex(externalPort : Int, protocol : String) : Int
-    {
-        return portMappings.indexOfFirst { it.ExternalPort == externalPort && it.Protocol == protocol }
-    }
+//    fun getMappingIndex(externalPort : Int, protocol : String) : Int
+//    {
+//        return portMappings.indexOfFirst { it.ExternalPort == externalPort && it.Protocol == protocol }
+//    }
 
     init {
         this.rootDevice = _rootDevice
         this.wanIPService = _wanIPService
+
         if(_wanIPService != null && _rootDevice != null) // these are only nullable for unit test purposes
         {
             this.displayName = this.rootDevice!!.displayString
@@ -1431,8 +1436,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                         leaseDuration.toString().toInt(),
                         ipAddress,
                         System.currentTimeMillis())
-                    portMappings.add(portMapping)
-                    // TODO: new port mapping added event
+                    addOrUpdate(portMapping)
                     UpnpManager.PortInitialFoundEvent.invoke(portMapping)
                     success = true
                 }
@@ -1480,6 +1484,23 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                 OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
             }
         }
+    }
+
+    fun addOrUpdate(mapping : PortMapping)
+    {
+        val key = mapping.getKey()
+        if(this.lookUpExisting.containsKey(key))
+        {
+            this.portMappings.remove(this.lookUpExisting[key])
+        }
+        this.lookUpExisting[key] = mapping
+        this.portMappings.add(mapping)
+    }
+
+    fun removeMapping(mapping : PortMapping)
+    {
+        this.lookUpExisting.remove(mapping.getKey())
+        this.portMappings.remove(mapping)
     }
 }
 
@@ -1556,6 +1577,11 @@ class PortMapping constructor(
     var Description : String = _Description
     var ActualExternalIP : String = _ActionExternalIP // the actual ip of the IGD device
     var TimeReadLeaseDurationMs : Long = _timeReadLeaseDurationMs
+
+    fun getKey() : Pair<Int, String>
+    {
+        return Pair<Int, String>(this.ExternalPort, this.Protocol)
+    }
 
     fun shortName() : String
     {

@@ -99,10 +99,19 @@ class UPnPManagerTests {
 
 
         val ss = TreeSet<PortMapping>(PortMapperComparatorExternalPort())
-
+        val lookUpExisting : MutableMap<Pair<Int,String>, PortMapping> = mutableMapOf()
         for (pm in portMappingsToAdd)
         {
+
+            val key = Pair<Int,String>(pm.ExternalPort, pm.Protocol)
+            if(lookUpExisting.containsKey(key))
+            {
+                ss.remove(lookUpExisting[key])
+            }
+            lookUpExisting[key] = pm
             ss.add(pm)
+
+
             //val list = ss.toList()
             //print(list.count())
         }
