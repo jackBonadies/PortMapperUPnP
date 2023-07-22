@@ -20,8 +20,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -35,6 +33,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -48,6 +47,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.ModalBottomSheetLayout
+import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -55,9 +56,11 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -82,6 +85,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -93,7 +97,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
@@ -107,6 +110,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
@@ -124,6 +128,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -140,7 +145,6 @@ import java.io.IOException
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.time.Instant
 import java.util.logging.*
 import kotlin.random.Random
 
@@ -249,6 +253,7 @@ class PortForwardApplication : Application() {
         var CurrentActivity: ComponentActivity? = null
 //        lateinit var showPopup : MutableState<Boolean>
         lateinit var currentSingleSelectedObject : MutableState<Any?>
+        var showContextMenu : MutableState<Boolean> = mutableStateOf(false)
         var PaddingBetweenCreateNewRuleRows = 4.dp
         var Logs : StringBuilder = StringBuilder()
         var OurLogger : Logger = Logger.getLogger("PortMapper")
@@ -446,7 +451,10 @@ class MainActivity : ComponentActivity() {
 
         var OurSnackbarHostState: SnackbarHostState? = null
     }
-    var upnpElementsViewModel = UPnPElementViewModel()
+
+    lateinit var upnpElementsViewModel: UPnPElementViewModel
+    //var upnpElementsViewModel: ViewModel by viewModels()
+    //var upnpElementsViewModel = UPnPElementViewModel()
     var searchInProgressJob : Job? = null
 
 
@@ -472,8 +480,13 @@ class MainActivity : ComponentActivity() {
 //        var result = future.get()
 
         //AndroidRouter().enableWiFi()
+        
+        // viewModel = ViewModelProvider(this).get(MyViewModel::class.java)
+        //     var upnpElementsViewModel = UPnPElementViewModel()
+
         var success = UpnpManager.Initialize(this, false)
-        updateUIFromData()
+        upnpElementsViewModel = ViewModelProvider(this).get(UPnPElementViewModel::class.java)
+        //updateUIFromData() // no longer needed with ViewModelProvided ViewModel
         UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
         UpnpManager.PortAddedEvent += ::portMappingAddedHandler
         UpnpManager.PortInitialFoundEvent += ::portMappingFoundHandler
@@ -499,6 +512,7 @@ class MainActivity : ComponentActivity() {
                 val scrollState = rememberScrollState()
                 var showAddRuleDialogState = remember { mutableStateOf(false) }
                 var showAboutDialogState = remember { mutableStateOf(false) }
+                var showMoreInfoDialogState = remember { mutableStateOf(false) }
                 var showAddRuleDialog by showAddRuleDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
                 var showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
 
@@ -506,7 +520,8 @@ class MainActivity : ComponentActivity() {
 //
 
 
-                PortForwardApplication.currentSingleSelectedObject = remember { mutableStateOf(null) }
+                PortForwardApplication.currentSingleSelectedObject =
+                    remember { mutableStateOf(null) }
 
 //                if(singleSelectionPopup)
 //                {
@@ -527,9 +542,18 @@ class MainActivity : ComponentActivity() {
 //                    }
                 //}
 
-                if(PortForwardApplication.currentSingleSelectedObject.value != null)
-                {
-                    EnterContextMenu(PortForwardApplication.currentSingleSelectedObject )
+                if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
+                    EnterContextMenu(
+                        PortForwardApplication.currentSingleSelectedObject,
+                        showMoreInfoDialogState
+                    )
+                }
+
+                if (showMoreInfoDialogState.value) {
+                    MoreInfoDialog(
+                        portMapping = PortForwardApplication.currentSingleSelectedObject.value as PortMapping,
+                        showDialog = showMoreInfoDialogState
+                    )
                 }
 
 
@@ -546,9 +570,8 @@ class MainActivity : ComponentActivity() {
 //                            Text("Hello, Dialog!")
 //                        }
                 }
-                
-                if(showAboutDialog)
-                {
+
+                if (showAboutDialog) {
                     AlertDialog(
                         onDismissRequest = { showAboutDialogState.value = false },
                         title = { Text("About") },
@@ -556,17 +579,20 @@ class MainActivity : ComponentActivity() {
 
                             Column()
                             {
-                                var aboutString : String = PortForwardApplication.appContext.getString(R.string.about_body);
-                                var packageInfo = PortForwardApplication.appContext.packageManager.getPackageInfo(PortForwardApplication.appContext.packageName, 0)
+                                var aboutString: String =
+                                    PortForwardApplication.appContext.getString(R.string.about_body);
+                                var packageInfo =
+                                    PortForwardApplication.appContext.packageManager.getPackageInfo(
+                                        PortForwardApplication.appContext.packageName,
+                                        0
+                                    )
 
                                 aboutString = String.format(aboutString, packageInfo.versionName)
-                                var spannedString : Spanned? = null
-                                if (Build.VERSION.SDK_INT >= 24)
-                                {
-                                    spannedString = Html.fromHtml(aboutString, Html.FROM_HTML_MODE_LEGACY)
-                                }
-                                else
-                                {
+                                var spannedString: Spanned? = null
+                                if (Build.VERSION.SDK_INT >= 24) {
+                                    spannedString =
+                                        Html.fromHtml(aboutString, Html.FROM_HTML_MODE_LEGACY)
+                                } else {
                                     spannedString = Html.fromHtml(aboutString)
                                 }
 
@@ -585,10 +611,9 @@ class MainActivity : ComponentActivity() {
                             }
 
 
-
-                               },
+                        },
                         confirmButton = {
-                            Button(onClick = { showAboutDialogState.value = false}) {
+                            Button(onClick = { showAboutDialogState.value = false }) {
                                 Text("OK")
                             }
                         })
@@ -601,9 +626,29 @@ class MainActivity : ComponentActivity() {
                 val anyIgdDevices = remember { mutableStateOf(!UpnpManager.IGDDevices.isEmpty()) }
                 UpnpManager.AnyIgdDevices = anyIgdDevices
 
-                Scaffold(
-                    snackbarHost = { SnackbarHost(OurSnackbarHostState!!) {
-                            data ->
+                val bottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
+
+                ModalBottomSheetLayout(
+                    sheetState = bottomSheetState,
+                    sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    sheetElevation = 24.dp,
+                    sheetBackgroundColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                    sheetContent = {
+                        // This is what will be shown in the bottom sheet
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            BottomSheetSortBy()
+                        }
+                    }
+                ) {
+
+                    Scaffold(
+
+                        snackbarHost = {
+                            SnackbarHost(OurSnackbarHostState!!) { data ->
                                 // custom snackbar with the custom colors
                                 Snackbar(
                                     data,
@@ -616,17 +661,16 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         },
-                    floatingActionButton = {
+                        floatingActionButton = {
 
-                        if(anyIgdDevices.value)
-                        {
-                            FloatingActionButton(
-                                // uses MaterialTheme.colorScheme.secondaryContainer
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
-                                onClick = {
-                                    showAddRuleDialog = true
+                            if (anyIgdDevices.value) {
+                                FloatingActionButton(
+                                    // uses MaterialTheme.colorScheme.secondaryContainer
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
+                                    onClick = {
+                                        showAddRuleDialog = true
 
-                                    //this works
+                                        //this works
 //                                    coroutineScope.launch {
 //                                        println("show snackbar")
 //                                        var snackbarResult = snackbarHostState.showSnackbar(
@@ -642,173 +686,201 @@ class MainActivity : ComponentActivity() {
 //                                        }
 //                                    }
 
-                                }) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Localized description",
-                                    tint = AdditionalColors.TextColor,
-                                )
+                                    }) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Localized description",
+                                        tint = AdditionalColors.TextColor,
+                                    )
+                                }
                             }
-                        }
-                    },
-                    topBar = {
-                        TopAppBar(
+                        },
+                        topBar = {
+                            TopAppBar(
 //                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
-                            //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-                            title = { Text(text = "PortMapper", color = AdditionalColors.TextColorStrong, fontWeight = FontWeight.Normal) },
-                            actions = { OverflowMenu(showAddRuleDialogState, showAboutDialogState) }
-                        )
-                    },
-                    content = {it  ->
+                                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                    containerColor = AdditionalColors.TopAppBarColor
+                                ),
+                                //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                                title = {
+                                    Text(
+                                        text = "PortMapper",
+                                        color = AdditionalColors.TextColorStrong,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                },
+                                actions = {
+                                    IconButton(onClick = {
+                                    coroutineScope.launch{
+                                        bottomSheetState.show()
+                                    }})
+                                    {
+                                        Icon(Icons.Default.Sort, contentDescription = "Sort")
+                                    }
+                                    OverflowMenu(
+                                        showAddRuleDialogState,
+                                        showAboutDialogState
+                                    )
+                                }
+                            )
+                        },
+                        content = { it ->
 
-                        val refreshScope = rememberCoroutineScope()
-                        var refreshState = remember { mutableStateOf(false) }
-                        var refreshing by refreshState
-
+                            val refreshScope = rememberCoroutineScope()
+                            var refreshState = remember { mutableStateOf(false) }
+                            var refreshing by refreshState
 
 
 //                            val refreshScope = rememberCoroutineScope()
 //                            var refreshing by remember { refreshState }
 
-                        fun refresh() = refreshScope.launch {
-                            refreshing = true
-                            //UpnpManager.Search(false)
-                            delay(6000)
-                            println("finish refreshing $refreshing")
-                            refreshing = false
-                        }
+                            fun refresh() = refreshScope.launch {
+                                refreshing = true
+                                //UpnpManager.Search(false)
+                                delay(6000)
+                                println("finish refreshing $refreshing")
+                                refreshing = false
+                            }
 
 
-                        val state = rememberPullRefreshState(refreshing, ::refresh)
+                            val state = rememberPullRefreshState(refreshing, ::refresh)
 
-                        //
+                            //
 
-                        BoxWithConstraints(
-                            Modifier
-                                .pullRefresh(state)
-                                .fillMaxHeight()
-                                .fillMaxWidth())
-                        {
-
-                            val boxHeight = with(LocalDensity.current) { constraints.maxHeight.toDp() }
-
-
-
-                            Column(
+                            BoxWithConstraints(
                                 Modifier
-                                    .padding(it)
+                                    .pullRefresh(state)
                                     .fillMaxHeight()
-                                    .fillMaxWidth()) {
+                                    .fillMaxWidth()
+                            )
+                            {
+
+                                val boxHeight =
+                                    with(LocalDensity.current) { constraints.maxHeight.toDp() }
+
+
+
+                                Column(
+                                    Modifier
+                                        .padding(it)
+                                        .fillMaxHeight()
+                                        .fillMaxWidth()
+                                ) {
 //                                    for (i in 1..10)
 //                                    {
 //                                        Text("test")
 //                                    }
-                                if(mainSearchInProgressAndNothingFoundYet!!.value)
-                                {
-                                    val offset = boxHeight * 0.28f
-                                    LoadingIcon("Searching for devices", Modifier.offset(y = offset))
-                                }
-                                else if(!anyIgdDevices.value)
-                                {
-                                    val offset = boxHeight * 0.28f
-                                    Column(modifier = Modifier.offset(y = offset))
-                                    {
-                                        Text("No UPnP enabled internet gateway devices found",
-                                            modifier = Modifier
-                                                .padding(0.dp, 10.dp)
-                                                .align(Alignment.CenterHorizontally),
-                                            textAlign = TextAlign.Center
+                                    if (mainSearchInProgressAndNothingFoundYet!!.value) {
+                                        val offset = boxHeight * 0.28f
+                                        LoadingIcon(
+                                            "Searching for devices",
+                                            Modifier.offset(y = offset)
                                         )
-
-                                        var interfacesUsedInSearch =
-                                            (UpnpManager.GetUPnPService().configuration as AndroidConfig).NetworkInterfacesUsedInfos
-                                        var anyInterfaces = UpnpManager.GetUPnPService().router.isEnabled
-                                        if(!anyInterfaces)
+                                    } else if (!anyIgdDevices.value) {
+                                        val offset = boxHeight * 0.28f
+                                        Column(modifier = Modifier.offset(y = offset))
                                         {
                                             Text(
-                                                "No valid interfaces",
+                                                "No UPnP enabled internet gateway devices found",
                                                 modifier = Modifier
                                                     .padding(0.dp, 10.dp)
                                                     .align(Alignment.CenterHorizontally),
                                                 textAlign = TextAlign.Center
                                             )
-                                        }
-                                        else {
 
-                                            Text(
-                                                "Interfaces Searched:",
-                                                modifier = Modifier
-                                                    .padding(0.dp, 10.dp, 0.dp, 0.dp)
-                                                    .align(Alignment.CenterHorizontally),
-                                                textAlign = TextAlign.Center
-                                            )
-
-
-                                            for (interfaceUsed in interfacesUsedInSearch!!) {
+                                            var interfacesUsedInSearch =
+                                                (UpnpManager.GetUPnPService().configuration as AndroidConfig).NetworkInterfacesUsedInfos
+                                            var anyInterfaces =
+                                                UpnpManager.GetUPnPService().router.isEnabled
+                                            if (!anyInterfaces) {
                                                 Text(
-                                                    "${interfaceUsed.first.displayName} (${interfaceUsed.second.networkTypeString.lowercase()})",
+                                                    "No valid interfaces",
                                                     modifier = Modifier
-                                                        .padding(0.dp, 0.dp)
+                                                        .padding(0.dp, 10.dp)
+                                                        .align(Alignment.CenterHorizontally),
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            } else {
+
+                                                Text(
+                                                    "Interfaces Searched:",
+                                                    modifier = Modifier
+                                                        .padding(0.dp, 10.dp, 0.dp, 0.dp)
+                                                        .align(Alignment.CenterHorizontally),
+                                                    textAlign = TextAlign.Center
+                                                )
+
+
+                                                for (interfaceUsed in interfacesUsedInSearch!!) {
+                                                    Text(
+                                                        "${interfaceUsed.first.displayName} (${interfaceUsed.second.networkTypeString.lowercase()})",
+                                                        modifier = Modifier
+                                                            .padding(0.dp, 0.dp)
+                                                            .align(Alignment.CenterHorizontally),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
+                                            }
+
+                                            // if no wifi
+                                            if (interfacesUsedInSearch == null ||
+                                                !interfacesUsedInSearch.any { it.second == NetworkType.WIFI }
+                                            ) {
+                                                Text(
+                                                    "Enable WiFi and retry",
+                                                    modifier = Modifier
+                                                        .padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                        .align(Alignment.CenterHorizontally),
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            } else {
+                                                Text(
+                                                    "Ensure a valid UPnP enabled internet gateway device is on the network and retry",
+                                                    modifier = Modifier
+                                                        .padding(0.dp, 20.dp, 0.dp, 10.dp)
                                                         .align(Alignment.CenterHorizontally),
                                                     textAlign = TextAlign.Center
                                                 )
                                             }
-                                        }
-
-                                        // if no wifi
-                                        if(interfacesUsedInSearch == null ||
-                                            !interfacesUsedInSearch.any {it.second == NetworkType.WIFI})
-                                        {
-                                            Text(
-                                                "Enable WiFi and retry",
+                                            Button(
+                                                onClick = {
+                                                    UpnpManager.Initialize(
+                                                        PortForwardApplication.appContext,
+                                                        true
+                                                    )
+                                                    UpnpManager.Search(false)
+                                                },
                                                 modifier = Modifier
-                                                    .padding(0.dp, 20.dp, 0.dp, 10.dp)
+                                                    .padding(0.dp, 10.dp)
                                                     .align(Alignment.CenterHorizontally),
-                                                textAlign = TextAlign.Center
-                                            )
+                                                shape = RoundedCornerShape(4),
+                                            ) {
+                                                Text(
+                                                    "Retry",
+                                                    color = AdditionalColors.TextColorStrong
+                                                )
+                                            }
                                         }
-                                        else
-                                        {
-                                            Text(
-                                                "Ensure a valid UPnP enabled internet gateway device is on the network and retry",
-                                                modifier = Modifier
-                                                    .padding(0.dp, 20.dp, 0.dp, 10.dp)
-                                                    .align(Alignment.CenterHorizontally),
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                        Button(
-                                            onClick = {
-                                                UpnpManager.Initialize(PortForwardApplication.appContext,true)
-                                                UpnpManager.Search(false)
-                                            },
-                                            modifier = Modifier
-                                                .padding(0.dp, 10.dp)
-                                                .align(Alignment.CenterHorizontally),
-                                            shape = RoundedCornerShape(4),
-                                        ) {
-                                            Text("Retry", color = AdditionalColors.TextColorStrong)
-                                        }
+                                    } else {
+                                        ConversationEntryPoint(upnpElementsViewModel)
                                     }
-                                }
-                                else
-                                {
-                                    ConversationEntryPoint(upnpElementsViewModel)
-                                }
 
 
 //                                MyScreen(viewModel)
 //                                Greeting("Android")
 //                                Text("hello")
 //                                MessageCard("hello", "message content", true)
+                                }
+
+                                PullRefreshIndicator(
+                                    refreshing,
+                                    state,
+                                    Modifier.align(Alignment.TopCenter)
+                                )
                             }
 
-                            PullRefreshIndicator(refreshing, state, Modifier.align(Alignment.TopCenter))
                         }
-
-                    }
-                )
+                    )
 //                Surface(
 //                    modifier = Modifier
 //                        .fillMaxSize()
@@ -825,6 +897,7 @@ class MainActivity : ComponentActivity() {
 //                    }
 //                }
 //                        }
+                }
             }
         }
     }
@@ -907,6 +980,104 @@ fun ourBar()
             OverflowMenu(showDialogMutable, showDialogMutable)
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Preview
+fun BottomSheetSortBy()
+{
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp)
+    ) {
+        Text(
+            text = "Sort By",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp,
+            modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+        )
+
+        Column()
+        {
+
+            for (i in 0..2) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+//                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    //FilterField.values().forEach {
+                    FilterButton(
+                        text = "test",//FilterField.from(i).name,
+                        isSelected = i ==2,
+                        onClick = { })
+                    FilterButton(
+                        text = FilterField.from(i).name,
+                        isSelected = i ==2,
+                        onClick = { })
+                    //}
+                }
+//                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+//                    FilterField.values().forEach {
+//                        FilterButton(
+//                            text = it.name,
+//                            isSelected = it.name == "FOLLOW_SYSTEM",
+//                            onClick = { })
+//                    }
+//                }
+            }
+    }
+
+    }
+}
+
+enum class FilterField(val intVal : Int) {
+    Index(0),
+    Description(1),
+    ExternalPort(2),
+    InternalPort(3),
+    Device(4),
+    Expiration(5);
+
+    companion object {
+        fun from(findValue: Int): FilterField = FilterField.values().first { it.intVal == findValue }
+    }
+}
+
+@ExperimentalMaterial3Api
+@Composable
+fun FilterButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    val buttonColor: Color
+    val textColor: Color
+    if (isSelected) {
+        buttonColor = MaterialTheme.colorScheme.primary
+        textColor = MaterialTheme.colorScheme.onPrimary
+    } else {
+        buttonColor = MaterialTheme.colorScheme.secondaryContainer
+        textColor = MaterialTheme.colorScheme.onSecondaryContainer
+    }
+
+    Card(
+        modifier = Modifier
+            .height(60.dp)
+            .width(100.dp)
+            .padding(6.dp),
+        colors = CardDefaults.cardColors(containerColor = buttonColor),
+        shape = RoundedCornerShape(14.dp),
+        onClick = onClick
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                modifier = Modifier.padding(2.dp),
+                text = text,
+                fontSize = 16.sp,
+                fontStyle = MaterialTheme.typography.headlineMedium.fontStyle,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = textColor,
+            )
+        }
+    }
 }
 
 fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPElementViewModel)
@@ -993,13 +1164,14 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 fun EnterContextMenu()
 {
     var showDialogMutable : MutableState<Any?> = remember { mutableStateOf(null) }
-    EnterContextMenu(showDialogMutable)
+    var showDialog = remember { mutableStateOf(false) }
+    EnterContextMenu(showDialogMutable, showDialog)
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
+fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>)
 {
     if(singleSelectedItem.value == null)
     {
@@ -1018,7 +1190,7 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
     )
     MyApplicationTheme {
         Dialog(
-            onDismissRequest = { singleSelectedItem.value = null },
+            onDismissRequest = { PortForwardApplication.showContextMenu.value = false },
             properties = prop,
         ) {
             Surface(
@@ -1037,53 +1209,57 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                         var portMapping = singleSelectedItem.value as PortMapping
                         menuItems.add(
                             Pair<String, () -> Unit>(
-                                "Edit",
-                                {
-                                    Toast.makeText(
-                                        PortForwardApplication.appContext,
-                                        "Edit clicked",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                })
+                                "Edit"
+                            ) {
+                                Toast.makeText(
+                                    PortForwardApplication.appContext,
+                                    "Edit clicked",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
-                                if (portMapping.Enabled) "Disable" else "Enable",
-                                {
+                                if (portMapping.Enabled) "Disable" else "Enable"
+                            ) {
 
-                                    fun enableDisableCallback(result : UPnPCreateMappingResult) {
-                                        //portMapping : PortMapping,
-                                        UpnpManager.enableDisableDefaultCallback(result)
-                                        RunUIThread {
-                                            if (result.Success!!) {
-                                                Toast.makeText(
-                                                    PortForwardApplication.appContext,
-                                                    "Success",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else {
-                                                Toast.makeText(
-                                                    PortForwardApplication.appContext,
-                                                    "Failure - ${result.FailureReason!!}",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            }
+                                fun enableDisableCallback(result: UPnPCreateMappingResult) {
+                                    //portMapping : PortMapping,
+                                    UpnpManager.enableDisableDefaultCallback(result)
+                                    RunUIThread {
+                                        if (result.Success!!) {
+                                            Toast.makeText(
+                                                PortForwardApplication.appContext,
+                                                "Success",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                PortForwardApplication.appContext,
+                                                "Failure - ${result.FailureReason!!}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
+                                }
 
-                                    var future = UpnpManager.DisableEnablePortMappingEntry(portMapping, !portMapping.Enabled, ::enableDisableCallback)
-                                    Toast.makeText(
-                                        PortForwardApplication.appContext,
-                                        "Disable clicked",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                })
+                                var future = UpnpManager.DisableEnablePortMappingEntry(
+                                    portMapping,
+                                    !portMapping.Enabled,
+                                    ::enableDisableCallback
+                                )
+                                Toast.makeText(
+                                    PortForwardApplication.appContext,
+                                    "Disable clicked",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
-                                "Delete",
-                                {
-                                    var future = UpnpManager.DeletePortMappingEntry(portMapping)
+                                "Delete"
+                            ) {
+                                var future = UpnpManager.DeletePortMappingEntry(portMapping)
 
 //
 //                                    Toast.makeText(
@@ -1091,17 +1267,13 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
 //                                        "Delete clicked",
 //                                        Toast.LENGTH_SHORT
 //                                    ).show()
-                                })
+                            }
                         )
                         menuItems.add(
-                            Pair<String, () -> Unit>("More Info",
-                                {
-                                    Toast.makeText(
-                                        PortForwardApplication.appContext,
-                                        "More Info clicked ${portMapping.Description}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                })
+                            Pair<String, () -> Unit>("More Info"
+                            ) {
+                                showMoreInfoDialog.value = true
+                            }
                         )
                         var index = 0
                         var lastIndex = menuItems.size - 1
@@ -1111,8 +1283,7 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>)
                                     .fillMaxWidth()
                                     .clickable {
                                         menuItem.second()
-                                        singleSelectedItem.value =
-                                            null //this redraws the inner composable before the outer...
+                                        PortForwardApplication.showContextMenu.value = false
                                     }
                                     .padding(vertical = 14.dp)
                             ) {
@@ -1868,41 +2039,24 @@ fun main() {
 
 data class Message(val name : String, val msg : String)
 
+fun _getDefaultPortMapping() : PortMapping
+{
+    return PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())
+}
+
 @Preview
 @Composable
 fun PreviewConversation() {
     MyApplicationTheme() {
 
-    //ComposeTutorialTheme {
-    val msgs = mutableListOf<UPnPViewElement>()
-    var pm = PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())
-    var upnpViewEl = UPnPViewElement(pm)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    msgs.add(upnpViewEl)
-    Conversation(msgs)
+        val msgs = mutableListOf<UPnPViewElement>()
+        val pm = _getDefaultPortMapping()
+        val upnpViewEl = UPnPViewElement(pm)
+        for (i in 0..20)
+        {
+            msgs.add(upnpViewEl)
+        }
+        Conversation(msgs)
     }
 
     //}
@@ -2086,7 +2240,7 @@ fun PortMappingCardAlt(portMapping: PortMapping)
         ) {
             Column(modifier = Modifier.weight(1f)){
                 Text(portMapping.Description, fontSize = TextUnit(20f, TextUnitType.Sp), fontWeight = FontWeight.SemiBold)
-                Text("${portMapping.LocalIP}")
+                Text("${portMapping.InternalIP}")
                 Text("${portMapping.ExternalPort} ➝ ${portMapping.InternalPort} • ${portMapping.Protocol}")
             }
 
@@ -2332,8 +2486,8 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
     MyApplicationTheme(){
 
-        var isRound by remember { mutableStateOf(true)}
-        val borderRadius by animateIntAsState(targetValue = if(isRound) 100 else 0, animationSpec = tween(durationMillis = 2000))
+        //var isRound by remember { mutableStateOf(true)}
+        //val borderRadius by animateIntAsState(targetValue = if(isRound) 100 else 0, animationSpec = tween(durationMillis = 2000))
 
     Card(
 //        onClick = {
@@ -2344,7 +2498,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 //                  },
         modifier = additionalModifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(borderRadius))
+            //.clip(RoundedCornerShape(borderRadius))
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
             .clickable {
@@ -2358,6 +2512,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 //                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
 //                    .show()
                 //isRound = !isRound
+                PortForwardApplication.showContextMenu.value = true
                 PortForwardApplication.currentSingleSelectedObject.value = portMapping
             },
             elevation = CardDefaults.cardElevation(),
@@ -2381,7 +2536,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
                     fontWeight = FontWeight.SemiBold,
                     color = AdditionalColors.TextColor
                 )
-                Text("${portMapping.LocalIP}", color = AdditionalColors.TextColor)
+                Text("${portMapping.InternalIP}", color = AdditionalColors.TextColor)
 
                 val text = buildAnnotatedString {
                     withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
@@ -2477,5 +2632,55 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 fun GreetingPreview() {
     MyApplicationTheme {
         Greeting("Android")
+    }
+}
+
+@Preview
+@Composable
+fun MoreInfoDialog()
+{
+    SetupPreview()
+    MoreInfoDialog(_getDefaultPortMapping(), remember { mutableStateOf(true) })
+}
+
+@Composable
+fun MoreInfoDialog(portMapping : PortMapping,  showDialog : MutableState<Boolean>)
+{
+    if(showDialog.value) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDialog.value = false },
+            title = { Text("Info") },
+            text = {
+                var pairs = mutableListOf<Pair<String, String>>()
+                pairs.add(Pair("Internal IP", portMapping.InternalIP))
+                pairs.add(Pair("Internal Port", portMapping.InternalPort.toString()))
+                pairs.add(Pair("External IP", portMapping.ExternalIP))
+                pairs.add(Pair("External Port", portMapping.ExternalPort.toString()))
+                pairs.add(Pair("Protocol", portMapping.Protocol))
+                pairs.add(Pair("Enabled", if (portMapping.Enabled) "True" else "False"))
+                pairs.add(Pair("Expires", portMapping.getRemainingLeaseTimeString()))
+                Column() {
+                    for (p in pairs) {
+                        Row()
+                        {
+                            Text(
+                                p.first,
+                                modifier = Modifier
+                                    .padding(0.dp, 0.dp, 10.dp, 4.dp)
+                                    .width(100.dp),
+                                textAlign = TextAlign.Right,
+                                color = AdditionalColors.TextColorWeak
+                            )
+                            Text(p.second, color = AdditionalColors.TextColorStrong)
+                        }
+                    }
+                }
+
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(onClick = { showDialog.value = false }) {
+                    Text("OK")
+                }
+            })
     }
 }

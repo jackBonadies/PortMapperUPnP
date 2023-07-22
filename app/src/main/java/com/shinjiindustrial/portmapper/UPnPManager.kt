@@ -567,7 +567,7 @@ class UpnpManager {
 
             var portMappingRequest = PortMappingRequest(
                 portMapping.Description,
-                portMapping.LocalIP,
+                portMapping.InternalIP,
                 portMapping.InternalPort.toString(),
                 portMapping.ActualExternalIP,
                 portMapping.ExternalPort.toString(),
@@ -1150,11 +1150,11 @@ enum class NetworkType(val networkTypeString: String) {
 }
 
 
-class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteService)
+class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteService?)
 {
 
-    var rootDevice : RemoteDevice
-    var wanIPService : RemoteService
+    var rootDevice : RemoteDevice?
+    var wanIPService : RemoteService?
     var displayName : String //i.e. Nokia IGD Version 2.00
     var friendlyDetailsName : String //i.e. Internet Home Gateway Device
     var manufacturer : String //i.e. Nokia
@@ -1174,20 +1174,33 @@ class IGDDevice constructor(_rootDevice : RemoteDevice, _wanIPService : RemoteSe
     init {
         this.rootDevice = _rootDevice
         this.wanIPService = _wanIPService
-        this.displayName = this.rootDevice.displayString
-        this.friendlyDetailsName = this.rootDevice.details.friendlyName
-        this.ipAddress = this.rootDevice.details.presentationURI.host //TODO if null maybe another way to find out
-        this.manufacturer = this.rootDevice.details.manufacturerDetails.manufacturer
-        this.upnpType = this.rootDevice.type.type
-        this.upnpTypeVersion = this.rootDevice.type.version
-        this.actionsMap = mutableMapOf()
-        for (action in _wanIPService.actions)
+        if(_wanIPService != null && _rootDevice != null) // these are only nullable for unit test purposes
         {
-            if(UpnpManager.ActionNames.contains(action.name))
+            this.displayName = this.rootDevice!!.displayString
+            this.friendlyDetailsName = this.rootDevice!!.details.friendlyName
+            this.ipAddress = this.rootDevice!!.details.presentationURI.host //TODO if null maybe another way to find out
+            this.manufacturer = this.rootDevice!!.details.manufacturerDetails.manufacturer
+            this.upnpType = this.rootDevice!!.type.type
+            this.upnpTypeVersion = this.rootDevice!!.type.version
+            this.actionsMap = mutableMapOf()
+            for (action in _wanIPService.actions)
             {
-                // are easy to call and parse output
-                actionsMap[action.name] = action
+                if(UpnpManager.ActionNames.contains(action.name))
+                {
+                    // are easy to call and parse output
+                    actionsMap[action.name] = action
+                }
             }
+        }
+        else
+        {
+            this.displayName = ""
+            this.friendlyDetailsName = ""
+            this.ipAddress = ""
+            this.manufacturer = ""
+            this.upnpType = ""
+            this.upnpTypeVersion = 1
+            this.actionsMap = mutableMapOf()
         }
     }
 
@@ -1482,7 +1495,7 @@ class PortMapping constructor(
     val _timeReadLeaseDurationMs : Long)
 {
     var ExternalIP : String = _ExternalIP // the returned ip from get port mapping
-    var LocalIP : String = _LocalIP
+    var InternalIP : String = _LocalIP
     var ExternalPort : Int = _ExternalPort
     var InternalPort : Int= _InternalPort
     var Protocol : String = _Protocol
@@ -1515,24 +1528,35 @@ class PortMapping constructor(
 
         if (hasDays)
         {
-            return "${totalSecs / (24*3600)} days, ${(totalSecs % (24*3600)) / 3600} hours"
+            val days = totalSecs / (24*3600)
+            val hours = (totalSecs % (24*3600)) / 3600
+            return "$days day${_plural(days)}, $hours hour${_plural(hours)}"
         }
         else if(hasHours)
         {
-            return "${totalSecs / (3600)} hours, ${(totalSecs % (3600)) / 60} minutes"
+            val hours = totalSecs / (3600)
+            val mins = (totalSecs % (3600)) / 60
+            return "$hours hour${_plural(hours)}, $mins minute${_plural(mins)}"
         }
         else if(hasMinutes)
         {
-            return "${totalSecs / (60)} minutes, ${(totalSecs % (60))} seconds"
+            val mins = totalSecs / (60)
+            val secs = (totalSecs % (60))
+            return "$mins minute${_plural(mins)}, $secs second${_plural(secs)}"
         }
         else if(hasSeconds)
         {
-            return "$totalSecs seconds"
+            return "$totalSecs second${_plural(totalSecs)}"
         }
         else
         {
             return "Expired"
         }
+    }
+
+    fun _plural(value : Int) : String
+    {
+        return if (value > 1) "s" else ""
     }
 }
 
