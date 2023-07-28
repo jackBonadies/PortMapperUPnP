@@ -1398,8 +1398,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 //        }
 //    }
 
-    val MIN_PORT = 1 // 0 is invalid port. wildcard port i.e. let the system choose.
-    val MAX_PORT = 65535
+
 
     private fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
         var slotIndex : Int = 0;
@@ -1503,6 +1502,9 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
         this.portMappings.remove(mapping)
     }
 }
+
+val MIN_PORT = 1 // 0 is invalid port. wildcard port i.e. let the system choose.
+val MAX_PORT = 65535
 
 class Event<T> {
     private val observers = mutableSetOf<(T) -> Unit>()

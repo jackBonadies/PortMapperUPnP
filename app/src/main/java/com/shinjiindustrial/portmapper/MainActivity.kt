@@ -26,9 +26,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -41,6 +39,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,6 +64,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -114,11 +114,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -141,9 +145,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
@@ -155,10 +156,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
@@ -203,7 +201,7 @@ object SharedPrefKeys
 
 object SharedPrefValues
 {
-    lateinit var DayNightPref : DayNightMode
+    var DayNightPref : DayNightMode = DayNightMode.FOLLOW_SYSTEM
     var MaterialYouTheme : Boolean = false
     var SortByPortMapping : SortBy = SortBy.Slot
     var Ascending : Boolean = true
@@ -584,34 +582,29 @@ class MainActivity : ComponentActivity() {
 
         AnimatedNavHost(navController = navController, startDestination = "main_screen") {
             composable("main_screen", exitTransition = {
-                slideOutHorizontally(
-                    targetOffsetX = { -300 }, animationSpec = tween(
-                        durationMillis = 300, easing = FastOutSlowInEasing
-                    )
-                ) //+ fadeOut(animationSpec = tween(300))
-            },
-                popEnterTransition = {
-                    slideInHorizontally(
-                        initialOffsetX = { -300 }, animationSpec = tween(
-                            durationMillis = 300, easing = FastOutSlowInEasing
-                        )
-                    ) //+ fadeIn(animationSpec = tween(300))
-
-                },
-            )
-            {
-                MainScreen(navController = navController)
-            }
-            composable("full_screen_dialog", exitTransition = {
-//                slideOutVertically(
-//                    targetOffsetY = { -300 }, animationSpec = tween(
+//                slideOutHorizontally(
+//                    targetOffsetX = { -300 }, animationSpec = tween(
 //                        durationMillis = 300, easing = FastOutSlowInEasing
 //                    )
-                //) //+
+//                )
                 fadeOut(animationSpec = tween(300))
             },
                 popEnterTransition = {
-                    fadeIn(animationSpec = tween(300))
+                    //fadeIn(animationSpec = tween(0))
+                    //this is whats used when going back from "create rule"
+                    slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(
+                        durationMillis = 200, easing = FastOutSlowInEasing
+                    )) + fadeIn(animationSpec = tween(400))
+                    //fadeIn(animationSpec = tween(300))
+//                    slideInHorizontally(
+//                        initialOffsetX = { -300 }, animationSpec = tween(
+//                            durationMillis = 300, easing = FastOutSlowInEasing
+//                        )
+//                    ) //+ fadeIn(animationSpec = tween(300))
+
+                },
+                popExitTransition = {
+                    fadeOut(animationSpec = tween(300))
 //                    slideInVertically(
 //                        initialOffsetY = { -300 }, animationSpec = tween(
 //                            durationMillis = 300, easing = FastOutSlowInEasing
@@ -619,6 +612,44 @@ class MainActivity : ComponentActivity() {
 //                    ) //+ fadeIn(animationSpec = tween(300))
 
                 },
+            )
+            {
+                MainScreen(navController = navController)
+            }
+            composable("full_screen_dialog",
+                    popExitTransition = {
+
+                                       slideOutVertically(
+                            targetOffsetY = { it / 2 }, animationSpec = tween(
+                                durationMillis = 200, easing = FastOutSlowInEasing
+                            )) + fadeOut(animationSpec = tween(100))
+//                slideOutVertically(
+//                    targetOffsetY = { -300 }, animationSpec = tween(
+//                        durationMillis = 300, easing = FastOutSlowInEasing
+//                    )
+                    //) //+
+                    //fadeOut(animationSpec = tween(300))
+                },
+                exitTransition = {
+               slideOutVertically(
+                   targetOffsetY = { it }, animationSpec = tween(
+                       durationMillis = 5000, easing = FastOutSlowInEasing
+                   ))
+                //) //+
+            },
+                enterTransition = {
+
+                    slideInVertically(initialOffsetY = { it }, animationSpec = tween(
+                            durationMillis = 200, easing = FastOutSlowInEasing
+                        )) + fadeIn(animationSpec = tween(400))
+//                        initialOffsetY = { -300 }, animationSpec = tween(
+//                            durationMillis = 300, easing = FastOutSlowInEasing
+//                        )
+
+                },
+                popEnterTransition = {
+                    fadeIn(animationSpec = tween(150))
+                }
             )
             {
                 RuleCreationDialog()
@@ -635,7 +666,7 @@ class MainActivity : ComponentActivity() {
         UpnpManager.UpdateUIFromData -= ::updateUIFromData
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     @Composable
     fun MainScreen(navController : NavHostController) {
         // A surface container using the 'background' color from the theme
@@ -793,12 +824,13 @@ class MainActivity : ComponentActivity() {
                 },
                 floatingActionButton = {
 
-                    if (anyIgdDevices.value) {
+                    if (true) {
                         FloatingActionButton(
                             // uses MaterialTheme.colorScheme.secondaryContainer
                             containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
                             onClick = {
-                                navController.navigate("full_screen_dialog")
+                                showAddRuleDialogState.value = true
+                                //navController.navigate("full_screen_dialog")
 
                                 //this works
 
@@ -1258,9 +1290,10 @@ fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onC
     }
 
     Card(
-        modifier = modifier.then(Modifier
-            .height(60.dp)
-            .padding(6.dp)),
+        modifier = modifier.then(
+            Modifier
+                .height(60.dp)
+                .padding(6.dp)),
         colors = CardDefaults.cardColors(containerColor = buttonColor),
         shape = RoundedCornerShape(14.dp),
         onClick = onClick
@@ -1513,6 +1546,7 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
 @Preview
 fun EnterPortDialog()
 {
+    SetupPreview()
     var showDialogMutable = remember { mutableStateOf(false) }
     EnterPortDialog(showDialogMutable, true)
 }
@@ -1527,18 +1561,6 @@ fun EnterPortDialog()
 @ExperimentalMaterial3Api
 @Composable
 fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boolean = false) {
-    val internalPortText = remember { mutableStateOf("") }
-    val externalPortText = remember { mutableStateOf("") }
-    val leaseDuration = remember { mutableStateOf("0") }
-    val description = remember { mutableStateOf("") }
-
-    var (ourIp, ourGatewayIp) = if (isPreview) Pair<String, String>("192.168.0.1","") else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
-        PortForwardApplication.appContext,
-        false
-    )
-
-    val internalIp = remember { mutableStateOf(ourIp!!) }
-
 
 
     var prop = DialogProperties(
@@ -1547,9 +1569,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
     securePolicy = SecureFlagPolicy.SecureOff,
     usePlatformDefaultWidth = false,
     decorFitsSystemWindows = true,
-//            usePlatformDefaultWidth = false,
-//            shape = RoundedCornerShape(16.dp),
-//            backgroundColor = Color.LightGray // set your preferred color here
     )
     MyApplicationTheme {
         Dialog(
@@ -1557,19 +1576,62 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
             properties = prop,
         ) {
             Surface(
-                shape = RoundedCornerShape(size = 6.dp)) {
+                shape = RoundedCornerShape(size = 6.dp))
+            {
+
+
+
+
+                val internalPortText = remember { mutableStateOf("") }
+                val internalPortTextEnd = remember { mutableStateOf("") }
+                val externalPortText = remember { mutableStateOf("") }
+                val externalPortTextEnd = remember { mutableStateOf("") }
+                val leaseDuration = remember { mutableStateOf("0") }
+                val description = remember { mutableStateOf("") }
+
+
+
+                var (ourIp, ourGatewayIp) = if (isPreview) Pair<String, String>("192.168.0.1","") else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
+                    PortForwardApplication.appContext,
+                    false
+                )
+
+                val internalIp = remember { mutableStateOf(ourIp!!) }
+
+
+
+                val descriptionError = remember { mutableStateOf(validateDescription(description.value).first) }
+                val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
+
+                var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
+                var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
+                var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
+                var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
+                var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
+                var interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
+
+                val hasSubmitted = remember { mutableStateOf(false) }
+
+
+
+
+
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
 //                    .background(
 //                        color = Color.DarkGray, shape = RoundedCornerShape(16.dp)
 //                    )
-                        .fillMaxWidth(0.9f)
+                        .fillMaxWidth(1.0f)
                 ) {
                     Text("Create New Rule", style = MaterialTheme.typography.headlineLarge, modifier = Modifier
                         .padding(6.dp, 6.dp)
                         .align(Alignment.Start))
                     Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp))
+
+
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(.9f)
@@ -1579,11 +1641,35 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     {
                         OutlinedTextField(
                             value = description.value,
-                            onValueChange = { description.value = it },
+                            onValueChange = {
+                                description.value = it;
+                                descriptionError.value = validateDescription(description.value).first
+                                descriptionErrorString.value = validateDescription(description.value).second
+                                            },
                             label = { Text("Description") },
+                            singleLine = true,
                             modifier = Modifier
                                 .weight(0.4f, true)
-                                .height(60.dp)
+                                ,//.height(60.dp),
+                            isError = hasSubmitted.value && descriptionError.value,
+                            trailingIcon = {
+                                if (hasSubmitted.value && descriptionError.value) {
+                                    Icon(Icons.Filled.Error, descriptionErrorString.value, tint = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            supportingText = {
+                                if(hasSubmitted.value && descriptionError.value) {
+                                    Text(
+                                        descriptionErrorString.value,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+//                                if (triedToSubmit.value && descriptionError.value) {
+//                                    Text("Description is empty", color = MaterialTheme.colorScheme.error)
+//                                }
+                            },
+
+
                         )
                     }
 
@@ -1594,11 +1680,29 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                         OutlinedTextField(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             value = internalIp.value,
-                            onValueChange = { internalIp.value = it },
+                            onValueChange = {
+                                internalIp.value = it
+                                internalIpHasError.value = validateInternalIp(internalIp.value).first
+                                interalIpErrorString.value = validateInternalIp(internalIp.value).second
+                            },
+                            isError = internalIpHasError.value,
+                            supportingText = {
+                                if(hasSubmitted.value && internalIpHasError.value) {
+                                    Text(
+                                        interalIpErrorString.value,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            },
+                            trailingIcon = {
+                                if (hasSubmitted.value && internalIpHasError.value) {
+                                    Icon(Icons.Filled.Error, interalIpErrorString.value, tint = MaterialTheme.colorScheme.error)
+                                }
+                            },
                             label = { Text("Internal Device") },
                             modifier = Modifier
                                 .weight(0.4f, true)
-                                .height(60.dp)
+                                //.height(60.dp)
                                 .onGloballyPositioned { coordinates ->
                                     //This value is used to assign to the DropDown the same width
                                     println("OurInternalDevice: " + coordinates.size.toSize())
@@ -1609,24 +1713,12 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                         return px / (context.resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
                                     }
 
-                                    val density = pxToDp(
-                                        PortForwardApplication.appContext,
-                                        (coordinates.size.height.toFloat())
-                                    )
+//                                    val density = pxToDp(
+//                                        PortForwardApplication.appContext,
+//                                        (coordinates.size.height.toFloat())
+//                                    )
                                     textfieldSize = coordinates.size.toSize()
                                 }
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        OutlinedTextField(
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            value = internalPortText.value,
-                            onValueChange = { internalPortText.value = it },
-                            label = { Text("Port") },
-                            modifier = Modifier
-                                .weight(0.2f, true)
-                                .height(60.dp)
                         )
 
                     }
@@ -1662,7 +1754,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
                     var selectedText by externalDeviceText
 
-
+                    PortRangeRow(internalPortText, internalPortTextEnd, startInternalHasError, endInternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
 
                     DeviceRow()
                     {
@@ -1671,59 +1763,9 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
                         DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
 
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        OutlinedTextField(
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            value = externalPortText.value,
-                            onValueChange = { externalPortText.value = it },
-                            label = { Text("Port") },
-                            modifier = Modifier
-                                .weight(0.2f, true)
-                                .height(60.dp)
-                        )
-
-
                     }
 
-
-//                    ExposedDropdownMenuBox(
-//                        expanded = expanded,
-//                        onExpandedChange = {
-//                            expanded = !expanded
-//                        }
-//                    ) {
-//                        TextField(
-//                            readOnly = true,
-//                            value = selectedOptionText,
-//                            onValueChange = { },
-//                            label = { Text("Label") },
-//                            trailingIcon = {
-//                                ExposedDropdownMenuDefaults.TrailingIcon(
-//                                    expanded = expanded
-//                                )
-//                            },
-//                            colors = ExposedDropdownMenuDefaults.textFieldColors()
-//                        )
-//                        ExposedDropdownMenu(
-//                            expanded = expanded,
-//                            onDismissRequest = {
-//                                expanded = false
-//                            }
-//                        ) {
-//                            options.forEach { selectionOption ->
-//                                DropdownMenuItem(
-//                                    text = {
-//                                        Text(selectionOption)
-//                                    },
-//                                    onClick = {
-//                                        selectedOptionText = selectionOption
-//                                        expanded = false
-//                                    }
-//                                )
-//                            }
-//                        }
-//                    }
+                    PortRangeRow(externalPortText, externalPortTextEnd, startExternalHasError, endExternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
 
                     var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
                     var selectedPort by selectedProtocolMutable
@@ -1735,7 +1777,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     ) {
                         var defaultModifier = Modifier
                             .fillMaxWidth(.5f)
-                            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
+                            //.height(60.dp)
+                            //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
                         DropDownOutline(defaultModifier,//Size(500f, textfieldSize.height),
                             selectedText = selectedProtocolMutable,
                             suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
@@ -1751,7 +1794,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             modifier = Modifier
                                 .weight(0.4f, true)
                                 //.fillMaxWidth(.4f)
-                                .height(60.dp)
+                                //.height(60.dp)
                         )
 
                     }
@@ -1760,15 +1803,15 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(.9f)
-                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
+                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp, bottom=10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Button(
                             onClick = {
                                 showDialogMutable.value = false
                             },
-                            shape = RoundedCornerShape(4),
-                            modifier = Modifier.weight(.6f)
+                            shape = RoundedCornerShape(16),
+                            modifier = Modifier.weight(.6f).height(46.dp)
                         ) {
                             Text("Cancel")
                         }
@@ -1781,16 +1824,20 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                             }
                         }
 
-//                        Text(text = "Create",
-//                            modifier = Modifier.weight(1.0f).clickable(interactionSource = interactionSource,
-//                                indication = null,
-//                                onClick = {
-//                                    println("TextField clicked")
-//                                })
-//                        )
-
                         Button(
                             onClick = {
+
+                                hasSubmitted.value = true
+                                if(descriptionError.value ||
+                                    startInternalHasError.value ||
+                                    startExternalHasError.value ||
+                                    endInternalHasError.value ||
+                                    endExternalHasError.value ||
+                                    internalIpHasError.value)
+                                {
+                                    // show toast and return
+                                    return@Button;
+                                }
 
                                 //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
@@ -1799,7 +1846,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                     RunUIThread {
 
 
-                                        //debug
+                                //debug
                                         for (res in result)
                                         {
                                             res!!
@@ -1861,8 +1908,8 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                                 var future = UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
                                 showDialogMutable.value = false
                             },
-                            shape = RoundedCornerShape(4),
-                            modifier = Modifier.weight(1.0f),
+                            shape = RoundedCornerShape(16),
+                            modifier = Modifier.weight(1.0f).height(46.dp),
 
                             )
                         {
@@ -1875,6 +1922,145 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
         }
         }
     }
+
+fun validateDescription(description : String) : Pair<Boolean, String>
+{
+    if(description.isEmpty())
+    {
+        return Pair(true, "Cannot be empty")
+    }
+    return Pair(false, "")
+}
+
+fun validateStartPort(startPort : String) : Pair<Boolean, String>
+{
+    if(startPort.isEmpty())
+    {
+        return Pair(true, "Port cannot be empty")
+    }
+    val portInt = startPort.toInt()
+    if(portInt < MIN_PORT || portInt > MAX_PORT)
+    {
+        return Pair(true, "Port must be between $MIN_PORT and $MAX_PORT")
+    }
+    return Pair(false, "")
+}
+
+fun validateEndPort(startPort : String, endPort : String) : Pair<Boolean, String>
+{
+    if(startPort.isEmpty())
+    {
+        // let them deal with that error first
+        return Pair(false, "")
+    }
+    if(endPort.isEmpty())
+    {
+        //valid
+        return Pair(false, "")
+    }
+
+    if(endPort.isEmpty())
+    {
+        //valid
+        return Pair(false, "")
+    }
+
+    val startPortInt = startPort.toInt()
+    val endPortInt = startPort.toInt()
+
+    if(endPortInt < MIN_PORT || endPortInt > MAX_PORT)
+    {
+        return Pair(true, "Port must be between $MIN_PORT and $MAX_PORT")
+    }
+
+    if(startPortInt > endPortInt)
+    {
+        return Pair(true, "End port must be after start")
+    }
+
+
+    return Pair(false, "")
+}
+
+fun validateInternalIp(ip : String) : Pair<Boolean, String>
+{
+    val regexIPv4 = """^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$""".toRegex()
+    return if(regexIPv4.matches(ip)) Pair(false, "") else Pair(true, "Must be valid IP address")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableState<String>, startHasError : MutableState<Boolean>, endHasError : MutableState<Boolean>, hasSubmitted : MutableState<Boolean>, modifier : Modifier)
+{
+    DeviceRow()
+    {
+
+        var startHasErrorString = remember { mutableStateOf(validateStartPort(startPortText.value).second) }
+        var endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value,endPortText.value).second) }
+
+        OutlinedTextField(
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = startPortText.value,
+            onValueChange = {
+                startPortText.value = it
+                startHasError.value = validateStartPort(startPortText.value).first
+                startHasErrorString.value = validateStartPort(startPortText.value).second
+                            },
+            label = { Text("Port Start") },
+            modifier = Modifier.then(modifier),
+                //.height(60.dp),
+            isError = hasSubmitted.value && startHasError.value,
+            supportingText = {
+                if(hasSubmitted.value && startHasError.value)
+                {
+                    Text(startHasErrorString.value, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            trailingIcon = {
+                if(hasSubmitted.value && startHasError.value)
+                {
+                    Icon(Icons.Filled.Error, contentDescription = startHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+                }
+            }
+
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text("to", modifier = Modifier.align(Alignment.CenterVertically))
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        OutlinedTextField(
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = endPortText.value,
+            onValueChange = {
+                endPortText.value = it
+                endHasError.value = validateEndPort(startPortText.value, endPortText.value).first
+                endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).second
+                            },
+            label = { Text("End (Optional)") },
+            modifier = Modifier.then(modifier)
+                ,
+            isError = hasSubmitted.value && endHasError.value,
+            supportingText = {
+                if(hasSubmitted.value && endHasError.value)
+                {
+                    Text(endHasErrorString.value, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            trailingIcon = {
+                if(hasSubmitted.value && endHasError.value)
+                {
+                    Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+                }
+            },
+//            visualTransformation = if (endPortText.value.isEmpty())
+//                PlaceholderTransformation("-")
+//            else VisualTransformation.None,
+        )
+    }
+}
 
 
 fun RunUIThread(runnable: Runnable)
@@ -1993,14 +2179,15 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
 }
 
 @Composable
-fun DeviceRow(content: @Composable () -> Unit) {
+fun DeviceRow(content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth(.9f)
             .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
-        horizontalArrangement = Arrangement.End
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Top // for the error text
     ) {
-        content()
+        content(this)
     }
 }
 
@@ -2371,6 +2558,7 @@ fun MessageCard(name: String, message : String, even : Boolean) {
 @Preview(showBackground = true)
 @Composable
 fun MessageCard() {
+    SetupPreview()
     MessageCard("Android", "I want to chat", true)
 }
 
@@ -2379,6 +2567,7 @@ fun MessageCard() {
 @Composable
 fun PortMappingCard()
 {
+    SetupPreview()
         PortMappingCard(
             PortMapping(
                 "Web Server",
@@ -2399,6 +2588,7 @@ fun PortMappingCard()
 @Composable
 fun PortMappingCardAlt()
 {
+    SetupPreview()
     MyApplicationTheme() {
 
     PortMappingCardAlt(
@@ -2887,4 +3077,27 @@ fun MoreInfoDialog(portMapping : PortMapping,  showDialog : MutableState<Boolean
                 }
             })
     }
+}
+
+class PlaceholderTransformation(val placeholder: String) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        return PlaceholderFilter(text, placeholder)
+    }
+}
+
+fun PlaceholderFilter(text: AnnotatedString, placeholder: String): TransformedText {
+
+    var out = placeholder
+
+    val numberOffsetTranslator = object : OffsetMapping {
+        override fun originalToTransformed(offset: Int): Int {
+            return 0
+        }
+
+        override fun transformedToOriginal(offset: Int): Int {
+            return 0
+        }
+    }
+
+    return TransformedText(AnnotatedString(placeholder), numberOffsetTranslator)
 }

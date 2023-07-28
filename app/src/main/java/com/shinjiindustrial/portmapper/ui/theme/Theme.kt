@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
@@ -143,7 +144,6 @@ object AdditionalColors {
         override var LogWarningText =  Color(0xffBBB529)
 
     }
-
     var ThemeSetting = mutableStateOf(SharedPrefValues.DayNightPref.intVal)
     var ThemeSettingMaterialYou = mutableStateOf(SharedPrefValues.MaterialYouTheme)
 }
