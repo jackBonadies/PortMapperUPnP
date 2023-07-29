@@ -3,7 +3,6 @@ package com.shinjiindustrial.portmapper
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -13,7 +12,6 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
-import androidx.compose.ui.text.toLowerCase
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +39,6 @@ import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
-import java.util.SortedSet
 import java.util.TreeSet
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
@@ -1597,36 +1594,35 @@ class PortMapping constructor(
         return timeToExpiration.toInt()
     }
 
+
+
     fun getRemainingLeaseTimeString() : String
     {
         // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
         val totalSecs = getRemainingLeaseTime()
-        val hasDays = totalSecs / (24*3600) >= 1
-        val hasHours = totalSecs / (3600) >= 1
-        val hasMinutes = totalSecs / (60) >= 1
-        val hasSeconds = totalSecs >= 1
+
+        var dhms = getDHMS(totalSecs)
+
+        val hasDays = dhms.days >= 1
+        val hasHours = dhms.hours >= 1
+        val hasMinutes = dhms.mins >= 1
+        val hasSeconds = dhms.seconds >= 1
 
         if (hasDays)
         {
-            val days = totalSecs / (24*3600)
-            val hours = (totalSecs % (24*3600)) / 3600
-            return "$days day${_plural(days)}, $hours hour${_plural(hours)}"
+            return "${dhms.days} day${_plural(dhms.days)}, ${dhms.hours} hour${_plural(dhms.hours)}"
         }
         else if(hasHours)
         {
-            val hours = totalSecs / (3600)
-            val mins = (totalSecs % (3600)) / 60
-            return "$hours hour${_plural(hours)}, $mins minute${_plural(mins)}"
+            return "${dhms.hours} hour${_plural(dhms.hours)}, ${dhms.mins} minute${_plural(dhms.mins)}"
         }
         else if(hasMinutes)
         {
-            val mins = totalSecs / (60)
-            val secs = (totalSecs % (60))
-            return "$mins minute${_plural(mins)}, $secs second${_plural(secs)}"
+            return "${dhms.mins} minute${_plural(dhms.mins)}, ${dhms.seconds} second${_plural(dhms.seconds)}"
         }
         else if(hasSeconds)
         {
-            return "$totalSecs second${_plural(totalSecs)}"
+            return "${dhms.seconds} second${_plural(dhms.seconds)}"
         }
         else
         {
@@ -1638,6 +1634,23 @@ class PortMapping constructor(
     {
         return if (value > 1) "s" else ""
     }
+}
+
+data class DayHourMinSec(val days : Int, val hours : Int, val mins : Int, val seconds : Int)
+{
+    fun totalSeconds() : Int
+    {
+        return days * 3600 * 24 + hours * 3600 + mins * 60 + seconds
+    }
+}
+
+fun getDHMS(totalSeconds : Int) : DayHourMinSec
+{
+    var days = totalSeconds / (24*3600)
+    var hours = (totalSeconds % (24*3600)) / 3600
+    var mins =  (totalSeconds % (3600)) / 60
+    var secs = (totalSeconds % (60))
+    return DayHourMinSec(days, hours, mins, secs)
 }
 
 fun formatShortName(protocol: String, externalIp: String, externalPort: String) : String

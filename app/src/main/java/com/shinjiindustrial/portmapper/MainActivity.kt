@@ -8,7 +8,6 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.fonts.FontStyle
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -24,6 +23,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -68,9 +69,11 @@ import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Expand
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -114,10 +117,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -133,6 +138,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
@@ -166,6 +172,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.io.IOException
+import java.lang.Exception
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -1119,7 +1126,9 @@ class MainActivity : ComponentActivity() {
             },
             content = { it ->
 
-                Column(modifier = Modifier.padding(it).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
+                Column(modifier = Modifier
+                    .padding(it)
+                    .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
                 {
                     CreateRuleContents()
                 }
@@ -1643,20 +1652,32 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Preview
 fun ColumnScope.CreateRuleContents()
 {
     //TODO FIX
     var isPreview = false;
     var showDialogMutable = remember { mutableStateOf(true) }
     var withButtons = false;
+    //END
+
+
+
+    var showLeaseDialog = remember { mutableStateOf(false) }
+
 
 
     val internalPortText = remember { mutableStateOf("") }
     val internalPortTextEnd = remember { mutableStateOf("") }
     val externalPortText = remember { mutableStateOf("") }
     val externalPortTextEnd = remember { mutableStateOf("") }
-    val leaseDuration = remember { mutableStateOf("0") }
+    val leaseDuration = remember { mutableStateOf("0 (max)") }
     val description = remember { mutableStateOf("") }
+
+    if(showLeaseDialog.value)
+    {
+        DurationPickerDialog(showLeaseDialog, leaseDuration)
+    }
 
 
     var (ourIp, ourGatewayIp) = remember {
@@ -1728,6 +1749,10 @@ fun ColumnScope.CreateRuleContents()
     }
 
     var textfieldSize by remember { mutableStateOf(Size.Zero) }
+    var expandedInternal = remember {mutableStateOf(false)}
+    var expandedExternal = remember {mutableStateOf(false)}
+
+    var portStartSize = remember { mutableStateOf(IntSize.Zero) }
 
     DeviceRow()
     {
@@ -1753,9 +1778,10 @@ fun ColumnScope.CreateRuleContents()
                     Icon(Icons.Filled.Error, interalIpErrorString.value, tint = MaterialTheme.colorScheme.error)
                 }
             },
+            singleLine = true,
             label = { Text("Internal Device") },
             modifier = Modifier
-                .weight(0.4f, true)
+                .weight(0.5f, true)
                 //.height(60.dp)
                 .onGloballyPositioned { coordinates ->
                     //This value is used to assign to the DropDown the same width
@@ -1774,8 +1800,27 @@ fun ColumnScope.CreateRuleContents()
                     textfieldSize = coordinates.size.toSize()
                 }
         )
+        Spacer(modifier = Modifier.width(8.dp))
 
+        //pass in expanded, pass in startHasErrorString, pass in internalPortText, pass in StartExternalHasError
+    // port start
+        var startHasErrorString = remember { mutableStateOf(validateStartPort(internalPortText.value).second) }
+        StartPortExpandable(internalPortText, startInternalHasError, startHasErrorString, hasSubmitted, expandedInternal, portStartSize)
     }
+
+    if(expandedInternal.value) {
+        PortRangeRow(
+            internalPortText,
+            internalPortTextEnd,
+            startInternalHasError,
+            endInternalHasError,
+            hasSubmitted,
+            Modifier.weight(0.2f, true),
+            portStartSize.value
+        )
+    }
+
+
 //                    val options = listOf("Option 1", "Option 2", "Option 3", "Option 4", "Option 5")
 //                    var expanded by remember { mutableStateOf(false) }
 //                    var selectedOptionText by remember { mutableStateOf(options[0]) }
@@ -1808,18 +1853,35 @@ fun ColumnScope.CreateRuleContents()
     var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
     var selectedText by externalDeviceText
 
-    PortRangeRow(internalPortText, internalPortTextEnd, startInternalHasError, endInternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
 
     DeviceRow()
     {
+//        var defaultModifier = Modifier
+//            .weight(0.5f, true)
+//            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
+//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
         var defaultModifier = Modifier
-            .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
+            .weight(0.5f, true)
+//            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
+//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
         DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
+        Spacer(modifier = Modifier.width(8.dp))
+        var startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).second) }
+        StartPortExpandable(externalPortText, startExternalHasError, startHasErrorString, hasSubmitted, expandedExternal, portStartSize)
 
     }
 
-    PortRangeRow(externalPortText, externalPortTextEnd, startExternalHasError, endExternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
+    if(expandedExternal.value) {
+        PortRangeRow(
+            externalPortText,
+            externalPortTextEnd,
+            startExternalHasError,
+            endExternalHasError,
+            hasSubmitted,
+            Modifier.weight(0.2f, true),
+            portStartSize.value
+        )
+    }
 
     var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
     var selectedPort by selectedProtocolMutable
@@ -1830,7 +1892,7 @@ fun ColumnScope.CreateRuleContents()
             .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
     ) {
         var defaultModifier = Modifier
-            .fillMaxWidth(.5f)
+            .weight(0.5f, true)
         //.height(60.dp)
         //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
         DropDownOutline(defaultModifier,//Size(500f, textfieldSize.height),
@@ -1840,13 +1902,39 @@ fun ColumnScope.CreateRuleContents()
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        var isFocused = remember { mutableStateOf(false) }
         OutlinedTextField(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = leaseDuration.value,
             onValueChange = { leaseDuration.value = it },
             label = { Text("Lease") },
+            trailingIcon = {
+                IconButton(onClick = { showLeaseDialog.value = true })
+                {
+                    Icon(
+                        Icons.Filled.Schedule,
+                        contentDescription = ""
+                    ) //TODO set error on main theme if not already.
+                }
+            },
             modifier = Modifier
-                .weight(0.4f, true)
+                .weight(0.5f, true)
+                .onFocusChanged {
+                    if (it.isFocused) {
+                        if (leaseDuration.value == "0 (max)") {
+                            leaseDuration.value = "0"
+                        }
+
+                    } else {
+
+                        if (leaseDuration.value == "0") {
+                            leaseDuration.value = "0 (max)"
+                        }
+                    }
+                },//isFocused.value = it.isFocused },
+//            visualTransformation = if (leaseDuration.value == "0" && !isFocused.value)
+//                PlaceholderTransformation("0 (max)")
+//            else VisualTransformation.None,
             //.fillMaxWidth(.4f)
             //.height(60.dp)
         )
@@ -1868,7 +1956,9 @@ fun ColumnScope.CreateRuleContents()
                     showDialogMutable.value = false
                 },
                 shape = RoundedCornerShape(16),
-                modifier = Modifier.weight(.6f).height(46.dp)
+                modifier = Modifier
+                    .weight(.6f)
+                    .height(46.dp)
             ) {
                 Text("Cancel")
             }
@@ -1963,7 +2053,9 @@ fun ColumnScope.CreateRuleContents()
                     showDialogMutable.value = false
                 },
                 shape = RoundedCornerShape(16),
-                modifier = Modifier.weight(1.0f).height(46.dp),
+                modifier = Modifier
+                    .weight(1.0f)
+                    .height(46.dp),
 
                 )
             {
@@ -1971,6 +2063,59 @@ fun ColumnScope.CreateRuleContents()
             }
         }
     }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState<Boolean>, errorString : MutableState<String>, hasSubmitted: MutableState<Boolean>, expanded : MutableState<Boolean>, startPortSize : MutableState<IntSize>)
+{
+    OutlinedTextField(
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        value = portText.value,
+        modifier = Modifier
+            .fillMaxWidth(.4f).onSizeChanged { startPortSize.value = it },
+        //.weight(0.4f, true),
+        singleLine = true,
+        onValueChange = {
+            portText.value = it
+            hasError.value = validateStartPort(portText.value).first
+            errorString.value = validateStartPort(portText.value).second
+        },
+        label = { if(expanded.value) Text("Port Start") else Text("Port") },
+        //modifier = Modifier.then(modifier),
+        //.height(60.dp),
+        isError = hasSubmitted.value && hasError.value,
+        supportingText = {
+            if(hasSubmitted.value && hasError.value)
+            {
+                Text(errorString.value, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        trailingIcon = {
+            if(hasSubmitted.value && hasError.value)
+            {
+                Icon(Icons.Filled.Error, contentDescription = errorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+            }
+            else
+            {
+                IconButton(onClick = { expanded.value = !expanded.value })
+                {
+                    if (expanded.value) {
+                        Icon(
+                            Icons.Filled.UnfoldLess,
+                            contentDescription = ""
+                        ) //TODO set error on main theme if not already.
+                    } else {
+                        Icon(
+                            Icons.Filled.UnfoldMore,
+                            contentDescription = ""
+                        ) //TODO set error on main theme if not already.
+                    }
+                }
+            }
+        }
+    )
 }
 
 val createNewRuleRowWidth = 1.0f
@@ -1990,7 +2135,7 @@ fun validateStartPort(startPort : String) : Pair<Boolean, String>
     {
         return Pair(true, "Port cannot be empty")
     }
-    val portInt = startPort.toInt()
+    val portInt = startPort.toIntOrMaxValue()
     if(portInt < MIN_PORT || portInt > MAX_PORT)
     {
         return Pair(true, "Port must be between $MIN_PORT and $MAX_PORT")
@@ -2017,8 +2162,8 @@ fun validateEndPort(startPort : String, endPort : String) : Pair<Boolean, String
         return Pair(false, "")
     }
 
-    val startPortInt = startPort.toInt()
-    val endPortInt = startPort.toInt()
+    val startPortInt = startPort.toIntOrMaxValue()
+    val endPortInt = startPort.toIntOrMaxValue()
 
     if(endPortInt < MIN_PORT || endPortInt > MAX_PORT)
     {
@@ -2034,6 +2179,151 @@ fun validateEndPort(startPort : String, endPort : String) : Pair<Boolean, String
     return Pair(false, "")
 }
 
+fun String.toIntOrMaxValue(): Int {
+    return try {
+        this.toInt()
+    }
+    catch(e : Exception)
+    {
+        Int.MAX_VALUE
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Preview
+fun outlineTextWithPicker()
+{
+    Column()
+    {
+        var expanded = remember { mutableStateOf(false) };
+        Row()
+        {
+            OutlinedTextField(
+                "Device",
+                modifier = Modifier.weight(.5f),
+                onValueChange = {
+
+                },
+                trailingIcon = null
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField("Port",
+                onValueChange = {
+
+                },
+                modifier = Modifier.weight(.5f),
+                trailingIcon = {
+                    IconButton(onClick = { expanded.value = !expanded.value })
+                    {
+                        if (expanded.value) {
+                            Icon(
+                                Icons.Filled.UnfoldLess,
+                                contentDescription = ""
+                            ) //TODO set error on main theme if not already.
+                        } else {
+                            Icon(
+                                Icons.Filled.UnfoldMore,
+                                contentDescription = ""
+                            ) //TODO set error on main theme if not already.
+                        }
+
+
+                    }
+                }
+            )
+        }
+
+    val expandAnimation by animateDpAsState(
+        targetValue = if (expanded.value) 60.dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 2000, // Duration of the animation
+            easing = LinearEasing // Animation easing
+        )
+    )
+        
+
+//        AnimatedVisibility(
+//            visible = expanded.value,
+//            enter = fadeIn(),
+//            exit = fadeOut()
+//        ) {
+    if (expanded.value) {
+        Row(modifier = Modifier.height(expandAnimation))
+        {
+            Spacer(
+                modifier = Modifier.weight(.5f),
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField("Port",
+                onValueChange = {
+
+                },
+                modifier = Modifier.weight(.5f),
+                trailingIcon = {
+                    IconButton(onClick = { expanded.value = !expanded.value })
+                    {
+                        if (expanded.value) {
+                            Icon(
+                                Icons.Filled.UnfoldLess,
+                                contentDescription = ""
+                            ) //TODO set error on main theme if not already.
+                        } else {
+                            Icon(
+                                Icons.Filled.UnfoldMore,
+                                contentDescription = ""
+                            ) //TODO set error on main theme if not already.
+                        }
+
+
+                    }
+                }
+            )
+        }
+    }
+        //}
+
+        Row()
+        {
+            OutlinedTextField(
+                "External Device",
+                modifier = Modifier.weight(.5f),
+                onValueChange = {
+
+                },
+                trailingIcon = null
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            OutlinedTextField("Port",
+                onValueChange = {
+
+                },
+                modifier = Modifier.weight(.5f),
+                trailingIcon = {
+                    IconButton(onClick = {  })
+                    {
+
+                        Icon(
+                            Icons.Filled.UnfoldMore,
+                            contentDescription = ""
+                        ) //TODO set error on main theme if not already.
+
+
+
+                    }
+                }
+            )
+        }
+    }
+
+
+}
+
 fun validateInternalIp(ip : String) : Pair<Boolean, String>
 {
     val regexIPv4 = """^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$""".toRegex()
@@ -2042,46 +2332,22 @@ fun validateInternalIp(ip : String) : Pair<Boolean, String>
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableState<String>, startHasError : MutableState<Boolean>, endHasError : MutableState<Boolean>, hasSubmitted : MutableState<Boolean>, modifier : Modifier)
+fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableState<String>, startHasError : MutableState<Boolean>, endHasError : MutableState<Boolean>, hasSubmitted : MutableState<Boolean>, modifier : Modifier, portSize : IntSize)
 {
     DeviceRow()
     {
 
-        var startHasErrorString = remember { mutableStateOf(validateStartPort(startPortText.value).second) }
         var endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value,endPortText.value).second) }
 
-        OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = startPortText.value,
-            onValueChange = {
-                startPortText.value = it
-                startHasError.value = validateStartPort(startPortText.value).first
-                startHasErrorString.value = validateStartPort(startPortText.value).second
-                            },
-            label = { Text("Port Start") },
-            modifier = Modifier.then(modifier),
-                //.height(60.dp),
-            isError = hasSubmitted.value && startHasError.value,
-            supportingText = {
-                if(hasSubmitted.value && startHasError.value)
-                {
-                    Text(startHasErrorString.value, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            trailingIcon = {
-                if(hasSubmitted.value && startHasError.value)
-                {
-                    Icon(Icons.Filled.Error, contentDescription = startHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
-                }
-            }
-
-        )
+        Spacer(modifier = Modifier.weight(0.5f, true))
 
         Spacer(modifier = Modifier.width(8.dp))
 
         Text("to", modifier = Modifier.align(Alignment.CenterVertically))
 
         Spacer(modifier = Modifier.width(8.dp))
+
+        
 
         OutlinedTextField(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2091,9 +2357,8 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
                 endHasError.value = validateEndPort(startPortText.value, endPortText.value).first
                 endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).second
                             },
-            label = { Text("End") },
-            modifier = Modifier.then(modifier)
-                ,
+            label = { Text("Port End") },
+            modifier = Modifier.width(with(LocalDensity.current) { portSize.width.toDp() }),
             isError = hasSubmitted.value && endHasError.value,
             supportingText = {
                 if(hasSubmitted.value && endHasError.value)
@@ -2101,12 +2366,27 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
                     Text(endHasErrorString.value, color = MaterialTheme.colorScheme.error)
                 }
             },
-            trailingIcon = {
-                if(hasSubmitted.value && endHasError.value)
-                {
-                    Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+
+
+            trailingIcon =
+                if (hasSubmitted.value && endHasError.value) {
+                    @Composable {
+                        if(hasSubmitted.value && endHasError.value)
+                        {
+                            Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+                        }
+                    }
+                } else {
+                    null
                 }
-            },
+
+//
+//            {
+//                if(hasSubmitted.value && endHasError.value)
+//                {
+//                    Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+//                }
+//            },
 //            visualTransformation = if (endPortText.value.isEmpty())
 //                PlaceholderTransformation("-")
 //            else VisualTransformation.None,
@@ -2116,14 +2396,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
 //            color = Color.DarkGray, // Adjust background color to your preference
 //            modifier = Modifier.padding(8.dp) // Adjust padding to your preference
 //        ) {
-            IconButton(onClick = {}, modifier = Modifier.align(Alignment.CenterVertically))
-            {
-                Icon(
-                    Icons.Filled.Expand,
-                    contentDescription = null,
-                    modifier = Modifier.align(Alignment.CenterVertically).size(32.dp)
-                )
-            }
+
         //}
     }
 }
@@ -2158,14 +2431,18 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
 
     val interactionSource = remember { MutableInteractionSource() }
     val focusRequester = remember { FocusRequester() }
+
+
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+
     Box(
-        modifier = Modifier.clickable(interactionSource = interactionSource,
+        modifier = defaultModifier.then(Modifier.clickable(interactionSource = interactionSource,
             indication = null,
             onClick = {
                 println("TextField clicked")
                 expanded = !expanded
                 focusRequester.requestFocus()
-            })
+            })).onSizeChanged { boxSize = it }
     ) {
 
         OutlinedTextField(
@@ -2200,7 +2477,7 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = defaultModifier
+            modifier = Modifier.width(with(LocalDensity.current) { boxSize.width.toDp() })
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -2226,7 +2503,7 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
 //                                println("TextField clicked")
 //                                expanded = !expanded
 //                            },
-            modifier = defaultModifier
+            modifier = Modifier.width(with(LocalDensity.current) { boxSize.width.toDp() }).background(Color.Blue)
 //                            .onGloballyPositioned { coordinates ->
 //                                //This value is used to assign to the DropDown the same width
 //                                //textfieldSize = coordinates.size.toSize()
