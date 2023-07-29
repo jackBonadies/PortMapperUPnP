@@ -664,7 +664,7 @@ class MainActivity : ComponentActivity() {
                 }
             )
             {
-                RuleCreationDialog()
+                RuleCreationDialog(navController = navController)
             }
         }
     }
@@ -1063,7 +1063,41 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun RuleCreationDialog() {
+    fun RuleCreationDialog(navController : NavHostController)  {
+
+        var isPreview = false;
+
+        val hasSubmitted = remember { mutableStateOf(false) }
+        val internalPortText = remember { mutableStateOf("") }
+        val internalPortTextEnd = remember { mutableStateOf("") }
+        val externalPortText = remember { mutableStateOf("") }
+        val externalPortTextEnd = remember { mutableStateOf("") }
+        val leaseDuration = remember { mutableStateOf("0 (max)") }
+        val description = remember { mutableStateOf("") }
+        val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).first) }
+        var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
+        var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
+        var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
+        var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
+        var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
+        var (ourIp, ourGatewayIp) = remember {
+            if (isPreview) Pair<String, String>(
+                "192.168.0.1",
+                ""
+            ) else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
+                PortForwardApplication.appContext,
+                false
+            )
+        }
+        val internalIp = remember { mutableStateOf(ourIp!!) }
+        var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
+        var (gatewayIps, defaultGatewayIp) = remember { getGatewayIpsWithDefault(ourGatewayIp!!) }
+        var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
+        //END
+
+
+
+
         Scaffold(
 
             snackbarHost = {
@@ -1088,8 +1122,7 @@ class MainActivity : ComponentActivity() {
                     ),
                     navigationIcon = {
                         IconButton(onClick = {
-                            // NAV CONTROLLER
-
+                            navController.popBackStack()
                         }) {
                             Icon(Icons.Filled.Close, contentDescription = "Close")
                         }
@@ -1104,7 +1137,87 @@ class MainActivity : ComponentActivity() {
                     },
                     actions = {
                         TextButton(
-                            onClick = { /* Handle click action here */ }
+                            onClick = {
+
+                                hasSubmitted.value = true
+                                if (descriptionHasError.value ||
+                                    startInternalHasError.value ||
+                                    startExternalHasError.value ||
+                                    endInternalHasError.value ||
+                                    endExternalHasError.value ||
+                                    internalIpHasError.value
+                                ) {
+                                    // show toast and return
+                                    return@TextButton;
+                                }
+
+                                //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
+
+                                fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
+
+                                    RunUIThread {
+
+
+                                        //debug
+                                        for (res in result) {
+                                            res!!
+                                            print(res.Success)
+                                            print(res.FailureReason)
+                                            print(res.ResultingMapping?.Protocol)
+                                        }
+
+                                        var numFailed = result.count { !it?.Success!! }
+
+                                        var anyFailed = numFailed > 0
+
+                                        if (anyFailed) {
+
+                                            // all failed
+                                            if (numFailed == result.size) {
+                                                if (result.size == 1) {
+                                                    MainActivity.showSnackBarViewLog("Failed to create rule.")
+                                                } else {
+                                                    MainActivity.showSnackBarViewLog("Failed to create rules.")
+                                                }
+                                            } else {
+                                                MainActivity.showSnackBarViewLog("Failed to create some rules.")
+                                            }
+
+
+//                                            var res = result[0]
+//                                            res!!
+//                                            // this will always be too long (text length) for a toast.
+//                                            Toast.makeText(
+//                                                PortForwardApplication.appContext,
+//                                                "Failure - ${res.FailureReason!!}",
+//                                                Toast.LENGTH_LONG
+//                                            ).show()
+                                        } else {
+                                            MainActivity.showSnackBarShortNoAction("Success!")
+                                        }
+                                    }
+                                }
+
+                                var portMappingRequestInput = PortMappingUserInput(
+                                    description.value,
+                                    internalIp.value,
+                                    internalPortText.value,
+                                    externalDeviceText.value,
+                                    externalPortText.value,
+                                    selectedProtocolMutable.value,
+                                    leaseDuration.value,
+                                    true
+                                )
+                                var future =
+                                    UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
+                                //showDialogMutable.value = false
+
+                                navController.popBackStack()
+
+
+
+
+                            }
                         ) {
                             Text(
                                 text = "CREATE",
@@ -1130,14 +1243,50 @@ class MainActivity : ComponentActivity() {
                     .padding(it)
                     .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
                 {
-                    CreateRuleContents()
+                    CreateRuleContents(
+                        hasSubmitted,
+                        internalPortText,
+                        internalPortTextEnd,
+                        externalPortText,
+                        externalPortTextEnd,
+                        leaseDuration,
+                        description,
+                        descriptionHasError,
+                        startInternalHasError,
+                        endInternalHasError,
+                        selectedProtocolMutable,
+                        startExternalHasError,
+                        endExternalHasError,
+                        internalIp,
+                        internalIpHasError,
+                        gatewayIps,
+                        externalDeviceText,
+                    )
                 }
 
             })
     }
 }
 
+fun getGatewayIpsWithDefault(deviceGateway : String) : Pair<MutableList<String>, String>
+{
+    var gatewayIps: MutableList<String> = mutableListOf()
+    var defaultGatewayIp = ""
+    synchronized(UpnpManager.lockIgdDevices)
+    {
+        for (device in UpnpManager.IGDDevices) {
+            gatewayIps.add(device.ipAddress)
+            if (device.ipAddress == deviceGateway) {
+                defaultGatewayIp = device.ipAddress
+            }
+        }
+    }
 
+    if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
+        defaultGatewayIp = gatewayIps[0]
+    }
+    return Pair<MutableList<String>, String>(gatewayIps, defaultGatewayIp)
+}
 
 
 //caused weird visual artifacts at runtime
@@ -1652,14 +1801,25 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Preview
-fun ColumnScope.CreateRuleContents()
+fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
+                                   internalPortText: MutableState<String>,
+                                   internalPortTextEnd: MutableState<String>,
+                                   externalPortText: MutableState<String>,
+                                   externalPortTextEnd: MutableState<String>,
+                                   leaseDuration: MutableState<String>,
+                                   description: MutableState<String>,
+                                   descriptionHasError: MutableState<Boolean>,
+                                   startInternalHasError: MutableState<Boolean>,
+                                   endInternalHasError: MutableState<Boolean>,
+                                   selectedProtocolMutable: MutableState<String>,
+                                   startExternalHasError: MutableState<Boolean>,
+                                   endExternalHasError: MutableState<Boolean>,
+                                   internalIp: MutableState<String>,
+                                   internalIpHasError: MutableState<Boolean>,
+                                   gatewayIps : MutableList<String>,
+                                   externalDeviceText: MutableState<String>)
 {
-    //TODO FIX
-    var isPreview = false;
-    var showDialogMutable = remember { mutableStateOf(true) }
-    var withButtons = false;
-    //END
+
 
 
 
@@ -1667,12 +1827,7 @@ fun ColumnScope.CreateRuleContents()
 
 
 
-    val internalPortText = remember { mutableStateOf("") }
-    val internalPortTextEnd = remember { mutableStateOf("") }
-    val externalPortText = remember { mutableStateOf("") }
-    val externalPortTextEnd = remember { mutableStateOf("") }
-    val leaseDuration = remember { mutableStateOf("0 (max)") }
-    val description = remember { mutableStateOf("") }
+
 
     if(showLeaseDialog.value)
     {
@@ -1680,31 +1835,17 @@ fun ColumnScope.CreateRuleContents()
     }
 
 
-    var (ourIp, ourGatewayIp) = remember {
-        if (isPreview) Pair<String, String>(
-            "192.168.0.1",
-            ""
-        ) else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
-            PortForwardApplication.appContext,
-            false
-        )
-    }
-
-    val internalIp = remember { mutableStateOf(ourIp!!) }
 
 
 
-    val descriptionError = remember { mutableStateOf(validateDescription(description.value).first) }
+
+
+
+
     val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
-
-    var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
-    var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
-    var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
-    var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
-    var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
     var interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
 
-    val hasSubmitted = remember { mutableStateOf(false) }
+
 
 
     Row(
@@ -1718,7 +1859,7 @@ fun ColumnScope.CreateRuleContents()
             value = description.value,
             onValueChange = {
                 description.value = it;
-                descriptionError.value = validateDescription(description.value).first
+                descriptionHasError.value = validateDescription(description.value).first
                 descriptionErrorString.value = validateDescription(description.value).second
             },
             label = { Text("Description") },
@@ -1726,14 +1867,14 @@ fun ColumnScope.CreateRuleContents()
             modifier = Modifier
                 .weight(0.4f, true)
             ,//.height(60.dp),
-            isError = hasSubmitted.value && descriptionError.value,
+            isError = hasSubmitted.value && descriptionHasError.value,
             trailingIcon = {
-                if (hasSubmitted.value && descriptionError.value) {
+                if (hasSubmitted.value && descriptionHasError.value) {
                     Icon(Icons.Filled.Error, descriptionErrorString.value, tint = MaterialTheme.colorScheme.error)
                 }
             },
             supportingText = {
-                if(hasSubmitted.value && descriptionError.value) {
+                if(hasSubmitted.value && descriptionHasError.value) {
                     Text(
                         descriptionErrorString.value,
                         color = MaterialTheme.colorScheme.error
@@ -1824,33 +1965,8 @@ fun ColumnScope.CreateRuleContents()
 //                    val options = listOf("Option 1", "Option 2", "Option 3", "Option 4", "Option 5")
 //                    var expanded by remember { mutableStateOf(false) }
 //                    var selectedOptionText by remember { mutableStateOf(options[0]) }
-    var gatewayIps: MutableList<String> = mutableListOf()
-    var defaultGatewayIp = ""
-
-    if(isPreview) {
 
 
-    }
-    else
-    {
-
-        synchronized(UpnpManager.lockIgdDevices)
-        {
-            for (device in UpnpManager.IGDDevices) {
-                gatewayIps.add(device.ipAddress)
-                if (device.ipAddress == ourGatewayIp) {
-                    defaultGatewayIp = device.ipAddress
-                }
-            }
-        }
-
-        if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
-            defaultGatewayIp = gatewayIps[0]
-        }
-    }
-
-    val suggestions = gatewayIps
-    var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
     var selectedText by externalDeviceText
 
 
@@ -1864,7 +1980,7 @@ fun ColumnScope.CreateRuleContents()
             .weight(0.5f, true)
 //            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
 //            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
+        DropDownOutline(defaultModifier, externalDeviceText, gatewayIps, "External Device")
         Spacer(modifier = Modifier.width(8.dp))
         var startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).second) }
         StartPortExpandable(externalPortText, startExternalHasError, startHasErrorString, hasSubmitted, expandedExternal, portStartSize)
@@ -1883,7 +1999,6 @@ fun ColumnScope.CreateRuleContents()
         )
     }
 
-    var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
     var selectedPort by selectedProtocolMutable
 
     Row(
@@ -1941,130 +2056,132 @@ fun ColumnScope.CreateRuleContents()
 
     }
 
-    if(withButtons) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(createNewRuleRowWidth)
-                .padding(
-                    top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp,
-                    bottom = 10.dp
-                ),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                onClick = {
-                    showDialogMutable.value = false
-                },
-                shape = RoundedCornerShape(16),
-                modifier = Modifier
-                    .weight(.6f)
-                    .height(46.dp)
-            ) {
-                Text("Cancel")
-            }
-            Spacer(modifier = Modifier.padding(18.dp))
-            val interactionSource = remember { MutableInteractionSource() }
-
-            val text = buildAnnotatedString {
-                withStyle(
-                    style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                ) {
-                    append("CREATE")
-                }
-            }
-
-            Button(
-                onClick = {
-
-                    hasSubmitted.value = true
-                    if (descriptionError.value ||
-                        startInternalHasError.value ||
-                        startExternalHasError.value ||
-                        endInternalHasError.value ||
-                        endExternalHasError.value ||
-                        internalIpHasError.value
-                    ) {
-                        // show toast and return
-                        return@Button;
-                    }
-
-                    //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-
-                    fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
-
-                        RunUIThread {
-
-
-                            //debug
-                            for (res in result) {
-                                res!!
-                                print(res.Success)
-                                print(res.FailureReason)
-                                print(res.ResultingMapping?.Protocol)
-                            }
-
-                            var numFailed = result.count { !it?.Success!! }
-
-                            var anyFailed = numFailed > 0
-
-                            if (anyFailed) {
-
-                                // all failed
-                                if (numFailed == result.size) {
-                                    if (result.size == 1) {
-                                        MainActivity.showSnackBarViewLog("Failed to create rule.")
-                                    } else {
-                                        MainActivity.showSnackBarViewLog("Failed to create rules.")
-                                    }
-                                } else {
-                                    MainActivity.showSnackBarViewLog("Failed to create some rules.")
-                                }
-
-
-//                                            var res = result[0]
-//                                            res!!
-//                                            // this will always be too long (text length) for a toast.
-//                                            Toast.makeText(
-//                                                PortForwardApplication.appContext,
-//                                                "Failure - ${res.FailureReason!!}",
-//                                                Toast.LENGTH_LONG
-//                                            ).show()
-                            } else {
-                                MainActivity.showSnackBarShortNoAction("Success!")
-                            }
-                        }
-                    }
-
-                    var portMappingRequestInput = PortMappingUserInput(
-                        description.value,
-                        internalIp.value,
-                        internalPortText.value,
-                        externalDeviceText.value,
-                        externalPortText.value,
-                        selectedProtocolMutable.value,
-                        leaseDuration.value,
-                        true
-                    )
-                    var future =
-                        UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
-                    showDialogMutable.value = false
-                },
-                shape = RoundedCornerShape(16),
-                modifier = Modifier
-                    .weight(1.0f)
-                    .height(46.dp),
-
-                )
-            {
-                Text("Create")
-            }
-        }
-    }
+//    var showDialogMutable = remember { mutableStateOf(true) }
+//    var withButtons = false;
+//    if(withButtons) {
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth(createNewRuleRowWidth)
+//                .padding(
+//                    top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp,
+//                    bottom = 10.dp
+//                ),
+//            horizontalArrangement = Arrangement.SpaceBetween
+//        ) {
+//            Button(
+//                onClick = {
+//                    //TODO
+//                    showDialogMutable.value = false
+//                },
+//                shape = RoundedCornerShape(16),
+//                modifier = Modifier
+//                    .weight(.6f)
+//                    .height(46.dp)
+//            ) {
+//                Text("Cancel")
+//            }
+//            Spacer(modifier = Modifier.padding(18.dp))
+//            val interactionSource = remember { MutableInteractionSource() }
+//
+//            val text = buildAnnotatedString {
+//                withStyle(
+//                    style = SpanStyle(
+//                        color = MaterialTheme.colorScheme.primary,
+//                        fontWeight = FontWeight.SemiBold
+//                    )
+//                ) {
+//                    append("CREATE")
+//                }
+//            }
+//
+//            Button(
+//                onClick = {
+//
+//                    hasSubmitted.value = true
+//                    if (descriptionHasError.value ||
+//                        startInternalHasError.value ||
+//                        startExternalHasError.value ||
+//                        endInternalHasError.value ||
+//                        endExternalHasError.value ||
+//                        internalIpHasError.value
+//                    ) {
+//                        // show toast and return
+//                        return@Button;
+//                    }
+//
+//                    //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
+//
+//                    fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
+//
+//                        RunUIThread {
+//
+//
+//                            //debug
+//                            for (res in result) {
+//                                res!!
+//                                print(res.Success)
+//                                print(res.FailureReason)
+//                                print(res.ResultingMapping?.Protocol)
+//                            }
+//
+//                            var numFailed = result.count { !it?.Success!! }
+//
+//                            var anyFailed = numFailed > 0
+//
+//                            if (anyFailed) {
+//
+//                                // all failed
+//                                if (numFailed == result.size) {
+//                                    if (result.size == 1) {
+//                                        MainActivity.showSnackBarViewLog("Failed to create rule.")
+//                                    } else {
+//                                        MainActivity.showSnackBarViewLog("Failed to create rules.")
+//                                    }
+//                                } else {
+//                                    MainActivity.showSnackBarViewLog("Failed to create some rules.")
+//                                }
+//
+//
+////                                            var res = result[0]
+////                                            res!!
+////                                            // this will always be too long (text length) for a toast.
+////                                            Toast.makeText(
+////                                                PortForwardApplication.appContext,
+////                                                "Failure - ${res.FailureReason!!}",
+////                                                Toast.LENGTH_LONG
+////                                            ).show()
+//                            } else {
+//                                MainActivity.showSnackBarShortNoAction("Success!")
+//                            }
+//                        }
+//                    }
+//
+//                    var portMappingRequestInput = PortMappingUserInput(
+//                        description.value,
+//                        internalIp.value,
+//                        internalPortText.value,
+//                        externalDeviceText.value,
+//                        externalPortText.value,
+//                        selectedProtocolMutable.value,
+//                        leaseDuration.value,
+//                        true
+//                    )
+//                    var future =
+//                        UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
+//                    showDialogMutable.value = false
+//                },
+//                shape = RoundedCornerShape(16),
+//                modifier = Modifier
+//                    .weight(1.0f)
+//                    .height(46.dp),
+//
+//                )
+//            {
+//                Text("Create")
+//            }
+//        }
+//    }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
