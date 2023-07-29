@@ -149,23 +149,18 @@ class UpnpManager {
         fun splitUserInputIntoRules(portMappingUserInput : PortMappingUserInput) : MutableList<PortMappingRequest>
         {
             var portMappingRequests : MutableList<PortMappingRequest> = mutableListOf()
-            val (inStart, inEnd) = getRange(portMappingUserInput.internalPort)
-            val (outStart, outEnd) = getRange(portMappingUserInput.externalPort)
-            val protocols = getProtocols(portMappingUserInput.protocol)
+            val (inStart, inEnd) = portMappingUserInput.getRange(true)
+            val (outStart, outEnd) = portMappingUserInput.getRange(false)
+            val protocols = portMappingUserInput.getProtocols()
 
-            // many 1 to 1 makes sense
-            // many external to 1 internal?? this makes sense but goes against retrieving ports with upnp
-            //   in the sense that you are supposed to be able to retrieve 1 single port with 1
-            //   (external ip, external port, protocol).
-            // not sure about others...
-            val inSize = inEnd - inStart + 1 // inclusive
-            val outSize = outEnd - outStart + 1
-            var xToOne = (inSize == 1 || outSize == 1) //many to one or one to one
-            if (inSize != outSize && !xToOne)
+            var errorString = portMappingUserInput.validateRange()
+            if (errorString.isNotEmpty())
             {
-                throw java.lang.Exception("Internal and External Ranges do not match")
+                throw java.lang.Exception(errorString)
             }
 
+            val inSize = inEnd - inStart + 1 // inclusive
+            val outSize = outEnd - outStart + 1
             var sizeOfRange = maxOf(inSize, outSize) - 1 // if just 1 element then size is 0
             for (i in 0..sizeOfRange)
             {
@@ -179,26 +174,7 @@ class UpnpManager {
             return portMappingRequests
         }
 
-        fun getRange(portRange : String) : Pair<Int, Int>
-        {
-            if(portRange.contains('-'))
-            {
-                var inRange = portRange.split('-')
-                return Pair(inRange[0].toInt(), inRange[1].toInt())
-            }
-            else
-            {
-                return Pair(portRange.toInt(), portRange.toInt())
-            }
-        }
 
-        fun getProtocols(protocol : String) : List<String>
-        {
-            return when (protocol) {
-                Protocol.BOTH.str() -> listOf("TCP", "UDP")
-                else -> listOf(protocol)
-            }
-        }
 
         data class PortMappingFullResult(val description : String, val internalIp : String, val internalPort : String)
 
@@ -875,11 +851,55 @@ fun defaultRuleDeletedCallback(result : UPnPResult) {
 }
 
 
-data class PortMappingUserInput(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
 {
     fun with(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
     {
         return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled)
+    }
+
+    fun validateRange() : String
+    {
+        // many 1 to 1 makes sense
+        // many different external to 1 internal
+        // 1 external to many internal //this isnt a thing and it doesnt make sense with upnp port retrieval
+
+        val (inStart, inEnd) = getRange(true)
+        val (outStart, outEnd) = getRange(false)
+
+        val inSize = inEnd - inStart + 1 // inclusive
+        val outSize = outEnd - outStart + 1
+        var xToOne = (inSize == 1) // many out to 1 in
+        if (inSize != outSize && !xToOne)
+        {
+            return "Internal and External Ranges do not match up."
+        }
+        else
+        {
+            return ""
+        }
+    }
+
+    fun getRange(internal : Boolean) : Pair<Int, Int>
+    {
+        var rangeInQuestion = if(internal) internalRange else externalRange
+        if(rangeInQuestion.contains('-'))
+        {
+            var inRange = rangeInQuestion.split('-')
+            return Pair(inRange[0].toInt(), inRange[1].toInt())
+        }
+        else
+        {
+            return Pair(rangeInQuestion.toInt(), rangeInQuestion.toInt())
+        }
+    }
+
+    fun getProtocols() : List<String>
+    {
+        return when (protocol) {
+            Protocol.BOTH.str() -> listOf("TCP", "UDP")
+            else -> listOf(protocol)
+        }
     }
 }
 data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)

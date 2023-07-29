@@ -481,6 +481,10 @@ class MainActivity : ComponentActivity() {
             showSnackBar(message, null, SnackbarDuration.Short)
         }
 
+        fun showSnackBarLongNoAction(message: String) {
+            showSnackBar(message, null, SnackbarDuration.Long)
+        }
+
         fun showSnackBar(
             message: String,
             action: String?,
@@ -1093,6 +1097,8 @@ class MainActivity : ComponentActivity() {
         var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
         var (gatewayIps, defaultGatewayIp) = remember { getGatewayIpsWithDefault(ourGatewayIp!!) }
         var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
+        var expandedInternal = remember { mutableStateOf(false) }
+        var expandedExternal = remember { mutableStateOf(false) }
         //END
 
 
@@ -1139,15 +1145,71 @@ class MainActivity : ComponentActivity() {
                         TextButton(
                             onClick = {
 
+                                var actualEndInternalError = expandedInternal.value && endInternalHasError.value
+                                var actualEndExternalError = expandedExternal.value && endExternalHasError.value
+
+
                                 hasSubmitted.value = true
                                 if (descriptionHasError.value ||
                                     startInternalHasError.value ||
                                     startExternalHasError.value ||
-                                    endInternalHasError.value ||
-                                    endExternalHasError.value ||
+                                    actualEndInternalError ||
+                                    actualEndExternalError ||
                                     internalIpHasError.value
                                 ) {
                                     // show toast and return
+                                    // Invalid Description, ExternalPort.
+                                    var invalidFields = mutableListOf<String>("")
+                                    if(descriptionHasError.value)
+                                    {
+                                        invalidFields.add("Description")
+                                    }
+                                    if(startInternalHasError.value)
+                                    {
+                                        invalidFields.add(if(expandedInternal.value) "Internal Port Start" else "Internal Port")
+                                    }
+                                    if(startExternalHasError.value)
+                                    {
+                                        invalidFields.add(if(expandedInternal.value) "External Port Start" else "External Port")
+                                    }
+                                    if(actualEndInternalError)
+                                    {
+                                        invalidFields.add("Internal Port End")
+                                    }
+                                    if(actualEndExternalError)
+                                    {
+                                        invalidFields.add("External Port End")
+                                    }
+                                    if(internalIpHasError.value)
+                                    {
+                                        invalidFields.add("Internal IP")
+                                    }
+
+                                    var invalidFieldsStr = invalidFields.joinToString(",")
+
+                                    MainActivity.showSnackBarLongNoAction("Invalid Fields: $invalidFieldsStr")
+                                    return@TextButton;
+                                }
+
+                                var internalRangeStr = if(expandedInternal.value) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
+                                var externalRangeStr = if(expandedExternal.value) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
+
+
+                                var portMappingRequestInput = PortMappingUserInput(
+                                    description.value,
+                                    internalIp.value,
+                                    internalRangeStr,
+                                    externalRangeStr,
+                                    externalPortText.value,
+                                    selectedProtocolMutable.value,
+                                    leaseDuration.value,
+                                    true
+                                )
+
+                                var errorString = portMappingRequestInput.validateRange()
+                                if(errorString.isNotEmpty())
+                                {
+                                    MainActivity.showSnackBarLongNoAction(errorString)
                                     return@TextButton;
                                 }
 
@@ -1156,8 +1218,6 @@ class MainActivity : ComponentActivity() {
                                 fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
 
                                     RunUIThread {
-
-
                                         //debug
                                         for (res in result) {
                                             res!!
@@ -1198,18 +1258,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
 
-                                var portMappingRequestInput = PortMappingUserInput(
-                                    description.value,
-                                    internalIp.value,
-                                    internalPortText.value,
-                                    externalDeviceText.value,
-                                    externalPortText.value,
-                                    selectedProtocolMutable.value,
-                                    leaseDuration.value,
-                                    true
-                                )
+
                                 var future =
-                                    UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
+                                    UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback) //spilts into rules
                                 //showDialogMutable.value = false
 
                                 navController.popBackStack()
@@ -1901,11 +1952,11 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = internalIp.value,
             onValueChange = {
-                internalIp.value = it
+                internalIp.value = it.filter { charIt -> charIt.isDigit() || charIt == '.' }
                 internalIpHasError.value = validateInternalIp(internalIp.value).first
                 interalIpErrorString.value = validateInternalIp(internalIp.value).second
             },
-            isError = internalIpHasError.value,
+            isError = hasSubmitted.value && internalIpHasError.value,
             supportingText = {
                 if(hasSubmitted.value && internalIpHasError.value) {
                     Text(
@@ -2021,7 +2072,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
         OutlinedTextField(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = leaseDuration.value,
-            onValueChange = { leaseDuration.value = it },
+            onValueChange = { leaseDuration.value = it.filter { charIt -> charIt.isDigit() } },
             label = { Text("Lease") },
             trailingIcon = {
                 IconButton(onClick = { showLeaseDialog.value = true })
@@ -2191,11 +2242,12 @@ fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         value = portText.value,
         modifier = Modifier
-            .fillMaxWidth(.4f).onSizeChanged { startPortSize.value = it },
+            .fillMaxWidth(.4f)
+            .onSizeChanged { startPortSize.value = it },
         //.weight(0.4f, true),
         singleLine = true,
         onValueChange = {
-            portText.value = it
+            portText.value = it.filter { charIt -> charIt.isDigit() }
             hasError.value = validateStartPort(portText.value).first
             errorString.value = validateStartPort(portText.value).second
         },
@@ -2470,7 +2522,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = endPortText.value,
             onValueChange = {
-                endPortText.value = it
+                endPortText.value = it.filter { charIt -> charIt.isDigit() }
                 endHasError.value = validateEndPort(startPortText.value, endPortText.value).first
                 endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).second
                             },
@@ -2553,13 +2605,17 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
     Box(
-        modifier = defaultModifier.then(Modifier.clickable(interactionSource = interactionSource,
-            indication = null,
-            onClick = {
-                println("TextField clicked")
-                expanded = !expanded
-                focusRequester.requestFocus()
-            })).onSizeChanged { boxSize = it }
+        modifier = defaultModifier
+            .then(
+                Modifier.clickable(interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {
+                        println("TextField clicked")
+                        expanded = !expanded
+                        focusRequester.requestFocus()
+                    })
+            )
+            .onSizeChanged { boxSize = it }
     ) {
 
         OutlinedTextField(
@@ -2594,7 +2650,8 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.width(with(LocalDensity.current) { boxSize.width.toDp() })
+            modifier = Modifier
+                .width(with(LocalDensity.current) { boxSize.width.toDp() })
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -2620,7 +2677,9 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
 //                                println("TextField clicked")
 //                                expanded = !expanded
 //                            },
-            modifier = Modifier.width(with(LocalDensity.current) { boxSize.width.toDp() }).background(Color.Blue)
+            modifier = Modifier
+                .width(with(LocalDensity.current) { boxSize.width.toDp() })
+                .background(Color.Blue)
 //                            .onGloballyPositioned { coordinates ->
 //                                //This value is used to assign to the DropDown the same width
 //                                //textfieldSize = coordinates.size.toSize()
