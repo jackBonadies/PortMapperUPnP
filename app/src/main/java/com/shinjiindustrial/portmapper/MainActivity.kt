@@ -1159,7 +1159,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     // show toast and return
                                     // Invalid Description, ExternalPort.
-                                    var invalidFields = mutableListOf<String>("")
+                                    var invalidFields = mutableListOf<String>()
                                     if(descriptionHasError.value)
                                     {
                                         invalidFields.add("Description")
@@ -1170,7 +1170,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if(startExternalHasError.value)
                                     {
-                                        invalidFields.add(if(expandedInternal.value) "External Port Start" else "External Port")
+                                        invalidFields.add(if(expandedExternal.value) "External Port Start" else "External Port")
                                     }
                                     if(actualEndInternalError)
                                     {
@@ -1194,15 +1194,14 @@ class MainActivity : ComponentActivity() {
                                 var internalRangeStr = if(expandedInternal.value) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
                                 var externalRangeStr = if(expandedExternal.value) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
 
-
                                 var portMappingRequestInput = PortMappingUserInput(
                                     description.value,
                                     internalIp.value,
                                     internalRangeStr,
+                                    externalDeviceText.value,
                                     externalRangeStr,
-                                    externalPortText.value,
                                     selectedProtocolMutable.value,
-                                    leaseDuration.value,
+                                    leaseDuration.value.replace(" (max)",""),
                                     true
                                 )
 
@@ -1312,6 +1311,8 @@ class MainActivity : ComponentActivity() {
                         internalIpHasError,
                         gatewayIps,
                         externalDeviceText,
+                        expandedInternal,
+                        expandedExternal
                     )
                 }
 
@@ -1868,7 +1869,9 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                                    internalIp: MutableState<String>,
                                    internalIpHasError: MutableState<Boolean>,
                                    gatewayIps : MutableList<String>,
-                                   externalDeviceText: MutableState<String>)
+                                   externalDeviceText: MutableState<String>,
+                                   expandedInternal: MutableState<Boolean>,
+                                   expandedExternal: MutableState<Boolean>)
 {
 
 
@@ -1941,8 +1944,6 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
     }
 
     var textfieldSize by remember { mutableStateOf(Size.Zero) }
-    var expandedInternal = remember {mutableStateOf(false)}
-    var expandedExternal = remember {mutableStateOf(false)}
 
     var portStartSize = remember { mutableStateOf(IntSize.Zero) }
 
