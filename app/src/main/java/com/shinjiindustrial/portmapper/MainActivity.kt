@@ -8,6 +8,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.fonts.FontStyle
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -63,8 +65,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Expand
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -93,6 +97,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
@@ -829,8 +834,8 @@ class MainActivity : ComponentActivity() {
                             // uses MaterialTheme.colorScheme.secondaryContainer
                             containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
                             onClick = {
-                                showAddRuleDialogState.value = true
-                                //navController.navigate("full_screen_dialog")
+                                //showAddRuleDialogState.value = true
+                                navController.navigate("full_screen_dialog")
 
                                 //this works
 
@@ -1074,26 +1079,51 @@ class MainActivity : ComponentActivity() {
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = AdditionalColors.TopAppBarColor
                     ),
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            // NAV CONTROLLER
+
+                        }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        }
+                    },
                     //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                     title = {
                         Text(
-                            text = "Create New Rule",
+                            text = "New Rule",
                             color = AdditionalColors.TextColorStrong,
                             fontWeight = FontWeight.Normal
                         )
                     },
                     actions = {
-                        IconButton(onClick = {
-
-                        })
-                        {
-                            Icon(Icons.Default.Sort, contentDescription = "Sort")
+                        TextButton(
+                            onClick = { /* Handle click action here */ }
+                        ) {
+                            Text(
+                                text = "CREATE",
+                                color = AdditionalColors.TextColorStrong,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
+//                        Text("CREATE", modifier = Modifier.clickable {
+//                            // navigate
+//                        })
+//                        IconButton(onClick = {
+//
+//                        })
+//                        {
+//                            Icon(Icons.Default.Sort, contentDescription = "Sort")
+//                        }
                     }
                 )
             },
             content = { it ->
-                Text("Hello World", modifier = Modifier.padding(it))
+
+                Column(modifier = Modifier.padding(it).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
+                {
+                    CreateRuleContents()
+                }
+
             })
     }
 }
@@ -1582,35 +1612,7 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
 
 
-                val internalPortText = remember { mutableStateOf("") }
-                val internalPortTextEnd = remember { mutableStateOf("") }
-                val externalPortText = remember { mutableStateOf("") }
-                val externalPortTextEnd = remember { mutableStateOf("") }
-                val leaseDuration = remember { mutableStateOf("0") }
-                val description = remember { mutableStateOf("") }
 
-
-
-                var (ourIp, ourGatewayIp) = if (isPreview) Pair<String, String>("192.168.0.1","") else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
-                    PortForwardApplication.appContext,
-                    false
-                )
-
-                val internalIp = remember { mutableStateOf(ourIp!!) }
-
-
-
-                val descriptionError = remember { mutableStateOf(validateDescription(description.value).first) }
-                val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
-
-                var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
-                var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
-                var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
-                var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
-                var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
-                var interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
-
-                val hasSubmitted = remember { mutableStateOf(false) }
 
 
 
@@ -1632,251 +1634,304 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 
 
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(.9f)
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.End
+
+                }
+            }
+        }
+        }
+    }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ColumnScope.CreateRuleContents()
+{
+    //TODO FIX
+    var isPreview = false;
+    var showDialogMutable = remember { mutableStateOf(true) }
+    var withButtons = false;
+
+
+    val internalPortText = remember { mutableStateOf("") }
+    val internalPortTextEnd = remember { mutableStateOf("") }
+    val externalPortText = remember { mutableStateOf("") }
+    val externalPortTextEnd = remember { mutableStateOf("") }
+    val leaseDuration = remember { mutableStateOf("0") }
+    val description = remember { mutableStateOf("") }
+
+
+    var (ourIp, ourGatewayIp) = remember {
+        if (isPreview) Pair<String, String>(
+            "192.168.0.1",
+            ""
+        ) else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
+            PortForwardApplication.appContext,
+            false
+        )
+    }
+
+    val internalIp = remember { mutableStateOf(ourIp!!) }
+
+
+
+    val descriptionError = remember { mutableStateOf(validateDescription(description.value).first) }
+    val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
+
+    var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
+    var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
+    var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
+    var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
+    var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
+    var interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
+
+    val hasSubmitted = remember { mutableStateOf(false) }
+
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(createNewRuleRowWidth)
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.End
+    )
+    {
+        OutlinedTextField(
+            value = description.value,
+            onValueChange = {
+                description.value = it;
+                descriptionError.value = validateDescription(description.value).first
+                descriptionErrorString.value = validateDescription(description.value).second
+            },
+            label = { Text("Description") },
+            singleLine = true,
+            modifier = Modifier
+                .weight(0.4f, true)
+            ,//.height(60.dp),
+            isError = hasSubmitted.value && descriptionError.value,
+            trailingIcon = {
+                if (hasSubmitted.value && descriptionError.value) {
+                    Icon(Icons.Filled.Error, descriptionErrorString.value, tint = MaterialTheme.colorScheme.error)
+                }
+            },
+            supportingText = {
+                if(hasSubmitted.value && descriptionError.value) {
+                    Text(
+                        descriptionErrorString.value,
+                        color = MaterialTheme.colorScheme.error
                     )
-                    {
-                        OutlinedTextField(
-                            value = description.value,
-                            onValueChange = {
-                                description.value = it;
-                                descriptionError.value = validateDescription(description.value).first
-                                descriptionErrorString.value = validateDescription(description.value).second
-                                            },
-                            label = { Text("Description") },
-                            singleLine = true,
-                            modifier = Modifier
-                                .weight(0.4f, true)
-                                ,//.height(60.dp),
-                            isError = hasSubmitted.value && descriptionError.value,
-                            trailingIcon = {
-                                if (hasSubmitted.value && descriptionError.value) {
-                                    Icon(Icons.Filled.Error, descriptionErrorString.value, tint = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            supportingText = {
-                                if(hasSubmitted.value && descriptionError.value) {
-                                    Text(
-                                        descriptionErrorString.value,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
+                }
 //                                if (triedToSubmit.value && descriptionError.value) {
 //                                    Text("Description is empty", color = MaterialTheme.colorScheme.error)
 //                                }
-                            },
+            },
 
 
-                        )
+            )
+    }
+
+    var textfieldSize by remember { mutableStateOf(Size.Zero) }
+
+    DeviceRow()
+    {
+        OutlinedTextField(
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = internalIp.value,
+            onValueChange = {
+                internalIp.value = it
+                internalIpHasError.value = validateInternalIp(internalIp.value).first
+                interalIpErrorString.value = validateInternalIp(internalIp.value).second
+            },
+            isError = internalIpHasError.value,
+            supportingText = {
+                if(hasSubmitted.value && internalIpHasError.value) {
+                    Text(
+                        interalIpErrorString.value,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            trailingIcon = {
+                if (hasSubmitted.value && internalIpHasError.value) {
+                    Icon(Icons.Filled.Error, interalIpErrorString.value, tint = MaterialTheme.colorScheme.error)
+                }
+            },
+            label = { Text("Internal Device") },
+            modifier = Modifier
+                .weight(0.4f, true)
+                //.height(60.dp)
+                .onGloballyPositioned { coordinates ->
+                    //This value is used to assign to the DropDown the same width
+                    println("OurInternalDevice: " + coordinates.size.toSize())
+                    // Get density.
+
+
+                    fun pxToDp(context: Context, px: Float): Float {
+                        return px / (context.resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
                     }
-
-                    var textfieldSize by remember { mutableStateOf(Size.Zero) }
-
-                    DeviceRow()
-                    {
-                        OutlinedTextField(
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            value = internalIp.value,
-                            onValueChange = {
-                                internalIp.value = it
-                                internalIpHasError.value = validateInternalIp(internalIp.value).first
-                                interalIpErrorString.value = validateInternalIp(internalIp.value).second
-                            },
-                            isError = internalIpHasError.value,
-                            supportingText = {
-                                if(hasSubmitted.value && internalIpHasError.value) {
-                                    Text(
-                                        interalIpErrorString.value,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            },
-                            trailingIcon = {
-                                if (hasSubmitted.value && internalIpHasError.value) {
-                                    Icon(Icons.Filled.Error, interalIpErrorString.value, tint = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            label = { Text("Internal Device") },
-                            modifier = Modifier
-                                .weight(0.4f, true)
-                                //.height(60.dp)
-                                .onGloballyPositioned { coordinates ->
-                                    //This value is used to assign to the DropDown the same width
-                                    println("OurInternalDevice: " + coordinates.size.toSize())
-                                    // Get density.
-
-
-                                    fun pxToDp(context: Context, px: Float): Float {
-                                        return px / (context.resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
-                                    }
 
 //                                    val density = pxToDp(
 //                                        PortForwardApplication.appContext,
 //                                        (coordinates.size.height.toFloat())
 //                                    )
-                                    textfieldSize = coordinates.size.toSize()
-                                }
-                        )
+                    textfieldSize = coordinates.size.toSize()
+                }
+        )
 
-                    }
+    }
 //                    val options = listOf("Option 1", "Option 2", "Option 3", "Option 4", "Option 5")
 //                    var expanded by remember { mutableStateOf(false) }
 //                    var selectedOptionText by remember { mutableStateOf(options[0]) }
-                    var gatewayIps: MutableList<String> = mutableListOf()
-                    var defaultGatewayIp = ""
+    var gatewayIps: MutableList<String> = mutableListOf()
+    var defaultGatewayIp = ""
 
-                    if(isPreview) {
+    if(isPreview) {
 
 
-                    }
-                    else
-                    {
+    }
+    else
+    {
 
-                        synchronized(UpnpManager.lockIgdDevices)
-                        {
-                            for (device in UpnpManager.IGDDevices) {
-                                gatewayIps.add(device.ipAddress)
-                                if (device.ipAddress == ourGatewayIp) {
-                                    defaultGatewayIp = device.ipAddress
-                                }
-                            }
-                        }
+        synchronized(UpnpManager.lockIgdDevices)
+        {
+            for (device in UpnpManager.IGDDevices) {
+                gatewayIps.add(device.ipAddress)
+                if (device.ipAddress == ourGatewayIp) {
+                    defaultGatewayIp = device.ipAddress
+                }
+            }
+        }
 
-                        if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
-                            defaultGatewayIp = gatewayIps[0]
-                        }
-                    }
+        if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
+            defaultGatewayIp = gatewayIps[0]
+        }
+    }
 
-                    val suggestions = gatewayIps
-                    var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
-                    var selectedText by externalDeviceText
+    val suggestions = gatewayIps
+    var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
+    var selectedText by externalDeviceText
 
-                    PortRangeRow(internalPortText, internalPortTextEnd, startInternalHasError, endInternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
+    PortRangeRow(internalPortText, internalPortTextEnd, startInternalHasError, endInternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
 
-                    DeviceRow()
-                    {
-                        var defaultModifier = Modifier
-                            .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-                            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-                        DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
+    DeviceRow()
+    {
+        var defaultModifier = Modifier
+            .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
+            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
+        DropDownOutline(defaultModifier, externalDeviceText, suggestions, "External Device")
 
-                    }
+    }
 
-                    PortRangeRow(externalPortText, externalPortTextEnd, startExternalHasError, endExternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
+    PortRangeRow(externalPortText, externalPortTextEnd, startExternalHasError, endExternalHasError, hasSubmitted, Modifier.weight(0.2f, true))
 
-                    var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
-                    var selectedPort by selectedProtocolMutable
+    var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
+    var selectedPort by selectedProtocolMutable
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(.9f)
-                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(createNewRuleRowWidth)
+            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
+    ) {
+        var defaultModifier = Modifier
+            .fillMaxWidth(.5f)
+        //.height(60.dp)
+        //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
+        DropDownOutline(defaultModifier,//Size(500f, textfieldSize.height),
+            selectedText = selectedProtocolMutable,
+            suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
+            "Protocol")
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        OutlinedTextField(
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = leaseDuration.value,
+            onValueChange = { leaseDuration.value = it },
+            label = { Text("Lease") },
+            modifier = Modifier
+                .weight(0.4f, true)
+            //.fillMaxWidth(.4f)
+            //.height(60.dp)
+        )
+
+    }
+
+    if(withButtons) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(createNewRuleRowWidth)
+                .padding(
+                    top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp,
+                    bottom = 10.dp
+                ),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Button(
+                onClick = {
+                    showDialogMutable.value = false
+                },
+                shape = RoundedCornerShape(16),
+                modifier = Modifier.weight(.6f).height(46.dp)
+            ) {
+                Text("Cancel")
+            }
+            Spacer(modifier = Modifier.padding(18.dp))
+            val interactionSource = remember { MutableInteractionSource() }
+
+            val text = buildAnnotatedString {
+                withStyle(
+                    style = SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                ) {
+                    append("CREATE")
+                }
+            }
+
+            Button(
+                onClick = {
+
+                    hasSubmitted.value = true
+                    if (descriptionError.value ||
+                        startInternalHasError.value ||
+                        startExternalHasError.value ||
+                        endInternalHasError.value ||
+                        endExternalHasError.value ||
+                        internalIpHasError.value
                     ) {
-                        var defaultModifier = Modifier
-                            .fillMaxWidth(.5f)
-                            //.height(60.dp)
-                            //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-                        DropDownOutline(defaultModifier,//Size(500f, textfieldSize.height),
-                            selectedText = selectedProtocolMutable,
-                            suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
-                            "Protocol")
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        OutlinedTextField(
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            value = leaseDuration.value,
-                            onValueChange = { leaseDuration.value = it },
-                            label = { Text("Lease") },
-                            modifier = Modifier
-                                .weight(0.4f, true)
-                                //.fillMaxWidth(.4f)
-                                //.height(60.dp)
-                        )
-
+                        // show toast and return
+                        return@Button;
                     }
 
+                    //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(.9f)
-                            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp, bottom=10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Button(
-                            onClick = {
-                                showDialogMutable.value = false
-                            },
-                            shape = RoundedCornerShape(16),
-                            modifier = Modifier.weight(.6f).height(46.dp)
-                        ) {
-                            Text("Cancel")
-                        }
-                        Spacer(modifier = Modifier.padding(18.dp))
-                        val interactionSource = remember { MutableInteractionSource() }
+                    fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
 
-                        val text = buildAnnotatedString {
-                            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)) {
-                                append("CREATE")
+                        RunUIThread {
+
+
+                            //debug
+                            for (res in result) {
+                                res!!
+                                print(res.Success)
+                                print(res.FailureReason)
+                                print(res.ResultingMapping?.Protocol)
                             }
-                        }
 
-                        Button(
-                            onClick = {
+                            var numFailed = result.count { !it?.Success!! }
 
-                                hasSubmitted.value = true
-                                if(descriptionError.value ||
-                                    startInternalHasError.value ||
-                                    startExternalHasError.value ||
-                                    endInternalHasError.value ||
-                                    endExternalHasError.value ||
-                                    internalIpHasError.value)
-                                {
-                                    // show toast and return
-                                    return@Button;
+                            var anyFailed = numFailed > 0
+
+                            if (anyFailed) {
+
+                                // all failed
+                                if (numFailed == result.size) {
+                                    if (result.size == 1) {
+                                        MainActivity.showSnackBarViewLog("Failed to create rule.")
+                                    } else {
+                                        MainActivity.showSnackBarViewLog("Failed to create rules.")
+                                    }
+                                } else {
+                                    MainActivity.showSnackBarViewLog("Failed to create some rules.")
                                 }
-
-                                //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-
-                                fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
-
-                                    RunUIThread {
-
-
-                                //debug
-                                        for (res in result)
-                                        {
-                                            res!!
-                                            print(res.Success)
-                                            print(res.FailureReason)
-                                            print(res.ResultingMapping?.Protocol)
-                                        }
-
-                                        var numFailed = result.count {!it?.Success!!}
-
-                                        var anyFailed = numFailed > 0
-
-                                        if(anyFailed) {
-
-                                            // all failed
-                                            if(numFailed == result.size)
-                                            {
-                                                if(result.size == 1)
-                                                {
-                                                    MainActivity.showSnackBarViewLog("Failed to create rule.")
-                                                }
-                                                else
-                                                {
-                                                    MainActivity.showSnackBarViewLog("Failed to create rules.")
-                                                }
-                                            }
-                                            else
-                                            {
-                                                MainActivity.showSnackBarViewLog("Failed to create some rules.")
-                                            }
 
 
 //                                            var res = result[0]
@@ -1887,41 +1942,38 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
 //                                                "Failure - ${res.FailureReason!!}",
 //                                                Toast.LENGTH_LONG
 //                                            ).show()
-                                        }
-                                        else
-                                        {
-                                            MainActivity.showSnackBarShortNoAction("Success!")
-                                        }
-                                    }
-                                }
-
-                                var portMappingRequestInput = PortMappingUserInput(
-                                    description.value,
-                                    internalIp.value,
-                                    internalPortText.value,
-                                    externalDeviceText.value,
-                                    externalPortText.value,
-                                    selectedProtocolMutable.value,
-                                    leaseDuration.value,
-                                    true
-                                )
-                                var future = UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
-                                showDialogMutable.value = false
-                            },
-                            shape = RoundedCornerShape(16),
-                            modifier = Modifier.weight(1.0f).height(46.dp),
-
-                            )
-                        {
-                            Text("Create")
+                            } else {
+                                MainActivity.showSnackBarShortNoAction("Success!")
+                            }
                         }
                     }
 
-                }
+                    var portMappingRequestInput = PortMappingUserInput(
+                        description.value,
+                        internalIp.value,
+                        internalPortText.value,
+                        externalDeviceText.value,
+                        externalPortText.value,
+                        selectedProtocolMutable.value,
+                        leaseDuration.value,
+                        true
+                    )
+                    var future =
+                        UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
+                    showDialogMutable.value = false
+                },
+                shape = RoundedCornerShape(16),
+                modifier = Modifier.weight(1.0f).height(46.dp),
+
+                )
+            {
+                Text("Create")
             }
         }
-        }
     }
+}
+
+val createNewRuleRowWidth = 1.0f
 
 fun validateDescription(description : String) : Pair<Boolean, String>
 {
@@ -2039,7 +2091,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
                 endHasError.value = validateEndPort(startPortText.value, endPortText.value).first
                 endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).second
                             },
-            label = { Text("End (Optional)") },
+            label = { Text("End") },
             modifier = Modifier.then(modifier)
                 ,
             isError = hasSubmitted.value && endHasError.value,
@@ -2059,6 +2111,20 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
 //                PlaceholderTransformation("-")
 //            else VisualTransformation.None,
         )
+//        Surface(
+//            shape = RoundedCornerShape(6.dp), // Adjust corner size to your preference
+//            color = Color.DarkGray, // Adjust background color to your preference
+//            modifier = Modifier.padding(8.dp) // Adjust padding to your preference
+//        ) {
+            IconButton(onClick = {}, modifier = Modifier.align(Alignment.CenterVertically))
+            {
+                Icon(
+                    Icons.Filled.Expand,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.CenterVertically).size(32.dp)
+                )
+            }
+        //}
     }
 }
 
@@ -2182,7 +2248,7 @@ fun DropDownOutline(defaultModifier : Modifier, selectedText : MutableState<Stri
 fun DeviceRow(content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier
-            .fillMaxWidth(.9f)
+            .fillMaxWidth(createNewRuleRowWidth)
             .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.Top // for the error text
