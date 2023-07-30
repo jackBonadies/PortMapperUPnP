@@ -106,6 +106,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -1095,10 +1097,15 @@ class MainActivity : ComponentActivity() {
         }
         val internalIp = remember { mutableStateOf(ourIp!!) }
         var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
-        var (gatewayIps, defaultGatewayIp) = remember { getGatewayIpsWithDefault(ourGatewayIp!!) }
+        var (gatewayIps, defaultGatewayIp) = remember { UpnpManager.GetGatewayIpsWithDefault(ourGatewayIp!!) }
         var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
         var expandedInternal = remember { mutableStateOf(false) }
         var expandedExternal = remember { mutableStateOf(false) }
+        var wanIpVersionOfGatewayIsVersion1 = remember { derivedStateOf {
+            var version = UpnpManager.GetDeviceByExternalIp(defaultGatewayIp)?.upnpTypeVersion ?: 2
+            version == 1
+            } }
+        //TODO derviedStateOf externalIp to get wanIPversion
         //END
 
 
@@ -1312,7 +1319,8 @@ class MainActivity : ComponentActivity() {
                         gatewayIps,
                         externalDeviceText,
                         expandedInternal,
-                        expandedExternal
+                        expandedExternal,
+                        wanIpVersionOfGatewayIsVersion1
                     )
                 }
 
@@ -1320,25 +1328,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun getGatewayIpsWithDefault(deviceGateway : String) : Pair<MutableList<String>, String>
-{
-    var gatewayIps: MutableList<String> = mutableListOf()
-    var defaultGatewayIp = ""
-    synchronized(UpnpManager.lockIgdDevices)
-    {
-        for (device in UpnpManager.IGDDevices) {
-            gatewayIps.add(device.ipAddress)
-            if (device.ipAddress == deviceGateway) {
-                defaultGatewayIp = device.ipAddress
-            }
-        }
-    }
 
-    if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
-        defaultGatewayIp = gatewayIps[0]
-    }
-    return Pair<MutableList<String>, String>(gatewayIps, defaultGatewayIp)
-}
 
 
 //caused weird visual artifacts at runtime
@@ -1871,7 +1861,9 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                                    gatewayIps : MutableList<String>,
                                    externalDeviceText: MutableState<String>,
                                    expandedInternal: MutableState<Boolean>,
-                                   expandedExternal: MutableState<Boolean>)
+                                   expandedExternal: MutableState<Boolean>,
+                                   wanIpIsV1: State<Boolean>
+)
 {
 
 
@@ -1885,7 +1877,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 
     if(showLeaseDialog.value)
     {
-        DurationPickerDialog(showLeaseDialog, leaseDuration)
+        DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
     }
 
 
@@ -2073,7 +2065,10 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
         OutlinedTextField(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = leaseDuration.value,
-            onValueChange = { leaseDuration.value = it.filter { charIt -> charIt.isDigit() } },
+            onValueChange = {
+                leaseDuration.value = capLeaseDur(it.filter { charIt -> charIt.isDigit() }, wanIpIsV1.value)
+
+                            },
             label = { Text("Lease") },
             trailingIcon = {
                 IconButton(onClick = { showLeaseDialog.value = true })
@@ -2233,6 +2228,21 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 //            }
 //        }
 //    }
+}
+
+// v1 - max is ui4 maxvalue (which is 100+ years, so just cap at signed int4 max)
+// v2 - max is 1 week (604800)
+fun capLeaseDur(leaseDurString : String, v1: Boolean) : String
+{
+    return if(v1)
+    {
+        leaseDurString.toIntOrMaxValue().toString()
+    }
+    else
+    {
+        val leaseInt = leaseDurString.toIntOrMaxValue()
+        minOf(leaseInt, 604800).toString()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

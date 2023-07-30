@@ -60,16 +60,16 @@ fun DurationPickerDialogPreview()
 {
     SetupPreview()
     MyApplicationTheme() {
-        var showDialog = remember { mutableStateOf(true) }
-        var leaseDurationValueSeconds = remember { mutableStateOf("3661") }
-        DurationPickerDialog(showDialog, leaseDurationValueSeconds)
+        val showDialog = remember { mutableStateOf(true) }
+        val leaseDurationValueSeconds = remember { mutableStateOf("3661") }
+        DurationPickerDialog(showDialog, leaseDurationValueSeconds, true)
     }
 }
 
 @Composable
-fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueSeconds : MutableState<String>)
+fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueSeconds : MutableState<String>, wanIpConnectionV1 : Boolean)
 {
-    var chosenValue = remember { mutableStateOf("") }
+    val chosenValue = remember { mutableStateOf("") }
     Dialog(onDismissRequest = { showDialog.value = false } ) {
         // Use Surface to apply elevation
         Surface(shape = MaterialTheme.shapes.medium, shadowElevation = 24.dp) {
@@ -82,7 +82,7 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                PickerRow(leaseDurationValueSeconds.value, chosenValue)
+                PickerRow(leaseDurationValueSeconds.value, chosenValue, wanIpConnectionV1)
 
                 Divider(modifier = Modifier
                     .height(2.dp)
@@ -98,7 +98,7 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 
                     TextButton(onClick = {
                         showDialog.value = false
-                        leaseDurationValueSeconds.value = chosenValue.value
+                        leaseDurationValueSeconds.value = capLeaseDur(chosenValue.value, false)
                     }) {
                         Text("Set", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
                     }
@@ -117,19 +117,21 @@ fun rememberPickerState(initialValue : Int) : PickerState
 }
 
 @Composable
-fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>) {
+fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIpConnectionV1 : Boolean) {
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
 
-        var initSeconds = if(initialSeconds.isBlank()) 0 else initialSeconds.replace(" (max)", "").toInt()
-        var dhms = getDHMS(initSeconds)
+        val initSeconds = if(initialSeconds.isBlank()) 0 else initialSeconds.replace(" (max)", "").toInt()
+        val dhms = getDHMS(initSeconds)
 
         val infiniteScroll = true
 
-        val dayValues = remember { getStringRange(0, 7, infiniteScroll) }
+        val maxDays = if(wanIpConnectionV1) 365 else 7
+
+        val dayValues = remember { getStringRange(0, maxDays, infiniteScroll) }
         val dayValuesPickerState = rememberPickerState(dhms.days)
 
         val hoursValues = remember { getStringRange(0, 23, infiniteScroll) }

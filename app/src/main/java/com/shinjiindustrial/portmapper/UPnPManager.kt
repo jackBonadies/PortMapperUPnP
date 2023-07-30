@@ -142,6 +142,40 @@ class UpnpManager {
             invokeUpdateUIFromData()
         }
 
+        fun GetDeviceByExternalIp(gatewayIp : String) : IGDDevice?
+        {
+            synchronized(UpnpManager.lockIgdDevices)
+            {
+                for (device in UpnpManager.IGDDevices) {
+                    if(gatewayIp == device.ipAddress)
+                    {
+                        return device
+                    }
+                }
+            }
+            return null
+        }
+
+        fun GetGatewayIpsWithDefault(deviceGateway : String) : Pair<MutableList<String>, String>
+        {
+            var gatewayIps: MutableList<String> = mutableListOf()
+            var defaultGatewayIp = ""
+            synchronized(UpnpManager.lockIgdDevices)
+            {
+                for (device in UpnpManager.IGDDevices) {
+                    gatewayIps.add(device.ipAddress)
+                    if (device.ipAddress == deviceGateway) {
+                        defaultGatewayIp = device.ipAddress
+                    }
+                }
+            }
+
+            if (defaultGatewayIp == "" && !gatewayIps.isEmpty()) {
+                defaultGatewayIp = gatewayIps[0]
+            }
+            return Pair<MutableList<String>, String>(gatewayIps, defaultGatewayIp)
+        }
+
         fun GetUPnPService() : UpnpService {
             return _upnpService!!
         }
