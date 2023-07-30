@@ -34,6 +34,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
@@ -66,6 +68,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
@@ -74,6 +77,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -110,10 +114,12 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -435,7 +441,7 @@ class MainActivity : ComponentActivity() {
 
     fun searchStarted(o: Any?) {
         runOnUiThread {
-            mainSearchInProgressAndNothingFoundYet!!.value = true
+            mainSearchInProgressAndNothingFoundYet!!.value = true // controls when loading bar is there
             searchInProgressJob?.cancel() // cancel old search timer
             if (mainSearchInProgressAndNothingFoundYet!!.value) {
                 searchInProgressJob = GlobalScope.launch {
@@ -526,6 +532,7 @@ class MainActivity : ComponentActivity() {
         }
 
         var OurSnackbarHostState: SnackbarHostState? = null
+        var MultiSelectItems : SnapshotStateList<PortMapping>? = null
     }
 
     lateinit var upnpElementsViewModel: UPnPElementViewModel
@@ -535,7 +542,7 @@ class MainActivity : ComponentActivity() {
     var searchInProgressJob: Job? = null
 
 
-    var mainSearchInProgressAndNothingFoundYet: MutableState<Boolean>? = null
+    var mainSearchInProgressAndNothingFoundYet: MutableState<Boolean>? = null //TODO similar thing with pullrefresh...
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -810,6 +817,7 @@ class MainActivity : ComponentActivity() {
 
 
         MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
+        MainActivity.MultiSelectItems = remember { mutableStateListOf<PortMapping>() }
         val scope = rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
         val anyIgdDevices = remember { mutableStateOf(!UpnpManager.IGDDevices.isEmpty()) }
@@ -852,7 +860,7 @@ class MainActivity : ComponentActivity() {
                 },
                 floatingActionButton = {
 
-                    if (true) {
+                    if (anyIgdDevices.value) {
                         FloatingActionButton(
                             // uses MaterialTheme.colorScheme.secondaryContainer
                             containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
@@ -873,27 +881,54 @@ class MainActivity : ComponentActivity() {
                 },
                 topBar = {
                     TopAppBar(
+                        navigationIcon = {
+                            if(MultiSelectItems!!.isNotEmpty())
+                            {
+                                IconButton(onClick = {
+                                    MultiSelectItems!!.clear()
+                                })
+                                {
+                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                                }
+                            }
+                        },
 //                                modifier = Modifier.height(40.dp),
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                             containerColor = AdditionalColors.TopAppBarColor
                         ),
                         //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                         title = {
+                            val title = if(MultiSelectItems!!.isEmpty()) "PortMapper" else "${MultiSelectItems!!.count()} Selected"
                             Text(
-                                text = "PortMapper",
+                                text = title,
                                 color = AdditionalColors.TextColorStrong,
                                 fontWeight = FontWeight.Normal
                             )
                         },
                         actions = {
-                            IconButton(onClick = {
-                                coroutineScope.launch {
-                                    bottomSheetState.show()
-                                }
-                            })
+
+                            if(MultiSelectItems!!.isEmpty())
                             {
-                                Icon(Icons.Default.Sort, contentDescription = "Sort")
+                                IconButton(onClick = {
+                                    coroutineScope.launch {
+                                        bottomSheetState.show()
+                                    }
+                                })
+                                {
+                                    Icon(Icons.Default.Sort, contentDescription = "Sort")
+                                }
                             }
+                            else
+                            {
+                                IconButton(onClick = {
+                                    deleteAll(MultiSelectItems)
+                                })
+                                {
+                                    Icon(Icons.Default.Delete, contentDescription = "Sort")
+                                }
+                            }
+
+
                             OverflowMenu(
                                 showAddRuleDialogState,
                                 showAboutDialogState
@@ -907,25 +942,22 @@ class MainActivity : ComponentActivity() {
                     var refreshState = remember { mutableStateOf(false) }
                     var refreshing by refreshState
 
-
-//                            val refreshScope = rememberCoroutineScope()
-//                            var refreshing by remember { refreshState }
-
                     fun refresh() = refreshScope.launch {
                         refreshing = true
-                        //UpnpManager.Search(false)
+                        UpnpManager.FullRefresh()
+
+                        //TODO cancel if already done
+
                         delay(6000)
                         println("finish refreshing $refreshing")
                         refreshing = false
                     }
 
-
                     val state = rememberPullRefreshState(refreshing, ::refresh)
-
-                    //
 
                     BoxWithConstraints(
                         Modifier
+                            .padding(it)
                             .pullRefresh(state)
                             .fillMaxHeight()
                             .fillMaxWidth()
@@ -939,7 +971,6 @@ class MainActivity : ComponentActivity() {
 
                         Column(
                             Modifier
-                                .padding(it)
                                 .fillMaxHeight()
                                 .fillMaxWidth()
                         ) {
@@ -1025,7 +1056,7 @@ class MainActivity : ComponentActivity() {
                                                 PortForwardApplication.appContext,
                                                 true
                                             )
-                                            UpnpManager.Search(false)
+                                            UpnpManager.FullRefresh()
                                         },
                                         modifier = Modifier
                                             .padding(0.dp, 10.dp)
@@ -2767,27 +2798,47 @@ fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : Muta
         onDismissRequest = { expanded = false }
     ) {
         // this gets called on expanded, so I dont think we need to monitor additional state.
+
         val items : MutableList<String> = mutableListOf()
-        items.add("Refresh")
-        if(UpnpManager.IGDDevices.isNotEmpty())
+        if(MainActivity.MultiSelectItems!!.isEmpty())
         {
-            var (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
-            if(anyEnabled) // also get info i.e. any enabled, any disabled
+            items.add("Refresh")
+            if(UpnpManager.IGDDevices.isNotEmpty())
             {
-                items.add("Disable All")
+                var (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
+                if(anyEnabled) // also get info i.e. any enabled, any disabled
+                {
+                    items.add("Disable All")
+                }
+                if (anyDisabled)
+                {
+                    items.add("Enable All")
+                }
+                if(anyDisabled || anyEnabled)
+                {
+                    items.add("Delete All")
+                }
             }
-            if (anyDisabled)
+            items.add("View Log")
+            items.add("Settings")
+            items.add("About")
+        }
+        else
+        {
+            var anyEnabled = MainActivity.MultiSelectItems!!.any() { it -> it.Enabled }
+            var anyDisabled = MainActivity.MultiSelectItems!!.any() { it -> !it.Enabled }
+            if(anyEnabled)
             {
-                items.add("Enable All")
+                items.add("Disable")
             }
-            if(anyDisabled || anyEnabled)
+            if(anyDisabled)
             {
-                items.add("Delete All")
+                items.add("Enable")
             }
         }
-        items.add("View Log")
-        items.add("Settings")
-        items.add("About")
+
+        var test : List<PortMapping>? = MainActivity.MultiSelectItems
+
         items.forEach { label ->
             DropdownMenuItem(text = { Text(label) }, onClick = {
                 // handle item click
@@ -2796,8 +2847,7 @@ fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : Muta
                 when (label) {
                     "Refresh" ->
                     {
-                        UpnpManager.Initialize(PortForwardApplication.appContext,true)
-                        UpnpManager.Search(false)
+                        UpnpManager.FullRefresh()
                     }
                     "Disable All" ->
                     {
@@ -2806,6 +2856,14 @@ fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : Muta
                     "Enable All" ->
                     {
                         enableDisableAll(true)
+                    }
+                    "Disable" ->
+                    {
+                        enableDisableAll(false, MainActivity.MultiSelectItems)
+                    }
+                    "Enable" ->
+                    {
+                        enableDisableAll(true, MainActivity.MultiSelectItems)
                     }
                     "Delete All" ->
                     {
@@ -2834,7 +2892,7 @@ fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : Muta
     }
 }
 
-fun deleteAll()
+fun deleteAll(chosenOnly : List<PortMapping>? = null)
 {
     fun batchCallback(result : MutableList<UPnPResult?>) {
 
@@ -2872,11 +2930,11 @@ fun deleteAll()
     }
 
     // get all enabled
-    var rules = UpnpManager.GetAllRules();
+    var rules = chosenOnly ?: UpnpManager.GetAllRules();
     UpnpManager.DeletePortMappingsEntry(rules, ::batchCallback)
 }
 
-fun enableDisableAll(enable : Boolean)
+fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null)
 {
     fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
 
@@ -2913,8 +2971,15 @@ fun enableDisableAll(enable : Boolean)
         }
     }
 
-    var rules = UpnpManager.GetEnabledDisabledRules(!enable);
-    UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
+    if(chosenRulesOnly != null)
+    {
+        var rules = chosenRulesOnly.filter { it -> it.Enabled != enable };
+        UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
+    }
+    else {
+        var rules = UpnpManager.GetEnabledDisabledRules(!enable);
+        UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
+    }
 }
 
 fun formatIpv4(ipAddr : Int) : String
@@ -3434,7 +3499,9 @@ fun NoMappingsCard()
     }
 }
 
-@OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier)
 {
@@ -3457,7 +3524,24 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
             //.clip(RoundedCornerShape(borderRadius))
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .clickable {
+            .combinedClickable(
+                onClick = {
+
+                    if(MainActivity.MultiSelectItems!!.isNotEmpty()) //TODO replace with IsMultiSelectMode()
+                    {
+                        ToggleSelection(portMapping)
+                    }
+                    else
+                    {
+                        PortForwardApplication.showContextMenu.value = true
+                        PortForwardApplication.currentSingleSelectedObject.value = portMapping
+                    }
+
+                },
+                onLongClick = {
+                    ToggleSelection(portMapping)
+                }
+            ),
 
 
 //                Snackbar
@@ -3468,9 +3552,8 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 //                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
 //                    .show()
                 //isRound = !isRound
-                PortForwardApplication.showContextMenu.value = true
-                PortForwardApplication.currentSingleSelectedObject.value = portMapping
-            },
+
+
             elevation = CardDefaults.cardElevation(),
             border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
             colors = CardDefaults.cardColors(
@@ -3480,12 +3563,26 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
         Row(
             modifier = Modifier
-                .padding(15.dp, 6.dp),//.background(Color(0xffc5dceb)),
+                .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
             //.background(MaterialTheme.colorScheme.secondaryContainer),
             verticalAlignment = Alignment.CenterVertically
 
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+
+            var multiSelectMode = MainActivity.MultiSelectItems!!.isNotEmpty()
+            var padLeft = if(multiSelectMode) 5.dp else 13.dp
+            if(multiSelectMode) {
+                CircleCheckbox(
+                    MainActivity.MultiSelectItems!!.contains(portMapping),
+                    true
+                ) {
+
+                    ToggleSelection(portMapping)
+
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f).padding(padLeft,0.dp,0.dp,0.dp)) {
                 Text(
                     portMapping.Description,
                     fontSize = TextUnit(20f, TextUnitType.Sp),
@@ -3561,6 +3658,44 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 //            }
 //        }
     }
+}
+
+fun ToggleSelection(portMapping : PortMapping)
+{
+    var has = MainActivity.MultiSelectItems!!.contains(portMapping)
+    if(has)
+    {
+        MainActivity.MultiSelectItems!!.remove(portMapping)
+    }
+    else
+    {
+        MainActivity.MultiSelectItems!!.add(portMapping)
+    }
+}
+
+@Composable
+fun CircleCheckbox(selected: Boolean, enabled: Boolean = true, onChecked: () -> Unit) {
+
+    val color = MaterialTheme.colorScheme
+    val imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle
+    val tint = if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
+    val background = if (selected) Color.White else Color.Transparent
+
+    IconButton(onClick = { onChecked() },
+        enabled = enabled) {
+
+        Icon(imageVector = imageVector, tint = tint,
+            modifier = Modifier.background(background, shape = CircleShape).size(28.dp),
+            contentDescription = "checkbox")
+    }
+}
+
+@Preview
+@Composable
+fun CircleCheckboxPreview()
+{
+    var selected = remember { mutableStateOf(false)}
+    CircleCheckbox(selected.value, true) { selected.value = !selected.value }
 }
 
 @Composable

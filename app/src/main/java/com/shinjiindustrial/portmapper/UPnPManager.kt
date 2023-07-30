@@ -280,6 +280,12 @@ class UpnpManager {
 
         var FailedToInitialize : Boolean = false
 
+        fun FullRefresh()
+        {
+            Initialize(PortForwardApplication.appContext,true)
+            Search(false)
+        }
+
         fun Initialize(context : Context, force : Boolean) : Boolean
         {
             if(_initialized && !force)
@@ -668,8 +674,8 @@ class UpnpManager {
             return future
         }
 
-        fun DeletePortMappingsEntry(portMappings : MutableList<PortMapping>,
-                                    onCompleteBatchCallback: (MutableList<UPnPResult?>) -> Unit) : Future<MutableList<PortMapping>>
+        fun DeletePortMappingsEntry(portMappings : List<PortMapping>,
+                                    onCompleteBatchCallback: (MutableList<UPnPResult?>) -> Unit) : Future<List<PortMapping>>
         {
             val callable = Callable {
 
