@@ -210,6 +210,7 @@ class UpnpManager {
 
 
 
+
         data class PortMappingFullResult(val description : String, val internalIp : String, val internalPort : String)
 
         fun CreatePortMappingRules(
@@ -496,7 +497,7 @@ class UpnpManager {
             {
                 for (device in IGDDevices)
                 {
-                    var newMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
+                    var newMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
                     newMappings.addAll(device.portMappings)
                     for(pm in newMappings)
                     {
@@ -561,7 +562,8 @@ class UpnpManager {
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt(),
                         remoteIp,
-                        System.currentTimeMillis()) // best bet for DateTime.UtcNow
+                        System.currentTimeMillis(),
+                        GetPsuedoSlot()) // best bet for DateTime.UtcNow
 
                     PortForwardApplication.OurLogger.log(Level.INFO, "Successfully read back our new rule (${pm.shortName()})")
 
@@ -940,7 +942,7 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 {
     fun realize() : PortMapping
     {
-        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis())
+        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis(), GetPsuedoSlot())
     }
 }
 
@@ -1268,7 +1270,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     var upnpType : String //i.e. InternetGatewayDevice
     var upnpTypeVersion : Int //i.e. 2
     var actionsMap : MutableMap<String, Action<RemoteService>>
-    var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
+    var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
     var lookUpExisting : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
 //    var hasAddPortMappingAction : Boolean
 //    var hasDeletePortMappingAction : Boolean
@@ -1317,7 +1319,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     fun EnumeratePortMappings()
     {
         // we enumerate port mappings later
-        portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer())
+        portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
         var finishedEnumeratingPortMappings = false
 
         val timeTakenMillis = measureTimeMillis {
@@ -1485,7 +1487,8 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt(),
                         ipAddress,
-                        System.currentTimeMillis())
+                        System.currentTimeMillis(),
+                        slotIndex)
                     addOrUpdate(portMapping)
                     UpnpManager.PortInitialFoundEvent.invoke(portMapping)
                     success = true
@@ -1618,7 +1621,8 @@ class PortMapping constructor(
     val _Enabled: Boolean,
     val _LeaseDuration: Int,
     val _ActionExternalIP : String,
-    val _timeReadLeaseDurationMs : Long)
+    val _timeReadLeaseDurationMs : Long,
+    val _pseudoSlot : Int)
 {
     var ExternalIP : String = _ExternalIP // the returned ip from get port mapping
     var InternalIP : String = _LocalIP
@@ -1630,6 +1634,7 @@ class PortMapping constructor(
     var Description : String = _Description
     var ActualExternalIP : String = _ActionExternalIP // the actual ip of the IGD device
     var TimeReadLeaseDurationMs : Long = _timeReadLeaseDurationMs
+    var Slot : Int = _pseudoSlot
 
     fun getKey() : Pair<Int, String>
     {

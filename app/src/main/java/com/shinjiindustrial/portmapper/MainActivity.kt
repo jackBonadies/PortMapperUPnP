@@ -181,6 +181,12 @@ import java.nio.ByteOrder
 import java.util.logging.*
 import kotlin.random.Random
 
+var PseudoSlotCounter : Int = MAX_PORT // as starting slot
+fun GetPsuedoSlot() : Int
+{
+    PseudoSlotCounter += 1
+    return PseudoSlotCounter
+}
 
 private val Context.dataStore by preferencesDataStore("preferences")
 
@@ -272,7 +278,8 @@ class PortForwardApplication : Application() {
             val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
             SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
             val sortOrderKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-            SharedPrefValues.SortByPortMapping = SortBy.from(preferences[sortOrderKey] ?: 0)
+            // much better default than slot. with slot updating a rule (i.e. enable or disable) sends it down to bottom
+            SharedPrefValues.SortByPortMapping = SortBy.from(preferences[sortOrderKey] ?: SortBy.ExternalPort.sortByValue)
             val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
             SharedPrefValues.Ascending = preferences[descAsc] ?: true
         }
@@ -1448,14 +1455,31 @@ fun BottomSheetSortBy() {
                     }
                     //}
                 }
+            }
+
+            Divider(modifier = Modifier.fillMaxWidth())
+
+            val asc = remember { mutableStateOf(SharedPrefValues.Ascending) }
+
+            Row(modifier = Modifier.fillMaxWidth()) {
 //                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-//                    FilterField.values().forEach {
-//                        FilterButton(
-//                            text = it.name,
-//                            isSelected = it.name == "FOLLOW_SYSTEM",
-//                            onClick = { })
-//                    }
-//                }
+                //FilterField.values().forEach {
+                for (j in 0 until 2) {
+                    var ascendingButton = j == 0
+                    SortSelectButton(
+                        modifier = Modifier.weight(1.0f),
+                        text = if(ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
+                        isSelected = ascendingButton == asc.value,
+                        onClick = {
+
+                            asc.value = ascendingButton
+                            SharedPrefValues.Ascending = ascendingButton
+                            UpnpManager.UpdateSorting()
+                            UpnpManager.invokeUpdateUIFromData()
+                            PortForwardApplication.instance.SaveSharedPrefs()
+
+                        })
+                }
             }
         }
     }
@@ -1495,15 +1519,15 @@ enum class SortBy(val sortByValue : Int) {
         }
     }
 
-    fun getComparer(): PortMapperComparatorBase {
+    fun getComparer(ascending : Boolean): PortMapperComparatorBase {
         return when(this)
         {
-            Slot -> PortMapperComparatorExternalPort() //TODO
-            Description -> PortMapperComparatorDescription()
-            InternalPort -> PortMapperComparatorInternalPort()
-            ExternalPort -> PortMapperComparatorExternalPort()
-            Device -> PortMapperComparatorDevice()
-            Expiration -> PortMapperComparatorExpiration()
+            Slot -> PortMapperComparerSlot(ascending)
+            Description -> PortMapperComparatorDescription(ascending)
+            InternalPort -> PortMapperComparatorInternalPort(ascending)
+            ExternalPort -> PortMapperComparatorExternalPort(ascending)
+            Device -> PortMapperComparatorDevice(ascending)
+            Expiration -> PortMapperComparatorExpiration(ascending)
         }
     }
 }
@@ -1531,16 +1555,20 @@ fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onC
         onClick = onClick
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                modifier = Modifier.padding(2.dp),
-                text = text,
-                fontSize = 16.sp,
-                fontStyle = MaterialTheme.typography.headlineMedium.fontStyle,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = textColor,
-            )
+//            Row()
+//            {
+//                Icon(Icons.Filled.Ascending)
+                Text(
+                    modifier = Modifier.padding(2.dp),
+                    text = text,
+                    fontSize = 16.sp,
+                    fontStyle = MaterialTheme.typography.headlineMedium.fontStyle,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = textColor,
+                )
+            //}
         }
     }
 }
@@ -1556,7 +1584,7 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 var index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())),index)
+                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
             }
 
         }
@@ -1713,11 +1741,11 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     !portMapping.Enabled,
                                     ::enableDisableCallback
                                 )
-                                Toast.makeText(
-                                    PortForwardApplication.appContext,
-                                    "Disable clicked",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+//                                Toast.makeText(
+//                                    PortForwardApplication.appContext,
+//                                    "Disable clicked",
+//                                    Toast.LENGTH_SHORT
+//                                ).show()
                             }
                         )
                         menuItems.add(
@@ -2960,7 +2988,7 @@ data class Message(val name : String, val msg : String)
 
 fun _getDefaultPortMapping() : PortMapping
 {
-    return PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis())
+    return PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
 }
 
 @Preview
@@ -3111,7 +3139,8 @@ fun PortMappingCard()
                 true,
                 0,
                 "192.168.18.1",
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                0
             )
         )
 }
@@ -3134,7 +3163,8 @@ fun PortMappingCardAlt()
             true,
             0,
             "192.168.18.1",
-            System.currentTimeMillis()
+            System.currentTimeMillis(),
+            0
         )
     )
 
