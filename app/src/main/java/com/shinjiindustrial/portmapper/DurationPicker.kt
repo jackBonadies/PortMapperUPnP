@@ -98,7 +98,7 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 
                     TextButton(onClick = {
                         showDialog.value = false
-                        leaseDurationValueSeconds.value = capLeaseDur(chosenValue.value, false)
+                        leaseDurationValueSeconds.value = capLeaseDur(chosenValue.value, wanIpConnectionV1)
                     }) {
                         Text("Set", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
                     }

@@ -457,9 +457,12 @@ class MainActivity : ComponentActivity() {
                         )
                     ) // calls LiveData.setValue i.e. must be done on UI thread
                 } else {
-                    for (mapping in device.portMappings) {
+
+                    for (mapping in device.portMappings)
+                    {
                         data.add(UPnPViewElement(mapping))
                     }
+
                 }
             }
             upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
@@ -1105,7 +1108,6 @@ class MainActivity : ComponentActivity() {
             var version = UpnpManager.GetDeviceByExternalIp(defaultGatewayIp)?.upnpTypeVersion ?: 2
             version == 1
             } }
-        //TODO derviedStateOf externalIp to get wanIPversion
         //END
 
 
