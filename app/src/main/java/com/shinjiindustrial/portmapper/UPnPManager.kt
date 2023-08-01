@@ -234,7 +234,7 @@ class UpnpManager {
                         fun callback(result: UPnPCreateMappingResult) {
 
                             defaultRuleAddedCallback(result)
-                            listOfResults[i+20] = result
+                            listOfResults[i] = result
                         }
 
                         var future = CreatePortMappingRule(
@@ -1649,7 +1649,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 
             if(existing != null && MainActivity.MultiSelectItems?.remove(existing) ?: false)
             {
-                MainActivity.MultiSelectItems!!.add(existing)
+                MainActivity.MultiSelectItems!!.add(mapping)
             }
         }
         this.lookUpExisting[key] = mapping
