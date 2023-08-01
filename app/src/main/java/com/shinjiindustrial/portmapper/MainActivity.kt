@@ -20,7 +20,9 @@ import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -550,6 +552,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState);
 
         PortForwardApplication.CurrentActivity = this
+            
+        onBackPressedDispatcher.addCallback(this)
+        {
+            println("My Back Pressed Callback")
+            if(IsMultiSelectMode())
+            {
+                MainActivity.MultiSelectItems!!.clear()
+            }
+            else
+            {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+        
         //OurNetworkInfo.GetNameTypeMappings(this)
         //getConnectionType(this)
         //getLocalIpAddress()
@@ -882,7 +899,7 @@ class MainActivity : ComponentActivity() {
                 topBar = {
                     TopAppBar(
                         navigationIcon = {
-                            if(MultiSelectItems!!.isNotEmpty())
+                            if(IsMultiSelectMode())
                             {
                                 IconButton(onClick = {
                                     MultiSelectItems!!.clear()
@@ -1306,7 +1323,7 @@ class MainActivity : ComponentActivity() {
 
 
                                 var future =
-                                    UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback) //spilts into rules
+                                    UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback) //spilts into rules
                                 //showDialogMutable.value = false
 
                                 navController.popBackStack()
@@ -2054,7 +2071,10 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
         StartPortExpandable(internalPortText, startInternalHasError, startHasErrorString, hasSubmitted, expandedInternal, portStartSize)
     }
 
-    if(expandedInternal.value) {
+    AnimatedVisibility(
+        visible = expandedInternal.value
+    ) {
+    //if(expandedInternal.value) {
         PortRangeRow(
             internalPortText,
             internalPortTextEnd,
@@ -2092,7 +2112,9 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 
     }
 
-    if(expandedExternal.value) {
+    AnimatedVisibility(
+        visible = expandedExternal.value
+    ) {
         PortRangeRow(
             externalPortText,
             externalPortTextEnd,
@@ -2929,9 +2951,9 @@ fun deleteAll(chosenOnly : List<PortMapping>? = null)
         }
     }
 
-    // get all enabled
-    var rules = chosenOnly ?: UpnpManager.GetAllRules();
-    UpnpManager.DeletePortMappingsEntry(rules, ::batchCallback)
+    // get all enabled. note: need to clone.
+    var rules = chosenOnly?.toList() ?: UpnpManager.GetAllRules();
+    var future = UpnpManager.DeletePortMappingsEntry(rules, ::batchCallback)
 }
 
 fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null)
@@ -3527,7 +3549,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
             .combinedClickable(
                 onClick = {
 
-                    if(MainActivity.MultiSelectItems!!.isNotEmpty()) //TODO replace with IsMultiSelectMode()
+                    if(IsMultiSelectMode())
                     {
                         ToggleSelection(portMapping)
                     }
@@ -3569,12 +3591,49 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
         ) {
 
-            var multiSelectMode = MainActivity.MultiSelectItems!!.isNotEmpty()
-            var padLeft = if(multiSelectMode) 5.dp else 13.dp
-            if(multiSelectMode) {
+            var multiSelectMode = IsMultiSelectMode()
+            //var padLeft = if(multiSelectMode) 5.dp else 13.dp
+
+            //TODO need to do existing content slide to right and fade new element in
+
+            val padLeft = 13.dp
+            //val transition = updateTransition(multiSelectMode, label = "transition")
+
+//            val offsetState = remember { MutableTransitionState(initialState = false) }
+//            val visState = remember { MutableTransitionState(initialState = false) }
+//
+////            val padLeft by transition.animateDp(
+////                transitionSpec = {
+////                    if (false isTransitioningTo true) {
+////                        spring(stiffness = Spring.StiffnessLow)
+////                    } else {
+////                        spring(stiffness = Spring.StiffnessLow)
+////                    }
+////                },
+////                label = "offset transition",
+////            ) { isVisible -> if (isVisible) 5.dp else 13.dp}
+//
+//
+//            val padLeft by animateDpAsState(
+//                if (offsetState.currentState) 30.dp else 5.dp,
+//                finishedListener = {
+//                   if (it == 30.dp) {
+//                       offsetState.targetState = false
+//                   }
+//                }
+//            )
+//
+//            offsetState.targetState = multiSelectMode
+
+            AnimatedVisibility(
+                visible = multiSelectMode,
+            ) {
+
+
                 CircleCheckbox(
                     MainActivity.MultiSelectItems!!.contains(portMapping),
-                    true
+                    true,
+                    Modifier.padding(10.dp, 0.dp, 2.dp, 0.dp)
                 ) {
 
                     ToggleSelection(portMapping)
@@ -3673,16 +3732,21 @@ fun ToggleSelection(portMapping : PortMapping)
     }
 }
 
+fun IsMultiSelectMode() : Boolean
+{
+    return MainActivity.MultiSelectItems!!.isNotEmpty()
+}
+
 @Composable
-fun CircleCheckbox(selected: Boolean, enabled: Boolean = true, onChecked: () -> Unit) {
+fun CircleCheckbox(selected: Boolean, enabled: Boolean = true, modifier : Modifier = Modifier, onChecked: () -> Unit) {
 
     val color = MaterialTheme.colorScheme
     val imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle
     val tint = if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
     val background = if (selected) Color.White else Color.Transparent
 
-    IconButton(onClick = { onChecked() },
-        enabled = enabled) {
+    IconButton(onClick = {  },
+        enabled = enabled, modifier = modifier.then(Modifier.size(28.dp))) {
 
         Icon(imageVector = imageVector, tint = tint,
             modifier = Modifier.background(background, shape = CircleShape).size(28.dp),
