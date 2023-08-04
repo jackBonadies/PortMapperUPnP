@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id("com.google.firebase.crashlytics")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -26,6 +28,12 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.debug
+        }
+        release_no_gps {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+            ext.noGps = false
         }
         debug
         {
@@ -82,6 +90,13 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android'
     implementation 'androidx.compose.runtime:runtime'
     implementation 'androidx.compose.runtime:runtime-livedata'
+
+    // manages versions, not actually included with apk
+    implementation platform('com.google.firebase:firebase-bom:32.2.2')
+    implementation 'com.google.firebase:firebase-crashlytics'
+
+
+
 
     //implementation "androidx.navigation:navigation-compose:2.6.0"
     implementation "com.google.accompanist:accompanist-navigation-animation:0.29.0-alpha"

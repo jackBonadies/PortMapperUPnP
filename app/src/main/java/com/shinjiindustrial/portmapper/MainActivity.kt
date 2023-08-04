@@ -170,6 +170,9 @@ import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.ktx.Firebase
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -257,6 +260,11 @@ class PortForwardApplication : Application() {
 
         super.onCreate()
 
+        var app = FirebaseApp.initializeApp(this)
+        if (app == null)
+        {
+            PortForwardApplication.crashlyticsEnabled = false;
+        }
 
         RestoreSharedPrefs()
 
@@ -310,6 +318,7 @@ class PortForwardApplication : Application() {
 
 
     companion object {
+
         lateinit var appContext: Context
         lateinit var instance: PortForwardApplication
         var CurrentActivity: ComponentActivity? = null
@@ -320,6 +329,7 @@ class PortForwardApplication : Application() {
         var Logs : StringBuilder = StringBuilder()
         var OurLogger : Logger = Logger.getLogger("PortMapper")
         val ScrollToBottom = "ScrollToBottom"
+        var crashlyticsEnabled: Boolean = false
 
         fun ShowToast( msg : String,  toastLength : Int)
         {
