@@ -170,9 +170,7 @@ import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
-import com.google.firebase.FirebaseApp
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.ktx.Firebase
+
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -257,14 +255,9 @@ class PortForwardApplication : Application() {
 
     override fun onCreate() {
 
-
         super.onCreate()
 
-        var app = FirebaseApp.initializeApp(this)
-        if (app == null)
-        {
-            PortForwardApplication.crashlyticsEnabled = false;
-        }
+        FirebaseConditional.Initialize(this)
 
         RestoreSharedPrefs()
 

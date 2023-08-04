@@ -1,9 +1,17 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id("com.google.firebase.crashlytics")
-    id("com.google.gms.google-services")
+    id "com.google.firebase.crashlytics"
+    id "com.google.gms.google-services"
 }
+
+// must be after the plugin is applied otherwise no tasks will be found
+android.applicationVariants.all { variant ->
+    println variant.flavorName
+    def googleTask = tasks.findByName("process${variant.name.capitalize()}GoogleServices")
+    googleTask.enabled = !"release_no_gps".equals(variant.flavorName)
+}
+
 
 android {
     namespace 'com.example.myapplication'
@@ -40,6 +48,20 @@ android {
             minifyEnabled false
         }
     }
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main']
+        }
+        release {
+            java.srcDirs = ['src/release']
+        }
+        release_no_gps {
+            java.srcDirs = ['src/no_gps']
+        }
+        debug {
+            java.srcDirs = ['src/no_gps']
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -60,6 +82,7 @@ android {
         exclude 'META-INF/beans.xml'
     }
 }
+
 
 dependencies {
 
@@ -92,8 +115,8 @@ dependencies {
     implementation 'androidx.compose.runtime:runtime-livedata'
 
     // manages versions, not actually included with apk
-    implementation platform('com.google.firebase:firebase-bom:32.2.2')
-    implementation 'com.google.firebase:firebase-crashlytics'
+    releaseImplementation platform('com.google.firebase:firebase-bom:32.2.2')
+    releaseImplementation 'com.google.firebase:firebase-crashlytics'
 
 
 
