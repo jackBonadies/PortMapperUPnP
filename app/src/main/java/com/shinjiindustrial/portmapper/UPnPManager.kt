@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -1386,10 +1387,14 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 
         if(_wanIPService != null && _rootDevice != null) // these are only nullable for unit test purposes
         {
+            // nullrefs warning: this is SSDP response, very possible for some fields to be null, DeviceDetails constructor allows it.
+            // the best bet on ip is (rootDevice!!.identity.descriptorURL.host) imo.  since that is what we use in RetreiveRemoteDescriptors class
+            // which then calls remoteDeviceAdded (us). presentationURI can be and is null sometimes.
+
             this.displayName = this.rootDevice!!.displayString
             this.friendlyDetailsName = this.rootDevice!!.details.friendlyName
-            this.ipAddress = this.rootDevice!!.details.presentationURI.host //TODO if null maybe another way to find out
-            this.manufacturer = this.rootDevice!!.details.manufacturerDetails.manufacturer
+            this.ipAddress = rootDevice!!.identity.descriptorURL.host //this.rootDevice!!.details.presentationURI.host
+            this.manufacturer = this.rootDevice!!.details.manufacturerDetails?.manufacturer ?: ""
             this.upnpType = this.rootDevice!!.type.type
             this.upnpTypeVersion = this.rootDevice!!.type.version
             this.actionsMap = mutableMapOf()
@@ -1641,27 +1646,31 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 
     fun addOrUpdate(mapping : PortMapping)
     {
-        val key = mapping.getKey()
-        if(this.lookUpExisting.containsKey(key))
+        synchronized(lockIgdDevices)
         {
-            var existing = this.lookUpExisting[key]
-            this.portMappings.remove(existing)
+            val key = mapping.getKey()
+            if (this.lookUpExisting.containsKey(key)) {
+                var existing = this.lookUpExisting[key]
+                this.portMappings.remove(existing) //TODO
 
-            if(existing != null && MainActivity.MultiSelectItems?.remove(existing) ?: false)
-            {
-                MainActivity.MultiSelectItems!!.add(mapping)
+                if (existing != null && MainActivity.MultiSelectItems?.remove(existing) ?: false) {
+                    MainActivity.MultiSelectItems!!.add(mapping)
+                }
             }
+            this.lookUpExisting[key] = mapping
+            this.portMappings.add(mapping)
         }
-        this.lookUpExisting[key] = mapping
-        this.portMappings.add(mapping)
 
     }
 
     fun removeMapping(mapping : PortMapping)
     {
-        this.lookUpExisting.remove(mapping.getKey())
-        this.portMappings.remove(mapping)
-        MainActivity.MultiSelectItems?.remove(mapping)
+        synchronized(lockIgdDevices)
+        {
+            this.lookUpExisting.remove(mapping.getKey())
+            this.portMappings.remove(mapping)
+            MainActivity.MultiSelectItems?.remove(mapping)
+        }
     }
 }
 

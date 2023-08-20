@@ -269,7 +269,6 @@ class PortForwardApplication : Application() {
 //        )
 
         val logger = Logger.getLogger("")
-        Logs = StringBuilder()
         logger.addHandler(StringBuilderHandler(Logs))
 
         var test = NetworkType.DATA.toString()
@@ -319,7 +318,7 @@ class PortForwardApplication : Application() {
         lateinit var currentSingleSelectedObject : MutableState<Any?>
         var showContextMenu : MutableState<Boolean> = mutableStateOf(false)
         var PaddingBetweenCreateNewRuleRows = 4.dp
-        var Logs : StringBuilder = StringBuilder()
+        var Logs : SnapshotStateList<String> = mutableStateListOf<String>()
         var OurLogger : Logger = Logger.getLogger("PortMapper")
         val ScrollToBottom = "ScrollToBottom"
         var crashlyticsEnabled: Boolean = false
@@ -341,11 +340,8 @@ class PortForwardApplication : Application() {
 
 }
 
-class StringBuilderHandler(private val stringBuilder: StringBuilder) : java.util.logging.Handler() {
+class StringBuilderHandler(private val stringBuilder: SnapshotStateList<String>) : java.util.logging.Handler() {
 
-//    override fun handleMessage(msg: Message) {
-//        super.handleMessage(msg)
-//    }
       override fun publish(record: LogRecord?) {
           record?.let {
               val prefix = when (it.level)
@@ -355,7 +351,7 @@ class StringBuilderHandler(private val stringBuilder: StringBuilder) : java.util
                   Level.SEVERE -> "E: "
                   else -> return // i.e. do not log
               }
-              stringBuilder.append(prefix + it.message).append("\n")
+              stringBuilder.add(prefix + it.message)
           }
       }
 //
@@ -464,23 +460,26 @@ class MainActivity : ComponentActivity() {
             Log.i("portmapperUI", "updateUIFromData")
 
             var data: MutableList<UPnPViewElement> = mutableListOf()
-            for (device in UpnpManager.IGDDevices) {
-                data.add(UPnPViewElement(device))
+            synchronized(UpnpManager.lockIgdDevices)
+            {
+                for (device in UpnpManager.IGDDevices) {
+                    data.add(UPnPViewElement(device))
 
-                if (device.portMappings.isEmpty()) {
-                    data.add(
-                        UPnPViewElement(
-                            device,
-                            true
-                        )
-                    ) // calls LiveData.setValue i.e. must be done on UI thread
-                } else {
+                    if (device.portMappings.isEmpty()) {
+                        data.add(
+                            UPnPViewElement(
+                                device,
+                                true
+                            )
+                        ) // calls LiveData.setValue i.e. must be done on UI thread
+                    } else {
 
-                    for (mapping in device.portMappings)
-                    {
-                        data.add(UPnPViewElement(mapping))
+                        for (mapping in device.portMappings) //TODO enumeration exception...
+                        {
+                            data.add(UPnPViewElement(mapping))
+                        }
+
                     }
-
                 }
             }
             upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
@@ -1252,7 +1251,7 @@ class MainActivity : ComponentActivity() {
                                         invalidFields.add("Internal IP")
                                     }
 
-                                    var invalidFieldsStr = invalidFields.joinToString(",")
+                                    var invalidFieldsStr = invalidFields.joinToString(", ")
 
                                     MainActivity.showSnackBarLongNoAction("Invalid Fields: $invalidFieldsStr")
                                     return@TextButton;
@@ -2935,7 +2934,7 @@ fun deleteAll(chosenOnly : List<PortMapping>? = null)
             var anyFailed = result.any {!it?.Success!!}
 
             if(anyFailed) {
-                var res = result[0]
+                var res = result.first {!it?.Success!!}
                 res!!
                 Toast.makeText(
                     PortForwardApplication.appContext,
@@ -2977,7 +2976,7 @@ fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = nu
             var anyFailed = result.any {!it?.Success!!}
 
             if(anyFailed) {
-                var res = result[0]
+                var res = result.first {!it?.Success!!}
                 res!!
                 Toast.makeText(
                     PortForwardApplication.appContext,

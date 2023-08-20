@@ -22,6 +22,7 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SaveAs
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,12 +33,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class LogViewActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -48,7 +53,7 @@ class LogViewActivity : ComponentActivity() {
         PortForwardApplication.CurrentActivity = this
         var scrollToBottom = this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false);
 
-        var logLines = PortForwardApplication.Logs.toString().split('\n')
+        var logLines = PortForwardApplication.Logs
 
         setContent {
             MyApplicationTheme {
@@ -72,7 +77,22 @@ class LogViewActivity : ComponentActivity() {
                                 )
                             },
                             actions = {
-                                IconButton(onClick = { CopyTextToClipboard(PortForwardApplication.Logs.toString()) }) {
+
+                                IconButton(onClick = {
+                                    PortForwardApplication.Logs.clear()
+                                    GlobalScope.launch {
+
+                                        delay(3000)
+                                        PortForwardApplication.Logs.add("hello world \r\nhello world \nhello world \n")
+                                        delay(3000)
+                                        PortForwardApplication.Logs.add("hello world2 \r\nhello world2 \nhello world2 \n")
+
+                                    }
+                                }) {
+                                    Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
+                                }
+
+                                IconButton(onClick = { CopyTextToClipboard(PortForwardApplication.Logs.joinToString("\n")) }) {
                                     Icon(Icons.Default.ContentCopy, contentDescription = "Copy to Clipboard")
                                 }
 
