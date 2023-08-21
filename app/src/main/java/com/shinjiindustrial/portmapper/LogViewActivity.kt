@@ -80,14 +80,6 @@ class LogViewActivity : ComponentActivity() {
 
                                 IconButton(onClick = {
                                     PortForwardApplication.Logs.clear()
-                                    GlobalScope.launch {
-
-                                        delay(3000)
-                                        PortForwardApplication.Logs.add("hello world \r\nhello world \nhello world \n")
-                                        delay(3000)
-                                        PortForwardApplication.Logs.add("hello world2 \r\nhello world2 \nhello world2 \n")
-
-                                    }
                                 }) {
                                     Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
                                 }

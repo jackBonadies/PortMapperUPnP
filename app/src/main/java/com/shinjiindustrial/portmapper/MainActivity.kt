@@ -474,7 +474,7 @@ class MainActivity : ComponentActivity() {
                         ) // calls LiveData.setValue i.e. must be done on UI thread
                     } else {
 
-                        for (mapping in device.portMappings) //TODO enumeration exception...
+                        for (mapping in device.portMappings)
                         {
                             data.add(UPnPViewElement(mapping))
                         }
@@ -958,11 +958,16 @@ class MainActivity : ComponentActivity() {
                 content = { it ->
 
                     val refreshScope = rememberCoroutineScope()
+
                     var refreshState = remember { mutableStateOf(false) }
                     var refreshing by refreshState
 
+                    val andResult = remember { derivedStateOf { refreshing && mainSearchInProgressAndNothingFoundYet!!.value } }
+
+                    val onlyShowMainProgressBar = true // looks slightly better in practice
+
                     fun refresh() = refreshScope.launch {
-                        refreshing = true
+                        refreshing = !onlyShowMainProgressBar
                         UpnpManager.FullRefresh()
 
                         //TODO cancel if already done
@@ -972,7 +977,7 @@ class MainActivity : ComponentActivity() {
                         refreshing = false
                     }
 
-                    val state = rememberPullRefreshState(refreshing, ::refresh)
+                    val state = rememberPullRefreshState(andResult.value, ::refresh)
 
                     BoxWithConstraints(
                         Modifier
