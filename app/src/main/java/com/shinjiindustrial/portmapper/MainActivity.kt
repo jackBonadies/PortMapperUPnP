@@ -166,6 +166,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.Navigator
+import androidx.navigation.navArgument
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
@@ -670,7 +673,17 @@ class MainActivity : ComponentActivity() {
             {
                 MainScreen(navController = navController)
             }
-            composable("full_screen_dialog",
+            composable("full_screen_dialog/{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}",
+                arguments = listOf(
+                    navArgument("description") { nullable = true; type = NavType.StringType }, // only if nullable (or default) are they optional
+                    navArgument("internalIp") { nullable = true; type = NavType.StringType },
+                    navArgument("internalRange") { nullable = true; type = NavType.StringType },
+                    navArgument("externalIp") { nullable = true; type = NavType.StringType },
+                    navArgument("externalRange") { nullable = true; type = NavType.StringType },
+                    navArgument("protocol") { nullable = true; type = NavType.StringType },
+                    navArgument("leaseDuration") { nullable = true; type = NavType.StringType },
+                    navArgument("enabled") { type = NavType.BoolType; defaultValue = false },
+                ),
                     popExitTransition = {
 
                                        slideOutVertically(
@@ -706,7 +719,24 @@ class MainActivity : ComponentActivity() {
                 }
             )
             {
-                RuleCreationDialog(navController = navController)
+            backStackEntry ->
+                val arguments = backStackEntry.arguments
+                val desc = arguments?.getString("description")
+                val internalIp = arguments?.getString("internalIp")
+                val internalRange = arguments?.getString("internalRange")
+                val externalIp = arguments?.getString("externalIp")
+                val externalRange = arguments?.getString("externalRange")
+                val protocol = arguments?.getString("protocol")
+                val leaseDuration = arguments?.getString("leaseDuration")
+                val enabled = arguments?.getBoolean("enabled")
+
+                var portMappingUserInputToEdit : PortMappingUserInput? = null
+                if(desc != null)
+                {
+                    portMappingUserInputToEdit = PortMappingUserInput(desc, internalIp!!, internalRange!!, externalIp!!, externalRange!!, protocol!!, leaseDuration!!, enabled!!)
+                }
+
+                RuleCreationDialog(navController = navController, portMappingUserInputToEdit)
             }
         }
     }
@@ -760,7 +790,8 @@ class MainActivity : ComponentActivity() {
         if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
             EnterContextMenu(
                 PortForwardApplication.currentSingleSelectedObject,
-                showMoreInfoDialogState
+                showMoreInfoDialogState,
+                navController
             )
         }
 
@@ -1134,17 +1165,17 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun RuleCreationDialog(navController : NavHostController)  {
+    fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappingUserInput? = null)  {
 
         var isPreview = false;
 
         val hasSubmitted = remember { mutableStateOf(false) }
-        val internalPortText = remember { mutableStateOf("") }
+        val internalPortText = remember { mutableStateOf(ruleToEdit?.internalRange ?: "") }
         val internalPortTextEnd = remember { mutableStateOf("") }
-        val externalPortText = remember { mutableStateOf("") }
+        val externalPortText = remember { mutableStateOf(ruleToEdit?.externalRange ?: "") }
         val externalPortTextEnd = remember { mutableStateOf("") }
-        val leaseDuration = remember { mutableStateOf("0 (max)") }
-        val description = remember { mutableStateOf("") }
+        val leaseDuration = remember { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
+        val description = remember { mutableStateOf(ruleToEdit?.description ?: "0 (max)") }
         val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).first) }
         var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
         var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
@@ -1160,7 +1191,7 @@ class MainActivity : ComponentActivity() {
                 false
             )
         }
-        val internalIp = remember { mutableStateOf(ourIp!!) }
+        val internalIp = remember { mutableStateOf(ruleToEdit?.internalIp ?: ourIp!!) }
         var internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
         var (gatewayIps, defaultGatewayIp) = remember { UpnpManager.GetGatewayIpsWithDefault(ourGatewayIp!!) }
         var externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
@@ -1207,7 +1238,7 @@ class MainActivity : ComponentActivity() {
                     //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                     title = {
                         Text(
-                            text = "New Rule",
+                            text = if(ruleToEdit == null) "New Rule" else "Edit Rule",
                             color = AdditionalColors.TextColorStrong,
                             fontWeight = FontWeight.Normal
                         )
@@ -1341,7 +1372,7 @@ class MainActivity : ComponentActivity() {
                             }
                         ) {
                             Text(
-                                text = "CREATE",
+                                text = if(ruleToEdit == null) "CREATE" else "APPLY",
                                 color = AdditionalColors.TextColorStrong,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                             )
@@ -1713,13 +1744,13 @@ fun EnterContextMenu()
 {
     var showDialogMutable : MutableState<Any?> = remember { mutableStateOf(null) }
     var showDialog = remember { mutableStateOf(false) }
-    EnterContextMenu(showDialogMutable, showDialog)
+    //EnterContextMenu(showDialogMutable, showDialog, null)
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>)
+fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController)
 {
     if(singleSelectedItem.value == null)
     {
@@ -1759,11 +1790,21 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 "Edit"
                             ) {
-                                Toast.makeText(
-                                    PortForwardApplication.appContext,
-                                    "Edit clicked",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                //                val desc = arguments?.getString("description")
+                                //                val internalIp = arguments?.getString("internalIp")
+                                //                val internalRange = arguments?.getString("internalRange")
+                                //                val externalIp = arguments?.getString("externalIp")
+                                //                val externalRange = arguments?.getString("externalRange")
+                                //                val protocol = arguments?.getString("protocol")
+                                //                val leaseDuration = arguments?.getString("leaseDuration")
+                                //                val enabled = arguments?.getBoolean("enabled")
+
+                                navController.navigate("full_screen_dialog/${portMapping.Description}/${portMapping.InternalIP}/${portMapping.InternalPort}/${portMapping.ActualExternalIP}/${portMapping.ExternalPort}/${portMapping.Protocol}/${portMapping.LeaseDuration}/${portMapping.Enabled}")
+//                                Toast.makeText(
+//                                    PortForwardApplication.appContext,
+//                                    "Edit clicked",
+//                                    Toast.LENGTH_SHORT
+//                                ).show()
                             }
                         )
                         menuItems.add(

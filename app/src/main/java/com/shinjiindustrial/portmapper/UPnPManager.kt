@@ -469,8 +469,23 @@ class UpnpManager {
             Log.i("portmapperUI", "IGD device added")
             synchronized(lockIgdDevices)
             {
+                val alreadyAdded = IGDDevices.any {it -> it.ipAddress == igdDevice.ipAddress && it.displayName == igdDevice.displayName }
+                if(alreadyAdded)
+                {
+                    OurLogger.log(
+                        Level.INFO,
+                        "Device ${igdDevice.displayName} at ${igdDevice.ipAddress} has already been added. Ignoring."
+                    )
+                    // we can also choose to replace the old with the new... not sure, since this seems to be fired rarely but randomly..
+                    // should test if having the old in this case causes any network issues.
+                    return
+                }
                 IGDDevices.add(igdDevice)
             }
+            OurLogger.log(
+                Level.INFO,
+                "Added Device ${igdDevice.displayName} at ${igdDevice.ipAddress}."
+            )
             UpnpManager.DeviceFoundEvent.invoke(igdDevice)
         }
 
