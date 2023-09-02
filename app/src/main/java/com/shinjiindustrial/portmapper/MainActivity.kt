@@ -8,6 +8,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -673,7 +674,7 @@ class MainActivity : ComponentActivity() {
             {
                 MainScreen(navController = navController)
             }
-            composable("full_screen_dialog/{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}",
+            composable("full_screen_dialog?description={description}&internalIp={internalIp}&internalRange={internalRange}&externalIp={externalIp}&externalRange={externalRange}&protocol={protocol}&leaseDuration={leaseDuration}&enabled={enabled}",
                 arguments = listOf(
                     navArgument("description") { nullable = true; type = NavType.StringType }, // only if nullable (or default) are they optional
                     navArgument("internalIp") { nullable = true; type = NavType.StringType },
@@ -1175,7 +1176,7 @@ class MainActivity : ComponentActivity() {
         val externalPortText = remember { mutableStateOf(ruleToEdit?.externalRange ?: "") }
         val externalPortTextEnd = remember { mutableStateOf("") }
         val leaseDuration = remember { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
-        val description = remember { mutableStateOf(ruleToEdit?.description ?: "0 (max)") }
+        val description = remember { mutableStateOf(ruleToEdit?.description ?: "") }
         val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).first) }
         var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
         var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
@@ -1799,7 +1800,20 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                 //                val leaseDuration = arguments?.getString("leaseDuration")
                                 //                val enabled = arguments?.getBoolean("enabled")
 
-                                navController.navigate("full_screen_dialog/${portMapping.Description}/${portMapping.InternalIP}/${portMapping.InternalPort}/${portMapping.ActualExternalIP}/${portMapping.ExternalPort}/${portMapping.Protocol}/${portMapping.LeaseDuration}/${portMapping.Enabled}")
+                                ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
+                                val uriBuilder = Uri.Builder()
+                                    .path("full_screen_dialog")
+                                    .appendQueryParameter("description", portMapping.Description)
+                                    .appendQueryParameter("internalIp", portMapping.InternalIP)
+                                    .appendQueryParameter("internalRange", portMapping.InternalPort.toString())
+                                    .appendQueryParameter("externalIp", portMapping.ExternalIP)
+                                    .appendQueryParameter("externalRange", portMapping.ExternalPort.toString())
+                                    .appendQueryParameter("protocol", portMapping.Protocol)
+                                    .appendQueryParameter("leaseDuration", portMapping.LeaseDuration.toString())
+                                    .appendQueryParameter("enabled", portMapping.Enabled.toString())
+                                val uri = uriBuilder.build()
+                                navController.navigate(uri.toString())
+                                //navController.navigate("full_screen_dialog/${portMapping.Description}/${portMapping.InternalIP}/${portMapping.InternalPort}/${portMapping.ActualExternalIP}/${portMapping.ExternalPort}/${portMapping.Protocol}/${portMapping.LeaseDuration}/${portMapping.Enabled}")
 //                                Toast.makeText(
 //                                    PortForwardApplication.appContext,
 //                                    "Edit clicked",
