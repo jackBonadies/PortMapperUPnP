@@ -174,6 +174,7 @@ import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -1251,6 +1252,8 @@ class MainActivity : ComponentActivity() {
                                 var actualEndInternalError = expandedInternal.value && endInternalHasError.value
                                 var actualEndExternalError = expandedExternal.value && endExternalHasError.value
 
+                                val usingInternalRange = expandedInternal.value && internalPortTextEnd.value.isNotEmpty()
+                                val usingExternalRange = expandedExternal.value && externalPortTextEnd.value.isNotEmpty()
 
                                 hasSubmitted.value = true
                                 if (descriptionHasError.value ||
@@ -1269,11 +1272,11 @@ class MainActivity : ComponentActivity() {
                                     }
                                     if(startInternalHasError.value)
                                     {
-                                        invalidFields.add(if(expandedInternal.value) "Internal Port Start" else "Internal Port")
+                                        invalidFields.add(if(usingInternalRange) "Internal Port Start" else "Internal Port")
                                     }
                                     if(startExternalHasError.value)
                                     {
-                                        invalidFields.add(if(expandedExternal.value) "External Port Start" else "External Port")
+                                        invalidFields.add(if(usingExternalRange) "External Port Start" else "External Port")
                                     }
                                     if(actualEndInternalError)
                                     {
@@ -1294,8 +1297,8 @@ class MainActivity : ComponentActivity() {
                                     return@TextButton;
                                 }
 
-                                var internalRangeStr = if(expandedInternal.value) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
-                                var externalRangeStr = if(expandedExternal.value) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
+                                var internalRangeStr = if(usingInternalRange) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
+                                var externalRangeStr = if(usingExternalRange) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
 
                                 var portMappingRequestInput = PortMappingUserInput(
                                     description.value,
@@ -1317,6 +1320,8 @@ class MainActivity : ComponentActivity() {
 
                                 //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
+                                val modifyCase = ruleToEdit != null
+
                                 fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
 
                                     RunUIThread {
@@ -1334,10 +1339,12 @@ class MainActivity : ComponentActivity() {
 
                                         if (anyFailed) {
 
+                                            val verbString = if(modifyCase) "modify" else "create"
+
                                             // all failed
                                             if (numFailed == result.size) {
                                                 if (result.size == 1) {
-                                                    MainActivity.showSnackBarViewLog("Failed to create rule.")
+                                                    MainActivity.showSnackBarViewLog("Failed to $verbString rule.")
                                                 } else {
                                                     MainActivity.showSnackBarViewLog("Failed to create rules.")
                                                 }
@@ -1360,16 +1367,66 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
 
+                                if(ruleToEdit != null)
+                                {
+                                    if(ruleToEdit == portMappingRequestInput)
+                                    {
+                                        PortForwardApplication.OurLogger.log(
+                                            Level.INFO,
+                                            "Rule has not changed. Nothing to do."
+                                        )
+                                        navController.popBackStack()
+                                    }
+                                    else
+                                    {
+                                        // delete old rule and add new rules...
 
-                                var future =
-                                    UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback) //spilts into rules
-                                //showDialogMutable.value = false
+                                        fun onDeleteCallback(result: UPnPResult) {
 
-                                navController.popBackStack()
+                                            try {
+                                                defaultRuleDeletedCallback(result)
+                                                RunUIThread {
+                                                    println("delete callback")
+                                                    if (result.Success!!) {
 
+                                                        // if successfully deleted original rule,
+                                                        //   add new rule.
+                                                        var future =
+                                                            UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback)
+                                                    }
+                                                    else
+                                                    {
+                                                        // the old rule must still be remaining if it failed to delete
+                                                        // so nothing has changed.
+                                                        MainActivity.showSnackBarViewLog("Failed to modify entry.")
 
+                                                    }
+                                                }
+                                            } catch (exception: Exception) {
+                                                PortForwardApplication.OurLogger.log(
+                                                    Level.SEVERE,
+                                                    "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                                                )
+                                                MainActivity.showSnackBarViewLog("Failed to modify entry.")
+                                                throw exception
+                                            }
+                                        }
 
+                                        var oldRulesToDelete = UpnpManager.splitUserInputIntoRules(ruleToEdit)
 
+                                        UpnpManager.DeletePortMapping(oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
+
+                                        navController.popBackStack()
+                                    }
+                                }
+                                else
+                                {
+                                    var future =
+                                        UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback) //spilts into rules
+                                    //showDialogMutable.value = false
+
+                                    navController.popBackStack()
+                                }
                             }
                         ) {
                             Text(
@@ -2211,7 +2268,14 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = leaseDuration.value,
             onValueChange = {
-                leaseDuration.value = capLeaseDur(it.filter { charIt -> charIt.isDigit() }, wanIpIsV1.value)
+
+                var digitsOnly = it.filter { charIt -> charIt.isDigit() }
+                if (digitsOnly.isBlank()) {
+                    leaseDuration.value = digitsOnly
+
+                } else{
+                    leaseDuration.value = capLeaseDur(digitsOnly, wanIpIsV1.value)
+                }
 
                             },
             label = { Text("Lease") },
@@ -2227,6 +2291,14 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             modifier = Modifier
                 .weight(0.5f, true)
                 .onFocusChanged {
+
+                    // one is allowed to temporarily leave blank.
+                    // but on leaving it must be valid
+                    if(!it.isFocused && leaseDuration.value.isBlank())
+                    {
+                        leaseDuration.value = "0"
+                    }
+
                     if (it.isFocused) {
                         if (leaseDuration.value == "0 (max)") {
                             leaseDuration.value = "0"
@@ -3611,12 +3683,9 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
             .combinedClickable(
                 onClick = {
 
-                    if(IsMultiSelectMode())
-                    {
+                    if (IsMultiSelectMode()) {
                         ToggleSelection(portMapping)
-                    }
-                    else
-                    {
+                    } else {
                         PortForwardApplication.showContextMenu.value = true
                         PortForwardApplication.currentSingleSelectedObject.value = portMapping
                     }

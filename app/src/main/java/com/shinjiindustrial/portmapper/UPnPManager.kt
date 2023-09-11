@@ -190,12 +190,15 @@ class UpnpManager {
                 throw java.lang.Exception(errorString)
             }
 
+
+
             val inSize = inEnd - inStart + 1 // inclusive
             val outSize = outEnd - outStart + 1
             var sizeOfRange = maxOf(inSize, outSize) - 1 // if just 1 element then size is 0
+
             for (i in 0..sizeOfRange) {
                 var inPort = if (inSize == 1) inStart else inStart + i
-                var outPort = if (inSize == 1) outStart else outStart + i
+                var outPort = if (outSize == 1) outStart else outStart + i
                 for (protocol in protocols) {
                     portMappingRequests.add(
                         portMappingUserInput.with(
