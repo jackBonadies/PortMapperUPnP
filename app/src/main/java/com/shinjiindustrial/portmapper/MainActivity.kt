@@ -518,24 +518,28 @@ class MainActivity : ComponentActivity() {
             duration: SnackbarDuration,
             onAction: () -> Unit = { }
         ) {
-            if (OurSnackbarHostState == null) {
+            if (OurSnackbarHostState == null)
+            {
                 PortForwardApplication.ShowToast(
                     message,
                     if ((duration == SnackbarDuration.Long || duration == SnackbarDuration.Indefinite)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
                 )
             }
-            GlobalScope.launch(Dispatchers.Main) {
+            else
+            {
+                GlobalScope.launch(Dispatchers.Main) {
 
-                var snackbarResult = OurSnackbarHostState!!.showSnackbar(
-                    message,
-                    action,
-                    (duration == SnackbarDuration.Indefinite),
-                    duration
-                )
-                println("shown")
-                when (snackbarResult) {
-                    SnackbarResult.Dismissed -> {}
-                    SnackbarResult.ActionPerformed -> onAction()
+                    var snackbarResult = OurSnackbarHostState!!.showSnackbar(
+                        message,
+                        action,
+                        (duration == SnackbarDuration.Indefinite),
+                        duration
+                    )
+                    println("shown")
+                    when (snackbarResult) {
+                        SnackbarResult.Dismissed -> {}
+                        SnackbarResult.ActionPerformed -> onAction()
+                    }
                 }
             }
         }
@@ -1205,8 +1209,11 @@ class MainActivity : ComponentActivity() {
             } }
         //END
 
-
-
+        // this can be null as its possible to start at this navhost
+        if(OurSnackbarHostState == null)
+        {
+            MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
+        }
 
         Scaffold(
 
@@ -2280,7 +2287,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                             },
             label = { Text("Lease") },
             trailingIcon = {
-                IconButton(onClick = { showLeaseDialog.value = true })
+                IconButton(onClick = { showLeaseDialog.value = true  })
                 {
                     Icon(
                         Icons.Filled.Schedule,
