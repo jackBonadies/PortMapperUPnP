@@ -21,7 +21,7 @@ package com.shinjiindustrial.portmapper
         {
             return orderBySwitch * cmp
         }
-        cmp = p1.ExternalIP.compareTo(p2.ExternalIP)
+        cmp = p1.ActualExternalIP.compareTo(p2.ActualExternalIP)
         if(cmp != 0)
         {
             return orderBySwitch * cmp

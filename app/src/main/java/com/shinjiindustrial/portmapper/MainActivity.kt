@@ -168,13 +168,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.Navigator
 import androidx.navigation.navArgument
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
-import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -1735,7 +1733,7 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 var index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
+                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", null,"192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
             }
 
         }
@@ -3216,7 +3214,7 @@ data class Message(val name : String, val msg : String)
 
 fun _getDefaultPortMapping() : PortMapping
 {
-    return PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
+    return PortMapping("Web Server", null,"192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
 }
 
 @Preview
@@ -3359,7 +3357,7 @@ fun PortMappingCard()
         PortMappingCard(
             PortMapping(
                 "Web Server",
-                "192.168.18.1",
+                null,
                 "192.168.18.13",
                 80,
                 80,
@@ -3383,7 +3381,7 @@ fun PortMappingCardAlt()
     PortMappingCardAlt(
         PortMapping(
             "Web Server",
-            "192.168.18.1",
+            null,
             "192.168.18.13",
             80,
             80,
@@ -3668,7 +3666,7 @@ fun NoMappingsCard()
 @Composable
 fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier)
 {
-    println("external ip test ${portMapping.ExternalIP}")
+    println("external ip test ${portMapping.ActualExternalIP}")
 
     MyApplicationTheme(){
 
@@ -3947,7 +3945,7 @@ fun MoreInfoDialog(portMapping : PortMapping,  showDialog : MutableState<Boolean
                 var pairs = mutableListOf<Pair<String, String>>()
                 pairs.add(Pair("Internal IP", portMapping.InternalIP))
                 pairs.add(Pair("Internal Port", portMapping.InternalPort.toString()))
-                pairs.add(Pair("External IP", portMapping.ExternalIP))
+                pairs.add(Pair("External IP", portMapping.ActualExternalIP))
                 pairs.add(Pair("External Port", portMapping.ExternalPort.toString()))
                 pairs.add(Pair("Protocol", portMapping.Protocol))
                 pairs.add(Pair("Enabled", if (portMapping.Enabled) "True" else "False"))

@@ -578,6 +578,7 @@ class UpnpManager {
 
         fun GetSpecificPortMappingRule(
             remoteIp: String,
+            remoteHost: String?,
             remotePort: String,
             protocol: String,
             callback: (UPnPCreateMappingResult) -> Unit
@@ -588,7 +589,8 @@ class UpnpManager {
             var device: IGDDevice = getIGDDevice(remoteIp)
             var action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
             var actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", remoteIp)
+            // this is actually remote host
+            actionInvocation.setInput("NewRemoteHost", remoteHost)
             actionInvocation.setInput("NewExternalPort", remotePort)
             actionInvocation.setInput("NewProtocol", protocol)
 
@@ -606,7 +608,7 @@ class UpnpManager {
 
                     var pm = PortMapping(
                         description.toString(),
-                        remoteIp.toString(),
+                        remoteHost,
                         internalClient.toString(),
                         remotePort.toString().toInt(),
                         internalPort.toString().toInt(),
@@ -700,7 +702,8 @@ class UpnpManager {
                 portMapping.ExternalPort.toString(),
                 portMapping.Protocol,
                 portMapping.LeaseDuration.toString(),
-                enable
+                enable,
+                portMapping.RemoteHost
             )
             return CreatePortMappingRule(
                 portMappingRequest,
@@ -812,7 +815,7 @@ class UpnpManager {
             var device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
             var action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
             var actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", "${portMapping.ActualExternalIP}");
+            actionInvocation.setInput("NewExternalIP", "${portMapping.ActualExternalIP}");
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}");
             actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}");
@@ -878,7 +881,7 @@ class UpnpManager {
             var device: IGDDevice = getIGDDevice(externalIp)
             var action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             var actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", externalIp);
+            actionInvocation.setInput("NewExternalIP", externalIp);
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort);
             actionInvocation.setInput("NewProtocol", portMappingRequest.protocol);
@@ -906,7 +909,8 @@ class UpnpManager {
                         callback(result)
                     } else {
                         var specificFuture = GetSpecificPortMappingRule(
-                            externalIp,
+                            portMappingRequest.externalIp,
+                            null,
                             portMappingRequest.externalPort,
                             portMappingRequest.protocol,
                             callback
@@ -1010,7 +1014,7 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
 {
     fun with(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
     {
-        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled)
+        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled, null)
     }
 
     fun validateRange() : String
@@ -1057,11 +1061,11 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
         }
     }
 }
-data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String?)
 {
     fun realize() : PortMapping
     {
-        return PortMapping(description, externalIp, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis(), GetPsuedoSlot())
+        return PortMapping(description, remoteHost, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis(), GetPsuedoSlot())
     }
 }
 
@@ -1505,7 +1509,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 //                    retryCount = 0
 //                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 //
-//                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
+//                    var remoteHost = invocation.getOutput("NewExternalIP") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
 //                    var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
 //                    var internalClient = invocation.getOutput("NewInternalClient") //string datatype
 //                    var internalPort = invocation.getOutput("NewInternalPort")
@@ -1592,7 +1596,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                     retryCount = 0
                     OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
-                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
+                    var externalIp = invocation.getOutput("NewExternalIP") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
                     var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
                     var internalClient = invocation.getOutput("NewInternalClient") //string datatype
                     var internalPort = invocation.getOutput("NewInternalPort")
@@ -1602,7 +1606,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                     var leaseDuration = invocation.getOutput("NewLeaseDuration")
                     var portMapping = PortMapping(
                         description.toString(),
-                        remoteHost.toString(),
+                        null,
                         internalClient.toString(),
                         externalPort.toString().toInt(),
                         internalPort.toString().toInt(),
@@ -1748,7 +1752,7 @@ class UPnPViewElement constructor(
 
 class PortMapping constructor(
     val _Description: String,
-    val _ExternalIP: String,
+    val _RemoteHost: String?,
     val _LocalIP: String,
     val _ExternalPort: Int,
     val _InternalPort: Int,
@@ -1759,7 +1763,31 @@ class PortMapping constructor(
     val _timeReadLeaseDurationMs : Long,
     val _pseudoSlot : Int)
 {
-    var ExternalIP : String = _ExternalIP // the returned ip from get port mapping
+    // the returned ip from get port mapping
+    // https://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf page 17
+    // (this is an optional filter for another device on the network that is trying to reach you.)
+    // "The NAT Traversal or port mapping functionality allows creation of mappings for both TCP and UDP
+    //protocols between an external IGD port (called ExternalPort) and an internal client address associated with
+    //one of its ports (respectively called InternalClient and InternalPort). It is also possible to narrow the
+    //mapping by limiting the mapping to a specific remote host1"
+    // (this means that the external ip is a given, it is the igd device)
+    // "2.3.17 RemoteHost
+    //This variable represents the source of inbound IP packets. This variable can contain a host name or a
+    //standard IPv4 address representation. This state variable MUST be formatted as:
+    //• a domain name of a network host like it is defined in [RFC 1035],
+    //• or as a set of four decimal digit groups separated by "." as defined in [RFC 3986],
+    //• or an empty string.
+    //This will be a wildcard in most cases (an empty string). In version 2.0, NAT vendors are REQUIRED to
+    //support non-wildcarded IP addresses in addition to wildcards. A non-wildcard value will allow for “narrow”
+    //port mappings, which MAY be desirable in some usage scenarios. When RemoteHost is a wildcard, all
+    //traffic sent to the ExternalPort on the WAN interface of the gateway is forwarded to the InternalClient on
+    //the InternalPort (this corresponds to the endpoint independent filtering behaviour defined in the [RFC
+    //4787]). When RemoteHost is specified as a specific external IP address as opposed to a wildcard, the NAT
+    //will only forward inbound packets from this RemoteHost to the InternalClient. All other packets will
+    //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
+    var RemoteHost : String? = _RemoteHost
+    // the actual ip of the IGD device
+    var ActualExternalIP : String = _ActionExternalIP
     var InternalIP : String = _LocalIP
     var ExternalPort : Int = _ExternalPort
     var InternalPort : Int= _InternalPort
@@ -1767,7 +1795,7 @@ class PortMapping constructor(
     var Enabled : Boolean = _Enabled
     var LeaseDuration : Int  = _LeaseDuration
     var Description : String = _Description
-    var ActualExternalIP : String = _ActionExternalIP // the actual ip of the IGD device
+
     var TimeReadLeaseDurationMs : Long = _timeReadLeaseDurationMs
     var Slot : Int = _pseudoSlot
 
