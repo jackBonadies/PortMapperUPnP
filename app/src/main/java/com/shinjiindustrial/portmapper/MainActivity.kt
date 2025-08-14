@@ -1185,7 +1185,7 @@ class MainActivity : ComponentActivity() {
         val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).first) }
         var startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
         var endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
-        var selectedProtocolMutable = remember { mutableStateOf(Protocol.TCP.str()) }
+        var selectedProtocolMutable = remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
         var startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
         var endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
         var (ourIp, ourGatewayIp) = remember {
