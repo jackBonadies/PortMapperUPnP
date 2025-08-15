@@ -1613,7 +1613,7 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 val index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", null,"192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
+                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
             }
 
         }
@@ -2882,7 +2882,7 @@ data class Message(val name : String, val msg : String)
 
 fun _getDefaultPortMapping() : PortMapping
 {
-    return PortMapping("Web Server", null,"192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
+    return PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
 }
 
 @Preview
@@ -3025,7 +3025,7 @@ fun PortMappingCard() //TODO: rename?
         PortMappingCard(
             PortMapping(
                 "Web Server",
-                null,
+                "",
                 "192.168.18.13",
                 80,
                 80,
@@ -3049,7 +3049,7 @@ fun PortMappingCardAlt() // TODO: rename?
     PortMappingCardAlt(
         PortMapping(
             "Web Server",
-            null,
+            "",
             "192.168.18.13",
             80,
             80,

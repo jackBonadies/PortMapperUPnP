@@ -578,7 +578,7 @@ class UpnpManager {
 
         fun GetSpecificPortMappingRule(
             remoteIp: String,
-            remoteHost: String?,
+            remoteHost: String,
             remotePort: String,
             protocol: String,
             callback: (UPnPCreateMappingResult) -> Unit
@@ -1010,7 +1010,7 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
 {
     fun with(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
     {
-        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled, null)
+        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled, "")
     }
 
     fun validateRange() : String
@@ -1057,7 +1057,7 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
         }
     }
 }
-data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String?)
+data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String)
 {
     fun realize() : PortMapping
     {
@@ -1748,7 +1748,7 @@ class UPnPViewElement constructor(
 
 class PortMapping constructor(
     val _Description: String,
-    val _RemoteHost: String?,
+    val _RemoteHost: String,
     val _LocalIP: String,
     val _ExternalPort: Int,
     val _InternalPort: Int,
@@ -1781,7 +1781,7 @@ class PortMapping constructor(
     //4787]). When RemoteHost is specified as a specific external IP address as opposed to a wildcard, the NAT
     //will only forward inbound packets from this RemoteHost to the InternalClient. All other packets will
     //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
-    var RemoteHost : String? = _RemoteHost
+    var RemoteHost : String = _RemoteHost
     // the actual ip of the IGD device
     var ActualExternalIP : String = _ActionExternalIP
     var InternalIP : String = _LocalIP
