@@ -815,7 +815,7 @@ class UpnpManager {
             val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
             val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
             val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewExternalIP", "${portMapping.ActualExternalIP}");
+            actionInvocation.setInput("NewRemoteHost", "${portMapping.RemoteHost}"); //!!
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}");
             actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}");
@@ -881,7 +881,7 @@ class UpnpManager {
             val device: IGDDevice = getIGDDevice(externalIp)
             val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewExternalIP", externalIp);
+            actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost);
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort);
             actionInvocation.setInput("NewProtocol", portMappingRequest.protocol);
@@ -910,7 +910,7 @@ class UpnpManager {
                     } else {
                         val specificFuture = GetSpecificPortMappingRule(
                             portMappingRequest.externalIp,
-                            null,
+                            portMappingRequest.remoteHost,
                             portMappingRequest.externalPort,
                             portMappingRequest.protocol,
                             callback
@@ -1505,7 +1505,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 //                    retryCount = 0
 //                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 //
-//                    var remoteHost = invocation.getOutput("NewExternalIP") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
+//                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
 //                    var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
 //                    var internalClient = invocation.getOutput("NewInternalClient") //string datatype
 //                    var internalPort = invocation.getOutput("NewInternalPort")
@@ -1592,7 +1592,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                     retryCount = 0
                     OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
-                    val externalIp = invocation.getOutput("NewExternalIP") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
+                    val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
                     val externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
                     val internalClient = invocation.getOutput("NewInternalClient") //string datatype
                     val internalPort = invocation.getOutput("NewInternalPort")
@@ -1602,7 +1602,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                     val leaseDuration = invocation.getOutput("NewLeaseDuration")
                     val portMapping = PortMapping(
                         description.toString(),
-                        null,
+                        remoteHost.toString(), //TODO standardize remote host so null == string.empty
                         internalClient.toString(),
                         externalPort.toString().toInt(),
                         internalPort.toString().toInt(),
