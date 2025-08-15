@@ -24,67 +24,7 @@ import kotlin.system.measureTimeMillis
  * See [testing documentation](http://d.android.com/tools/testing).
  */
 class UPnPManagerTests {
-    @Test
-    fun eventFlow() {
 
-        var sharedVar = 0
-
-        var msf : MutableSharedFlow<Any?> = MutableSharedFlow(extraBufferCapacity = 1,  onBufferOverflow = BufferOverflow.DROP_OLDEST)
-
-//        GlobalScope.launch(Dispatchers.Default) {
-//            msf.conflate().onEach {
-//
-//                println("performing the event for $sharedVar")
-//                Thread.sleep(1000)
-//            }.collect {}
-//        }
-
-        msf.conflate().onEach {
-
-            println("performing the event for $sharedVar")
-            Thread.sleep(1000)
-        }.launchIn(CoroutineScope(Dispatchers.IO))//lifecycleScope) //shorthand for scope.launch { flow.collect() }
-
-        GlobalScope.launch(Dispatchers.Default) {
-            for(i in 0 until 2000)
-            {
-                java.lang.Thread.sleep(1)
-                msf.emit(null)
-                sharedVar += 1
-            }
-
-            java.lang.Thread.sleep(2000)
-            sharedVar += 1
-            msf.emit(null)
-
-            println("done")
-        }
-
-        Thread.sleep(40000)
-
-
-
-//        val eventFlow = MutableSharedFlow<Any>()
-//        eventFlow.conflate().onEach{}
-//
-//        eventFlow.emit("Some event data")
-
-
-//        val eventFlow = MutableSharedFlow<List<MyEvent>>() // Use your event type here
-//
-//// In your event handler...
-//        eventFlow
-//            .conflate() // Only process the most recent list of events
-//            .onEach { eventList ->
-//                // Handle the event here. This will only be called for the most recent list of events.
-//            }
-//            .launchIn(scope) // Launch this in a CoroutineScope. You might use the lifecycleScope in Android.
-//
-//// When you add an event to the list...
-//        val newList = myList + newEvent // Add the new event to the list
-//        eventFlow.emit(newList) // Emit the new list
-
-    }
     @Test
     fun addingAndReplaceRules()
     {
@@ -103,7 +43,6 @@ class UPnPManagerTests {
         val lookUpExisting : MutableMap<Pair<Int,String>, PortMapping> = mutableMapOf()
         for (pm in portMappingsToAdd)
         {
-
             val key = Pair<Int,String>(pm.ExternalPort, pm.Protocol)
             if(lookUpExisting.containsKey(key))
             {

@@ -4,7 +4,6 @@ package com.shinjiindustrial.portmapper
 
 
 import android.annotation.SuppressLint
-import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -159,7 +158,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -181,9 +179,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.io.IOException
 import java.lang.Exception
@@ -226,93 +222,6 @@ enum class DayNightMode(val intVal : Int) {
     companion object {
         fun from(findValue: Int): DayNightMode = DayNightMode.values().first { it.intVal == findValue }
     }
-}
-
-
-//TODO clean up create (picker for duration, indication that 0 is max), port range, full screen (?)
-//TODO group by algorithm. way to convert from grouped port mappings to individial
-//TODO are "slots" ordering important?
-//TODO swipe to refresh still broken...
-class PortForwardApplication : Application() {
-
-    override fun onCreate() {
-
-        super.onCreate()
-
-        FirebaseConditional.Initialize(this)
-
-        RestoreSharedPrefs()
-
-        instance = this
-        appContext = applicationContext
-
-        val logger = Logger.getLogger("")
-        logger.addHandler(StringBuilderHandler(Logs))
-
-        println("PortForwardApplication onCreate Finished")
-    }
-
-    fun RestoreSharedPrefs()
-    {
-        runBlocking {
-            val preferences = dataStore.data.first()
-            val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
-            SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
-            val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
-            SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
-            val sortOrderKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-            // much better default than slot. with slot updating a rule (i.e. enable or disable) sends it down to bottom
-            SharedPrefValues.SortByPortMapping = SortBy.from(preferences[sortOrderKey] ?: SortBy.ExternalPort.sortByValue)
-            val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-            SharedPrefValues.Ascending = preferences[descAsc] ?: true
-        }
-    }
-
-    fun SaveSharedPrefs() {
-        GlobalScope.launch(Dispatchers.IO) {
-            dataStore.edit { preferences ->
-                val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
-                preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
-                val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
-                preferences[materialYouKey] = SharedPrefValues.MaterialYouTheme
-                val sortKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-                preferences[sortKey] = SharedPrefValues.SortByPortMapping.sortByValue
-                val descAscKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-                preferences[descAscKey] = SharedPrefValues.Ascending
-            }
-        }
-    }
-
-
-    companion object {
-
-        lateinit var appContext: Context
-        lateinit var instance: PortForwardApplication
-        var CurrentActivity: ComponentActivity? = null
-//        lateinit var showPopup : MutableState<Boolean>
-        lateinit var currentSingleSelectedObject : MutableState<Any?>
-        var showContextMenu : MutableState<Boolean> = mutableStateOf(false)
-        var PaddingBetweenCreateNewRuleRows = 4.dp
-        var Logs : SnapshotStateList<String> = mutableStateListOf<String>()
-        var OurLogger : Logger = Logger.getLogger("PortMapper")
-        val ScrollToBottom = "ScrollToBottom"
-        var crashlyticsEnabled: Boolean = false
-
-        fun ShowToast( msg : String,  toastLength : Int)
-        {
-            GlobalScope.launch(Dispatchers.Main) {
-                CurrentActivity?.runOnUiThread {
-                    Toast.makeText(
-                        appContext,
-                        msg,
-                        toastLength
-                    ).show()
-                }
-            }
-        }
-    }
-
-
 }
 
 class StringBuilderHandler(private val stringBuilder: SnapshotStateList<String>) : java.util.logging.Handler() {
@@ -1692,6 +1601,7 @@ fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onC
     }
 }
 
+//TODO: mock profile
 fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPElementViewModel)
 {
     GlobalScope.launch {
@@ -1823,14 +1733,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 "Edit"
                             ) {
-                                //                val desc = arguments?.getString("description")
-                                //                val internalIp = arguments?.getString("internalIp")
-                                //                val internalRange = arguments?.getString("internalRange")
-                                //                val externalIp = arguments?.getString("externalIp")
-                                //                val externalRange = arguments?.getString("externalRange")
-                                //                val protocol = arguments?.getString("protocol")
-                                //                val leaseDuration = arguments?.getString("leaseDuration")
-                                //                val enabled = arguments?.getBoolean("enabled")
 
                                 ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
                                 val uriBuilder = Uri.Builder()
@@ -1845,12 +1747,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     .appendQueryParameter("enabled", portMapping.Enabled.toString())
                                 val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
-                                //navController.navigate("full_screen_dialog/${portMapping.Description}/${portMapping.InternalIP}/${portMapping.InternalPort}/${portMapping.ActualExternalIP}/${portMapping.ExternalPort}/${portMapping.Protocol}/${portMapping.LeaseDuration}/${portMapping.Enabled}")
-//                                Toast.makeText(
-//                                    PortForwardApplication.appContext,
-//                                    "Edit clicked",
-//                                    Toast.LENGTH_SHORT
-//                                ).show()
                             }
                         )
                         menuItems.add(
@@ -1883,11 +1779,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     !portMapping.Enabled,
                                     ::enableDisableCallback
                                 )
-//                                Toast.makeText(
-//                                    PortForwardApplication.appContext,
-//                                    "Disable clicked",
-//                                    Toast.LENGTH_SHORT
-//                                ).show()
                             }
                         )
                         menuItems.add(
@@ -1895,13 +1786,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                 "Delete"
                             ) {
                                 UpnpManager.DeletePortMappingEntry(portMapping)
-
-//
-//                                    Toast.makeText(
-//                                        PortForwardApplication.appContext,
-//                                        "Delete clicked",
-//                                        Toast.LENGTH_SHORT
-//                                    ).show()
                             }
                         )
                         menuItems.add(
@@ -1981,16 +1865,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                 shape = RoundedCornerShape(size = 6.dp))
             {
 
-
-
-
-
-
-
-
-
-
-
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -2003,9 +1877,6 @@ fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boole
                         .padding(6.dp, 6.dp)
                         .align(Alignment.Start))
                     Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp))
-
-
-
 
                 }
             }
@@ -2038,33 +1909,15 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 )
 {
 
-
-
-
     val showLeaseDialog = remember { mutableStateOf(false) }
-
-
-
-
 
     if(showLeaseDialog.value)
     {
         DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
     }
 
-
-
-
-
-
-
-
-
     val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
     val interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
-
-
-
 
     Row(
         modifier = Modifier
@@ -2281,140 +2134,9 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                         }
                     }
                 },//isFocused.value = it.isFocused },
-//            visualTransformation = if (leaseDuration.value == "0" && !isFocused.value)
-//                PlaceholderTransformation("0 (max)")
-//            else VisualTransformation.None,
-            //.fillMaxWidth(.4f)
-            //.height(60.dp)
         )
 
     }
-
-//    var showDialogMutable = remember { mutableStateOf(true) }
-//    var withButtons = false;
-//    if(withButtons) {
-//        Row(
-//            modifier = Modifier
-//                .fillMaxWidth(createNewRuleRowWidth)
-//                .padding(
-//                    top = PortForwardApplication.PaddingBetweenCreateNewRuleRows + 10.dp,
-//                    bottom = 10.dp
-//                ),
-//            horizontalArrangement = Arrangement.SpaceBetween
-//        ) {
-//            Button(
-//                onClick = {
-//                    //TODO
-//                    showDialogMutable.value = false
-//                },
-//                shape = RoundedCornerShape(16),
-//                modifier = Modifier
-//                    .weight(.6f)
-//                    .height(46.dp)
-//            ) {
-//                Text("Cancel")
-//            }
-//            Spacer(modifier = Modifier.padding(18.dp))
-//            val interactionSource = remember { MutableInteractionSource() }
-//
-//            val text = buildAnnotatedString {
-//                withStyle(
-//                    style = SpanStyle(
-//                        color = MaterialTheme.colorScheme.primary,
-//                        fontWeight = FontWeight.SemiBold
-//                    )
-//                ) {
-//                    append("CREATE")
-//                }
-//            }
-//
-//            Button(
-//                onClick = {
-//
-//                    hasSubmitted.value = true
-//                    if (descriptionHasError.value ||
-//                        startInternalHasError.value ||
-//                        startExternalHasError.value ||
-//                        endInternalHasError.value ||
-//                        endExternalHasError.value ||
-//                        internalIpHasError.value
-//                    ) {
-//                        // show toast and return
-//                        return@Button;
-//                    }
-//
-//                    //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-//
-//                    fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
-//
-//                        RunUIThread {
-//
-//
-//                            //debug
-//                            for (res in result) {
-//                                res!!
-//                                print(res.Success)
-//                                print(res.FailureReason)
-//                                print(res.ResultingMapping?.Protocol)
-//                            }
-//
-//                            var numFailed = result.count { !it?.Success!! }
-//
-//                            var anyFailed = numFailed > 0
-//
-//                            if (anyFailed) {
-//
-//                                // all failed
-//                                if (numFailed == result.size) {
-//                                    if (result.size == 1) {
-//                                        MainActivity.showSnackBarViewLog("Failed to create rule.")
-//                                    } else {
-//                                        MainActivity.showSnackBarViewLog("Failed to create rules.")
-//                                    }
-//                                } else {
-//                                    MainActivity.showSnackBarViewLog("Failed to create some rules.")
-//                                }
-//
-//
-////                                            var res = result[0]
-////                                            res!!
-////                                            // this will always be too long (text length) for a toast.
-////                                            Toast.makeText(
-////                                                PortForwardApplication.appContext,
-////                                                "Failure - ${res.FailureReason!!}",
-////                                                Toast.LENGTH_LONG
-////                                            ).show()
-//                            } else {
-//                                MainActivity.showSnackBarShortNoAction("Success!")
-//                            }
-//                        }
-//                    }
-//
-//                    var portMappingRequestInput = PortMappingUserInput(
-//                        description.value,
-//                        internalIp.value,
-//                        internalPortText.value,
-//                        externalDeviceText.value,
-//                        externalPortText.value,
-//                        selectedProtocolMutable.value,
-//                        leaseDuration.value,
-//                        true
-//                    )
-//                    var future =
-//                        UpnpManager.CreatePortMappingRules(portMappingRequestInput, ::batchCallback)
-//                    showDialogMutable.value = false
-//                },
-//                shape = RoundedCornerShape(16),
-//                modifier = Modifier
-//                    .weight(1.0f)
-//                    .height(46.dp),
-//
-//                )
-//            {
-//                Text("Create")
-//            }
-//        }
-//    }
 }
 
 // v1 - max is ui4 maxvalue (which is 100+ years, so just cap at signed int4 max)
@@ -2746,25 +2468,8 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
                 } else {
                     null
                 }
-
-//
-//            {
-//                if(hasSubmitted.value && endHasError.value)
-//                {
-//                    Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
-//                }
-//            },
-//            visualTransformation = if (endPortText.value.isEmpty())
-//                PlaceholderTransformation("-")
-//            else VisualTransformation.None,
         )
-//        Surface(
-//            shape = RoundedCornerShape(6.dp), // Adjust corner size to your preference
-//            color = Color.DarkGray, // Adjust background color to your preference
-//            modifier = Modifier.padding(8.dp) // Adjust padding to your preference
-//        ) {
 
-        //}
     }
 }
 
@@ -3117,8 +2822,6 @@ fun formatIpv4(ipAddr : Int) : String
     return inetAddress.hostAddress
 }
 
-
-
 //fun getLocalIpAddress(context: Context): InetAddress? {
 //    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 //    var ipAddress = wifiManager.connectionInfo.ipAddress
@@ -3316,7 +3019,7 @@ fun MessageCard() {
 @Preview(showBackground = true)
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun PortMappingCard()
+fun PortMappingCard() //TODO: rename?
 {
     SetupPreview()
         PortMappingCard(
@@ -3338,7 +3041,7 @@ fun PortMappingCard()
 
 @Preview(showBackground = true)
 @Composable
-fun PortMappingCardAlt()
+fun PortMappingCardAlt() // TODO: rename?
 {
     SetupPreview()
     MyApplicationTheme {
@@ -3412,39 +3115,6 @@ fun PortMappingCardAlt(portMapping: PortMapping)
 
             }
         }
-
-
-
-//        Column(
-//            modifier = Modifier.padding(15.dp)
-//        ) {
-//            Row(verticalAlignment = Alignment.CenterVertically){
-//                Text(portMapping.Description, fontSize = TextUnit(20f, TextUnitType.Sp), fontWeight = FontWeight.SemiBold)
-//                Text(portMapping.Protocol)
-//                Text("Enabled")
-//                Text(
-//                    text = "On",
-//                    modifier = Modifier
-//                        .padding(2.dp)
-//                        .background(color = Color(0xff90ee90), shape = RoundedCornerShape(10.dp))
-//                        .padding(8.dp),
-//                    color = Color.Black
-//                )
-//            }
-//
-//
-////                buildAnnotatedString {
-////                    append("welcome to ")
-////                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
-////                    ) {
-////                        append("Jetpack Compose Playground")
-////                    }
-////                }
-//            Row() {
-//                Text(portMapping.LocalIP)
-//                Text(" • 80 → 80") // ➝ ➜
-//            }
-//        }
     }
 }
 
@@ -3588,38 +3258,9 @@ fun NoMappingsCard()
                             color = AdditionalColors.TextColor
                         )
                     }
-//                    Text("${portMapping.LocalIP}")
 
-//                    val text = buildAnnotatedString {
-//                        withStyle(style = SpanStyle(color = AdditionalColors.Enabled_Green)) {
-//                            append("⬤")
-//                        }
-//                        withStyle(style = SpanStyle()) {
-//                            append(if (portMapping.Enabled) " Enabled" else " Disabled")
-//                        }
-//                    }
-//
-//
-//                    Text(text)
                 }
-//
-//
-////                buildAnnotatedString {
-////                    append("welcome to ")
-////                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
-////                    ) {
-////                        append("Jetpack Compose Playground")
-////                    }
-////                }
-//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-//                    Text(
-//                        "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
-//                        fontSize = TextUnit(20f, TextUnitType.Sp),
-//                        fontWeight = FontWeight.SemiBold
-//                    )
-//                    Text("${portMapping.Protocol}")
-//
-//                }
+
         }
         }
     }
@@ -3785,38 +3426,6 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
         }
     }
 
-
-
-//        Column(
-//            modifier = Modifier.padding(15.dp)
-//        ) {
-//            Row(verticalAlignment = Alignment.CenterVertically){
-//                Text(portMapping.Description, fontSize = TextUnit(20f, TextUnitType.Sp), fontWeight = FontWeight.SemiBold)
-//                Text(portMapping.Protocol)
-//                Text("Enabled")
-//                Text(
-//                    text = "On",
-//                    modifier = Modifier
-//                        .padding(2.dp)
-//                        .background(color = Color(0xff90ee90), shape = RoundedCornerShape(10.dp))
-//                        .padding(8.dp),
-//                    color = Color.Black
-//                )
-//            }
-//
-//
-////                buildAnnotatedString {
-////                    append("welcome to ")
-////                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
-////                    ) {
-////                        append("Jetpack Compose Playground")
-////                    }
-////                }
-//            Row() {
-//                Text(portMapping.LocalIP)
-//                Text(" • 80 → 80") // ➝ ➜
-//            }
-//        }
     }
 }
 
