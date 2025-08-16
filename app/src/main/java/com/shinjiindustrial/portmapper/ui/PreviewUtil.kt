@@ -1,4 +1,4 @@
-package com.shinjiindustrial.portmapper.common
+package com.shinjiindustrial.portmapper.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext

@@ -1,4 +1,4 @@
-package com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper.ui
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -47,7 +47,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.DayHourMinSec
+import com.shinjiindustrial.portmapper.common.capLeaseDur
+import com.shinjiindustrial.portmapper.getDHMS
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -98,7 +100,8 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 
                     TextButton(onClick = {
                         showDialog.value = false
-                        leaseDurationValueSeconds.value = capLeaseDur(chosenValue.value, wanIpConnectionV1)
+                        leaseDurationValueSeconds.value =
+                            capLeaseDur(chosenValue.value, wanIpConnectionV1)
                     }) {
                         Text("Set", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
                     }
@@ -184,7 +187,12 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
                 startIndex = dhms.mins,
             )
 
-            chosenValue.value = DayHourMinSec(dayValuesPickerState.selectedItem.toInt(),hoursValuesPickerState.selectedItem.toInt(), minsValuesPickerState.selectedItem.toInt(),0).totalSeconds().toString()
+            chosenValue.value = DayHourMinSec(
+                dayValuesPickerState.selectedItem.toInt(),
+                hoursValuesPickerState.selectedItem.toInt(),
+                minsValuesPickerState.selectedItem.toInt(),
+                0
+            ).totalSeconds().toString()
         }
     }
 }

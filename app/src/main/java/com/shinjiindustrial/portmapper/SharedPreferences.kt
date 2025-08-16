@@ -1,5 +1,7 @@
 package com.shinjiindustrial.portmapper
 
+import com.shinjiindustrial.portmapper.common.SortBy
+
 object SharedPrefKeys
 {
     val dayNightPref = "dayNightPref"

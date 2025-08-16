@@ -64,7 +64,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.MoreVert
@@ -78,8 +77,6 @@ import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -97,7 +94,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
@@ -114,7 +110,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -128,7 +123,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.IntSize
@@ -152,17 +146,23 @@ import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
-import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.common.ValidationError
+import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.common.toMessage
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
-import com.shinjiindustrial.portmapper.ports.DeviceHeader
-import com.shinjiindustrial.portmapper.ports.LoadingIcon
-import com.shinjiindustrial.portmapper.ports.NoMappingsCard
-import com.shinjiindustrial.portmapper.ports.PortMappingCard
+import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
+import com.shinjiindustrial.portmapper.ui.ConversationEntryPoint
+import com.shinjiindustrial.portmapper.ui.DeviceHeader
+import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
+import com.shinjiindustrial.portmapper.ui.LoadingIcon
+import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
+import com.shinjiindustrial.portmapper.ui.NoMappingsCard
+import com.shinjiindustrial.portmapper.ui.PortMappingCard
+import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -607,10 +607,8 @@ class MainActivity : ComponentActivity() {
     fun MainScreen(navController : NavHostController) {
         // A surface container using the 'background' color from the theme
         rememberScrollState()
-        val showAddRuleDialogState = remember { mutableStateOf(false) }
         val showAboutDialogState = remember { mutableStateOf(false) }
         val showMoreInfoDialogState = remember { mutableStateOf(false) }
-        var showAddRuleDialog by showAddRuleDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
         val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
 
 //                var showMainLoading = remember { mutableStateOf(searchStarted) }
@@ -652,21 +650,6 @@ class MainActivity : ComponentActivity() {
                 portMapping = PortForwardApplication.currentSingleSelectedObject.value as PortMapping,
                 showDialog = showMoreInfoDialogState
             )
-        }
-
-
-        if (showAddRuleDialog) {
-
-            EnterPortDialog(showAddRuleDialogState)
-
-//                    Dialog(onDismissRequest = {
-//                        println("dismiss request")
-//                        showDialog = false })
-//                    {
-//                            // Dialog content here
-//                            Box(modifier = Modifier.background(Color.White)) {
-//                            Text("Hello, Dialog!")
-//                        }
         }
 
         if (showAboutDialog) {
@@ -832,7 +815,6 @@ class MainActivity : ComponentActivity() {
 
 
                             OverflowMenu(
-                                showAddRuleDialogState,
                                 showAboutDialogState
                             )
                         }
@@ -977,6 +959,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             } else {
+                                // TODO: ??????
                                 ConversationEntryPoint(upnpElementsViewModel)
                             }
 
@@ -1014,326 +997,7 @@ class MainActivity : ComponentActivity() {
 //                        }
         }
     }
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappingUserInput? = null)  {
-
-        val isPreview = false
-
-        val hasSubmitted = remember { mutableStateOf(false) }
-        val internalPortText = remember { mutableStateOf(ruleToEdit?.internalRange ?: "") }
-        val internalPortTextEnd = remember { mutableStateOf("") }
-        val externalPortText = remember { mutableStateOf(ruleToEdit?.externalRange ?: "") }
-        val externalPortTextEnd = remember { mutableStateOf("") }
-        val leaseDuration = remember { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
-        val description = remember { mutableStateOf(ruleToEdit?.description ?: "") }
-        val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).hasError) }
-        val startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).hasError) }
-        val endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).hasError) }
-        val selectedProtocolMutable = remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
-        val startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).hasError) }
-        val endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).hasError) }
-        val (ourIp, ourGatewayIp) = remember {
-            if (isPreview) Pair<String, String>(
-                "192.168.0.1",
-                ""
-            ) else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
-                PortForwardApplication.appContext,
-                false
-            )
-        }
-        val internalIp = remember { mutableStateOf(ruleToEdit?.internalIp ?: ourIp!!) }
-        val internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
-        val (gatewayIps, defaultGatewayIp) = remember { UpnpManager.GetGatewayIpsWithDefault(ourGatewayIp!!) }
-        val externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
-        val expandedInternal = remember { mutableStateOf(false) }
-        val expandedExternal = remember { mutableStateOf(false) }
-        val wanIpVersionOfGatewayIsVersion1 = remember { derivedStateOf {
-            val version = UpnpManager.GetDeviceByExternalIp(defaultGatewayIp)?.upnpTypeVersion ?: 2
-            version == 1
-            } }
-        //END
-
-        // this can be null as its possible to start at this navhost
-        if(OurSnackbarHostState == null)
-        {
-            MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
-        }
-
-        Scaffold(
-
-            snackbarHost = {
-                SnackbarHost(MainActivity.OurSnackbarHostState!!) { data ->
-                    // custom snackbar with the custom colors
-                    Snackbar(
-                        data,
-                        actionColor = AdditionalColors.PrimaryDarkerBlue
-                        // according to https://m2.material.io/design/color/dark-theme.html
-                        // light snackbar in darkmode is good.
-//                                    containerColor = AdditionalColors.CardContainerColor,
-//                                    contentColor = AdditionalColors.TextColor
-//                                    //contentColor = ...,
-                    )
-                }
-            },
-            topBar = {
-                TopAppBar(
-//                                modifier = Modifier.height(40.dp),
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = AdditionalColors.TopAppBarColor
-                    ),
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            navController.popBackStack()
-                        }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Close")
-                        }
-                    },
-                    //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-                    title = {
-                        Text(
-                            text = if(ruleToEdit == null) "New Rule" else "Edit Rule",
-                            color = AdditionalColors.TextColorStrong,
-                            fontWeight = FontWeight.Normal
-                        )
-                    },
-                    actions = {
-                        TextButton(
-                            onClick = {
-
-                                val actualEndInternalError = expandedInternal.value && endInternalHasError.value
-                                val actualEndExternalError = expandedExternal.value && endExternalHasError.value
-
-                                val usingInternalRange = expandedInternal.value && internalPortTextEnd.value.isNotEmpty()
-                                val usingExternalRange = expandedExternal.value && externalPortTextEnd.value.isNotEmpty()
-
-                                hasSubmitted.value = true
-                                if (descriptionHasError.value ||
-                                    startInternalHasError.value ||
-                                    startExternalHasError.value ||
-                                    actualEndInternalError ||
-                                    actualEndExternalError ||
-                                    internalIpHasError.value
-                                ) {
-                                    // show toast and return
-                                    // Invalid Description, ExternalPort.
-                                    val invalidFields = mutableListOf<String>()
-                                    if(descriptionHasError.value)
-                                    {
-                                        invalidFields.add("Description")
-                                    }
-                                    if(startInternalHasError.value)
-                                    {
-                                        invalidFields.add(if(usingInternalRange) "Internal Port Start" else "Internal Port")
-                                    }
-                                    if(startExternalHasError.value)
-                                    {
-                                        invalidFields.add(if(usingExternalRange) "External Port Start" else "External Port")
-                                    }
-                                    if(actualEndInternalError)
-                                    {
-                                        invalidFields.add("Internal Port End")
-                                    }
-                                    if(actualEndExternalError)
-                                    {
-                                        invalidFields.add("External Port End")
-                                    }
-                                    if(internalIpHasError.value)
-                                    {
-                                        invalidFields.add("Internal IP")
-                                    }
-
-                                    val invalidFieldsStr = invalidFields.joinToString(", ")
-
-                                    MainActivity.showSnackBarLongNoAction("Invalid Fields: $invalidFieldsStr")
-                                    return@TextButton
-                                }
-
-                                val internalRangeStr = if(usingInternalRange) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
-                                val externalRangeStr = if(usingExternalRange) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
-
-                                val portMappingRequestInput = PortMappingUserInput(
-                                    description.value,
-                                    internalIp.value,
-                                    internalRangeStr,
-                                    externalDeviceText.value,
-                                    externalRangeStr,
-                                    selectedProtocolMutable.value,
-                                    leaseDuration.value.replace(" (max)",""),
-                                    true
-                                )
-
-                                val errorString = portMappingRequestInput.validateRange()
-                                if(errorString.isNotEmpty())
-                                {
-                                    MainActivity.showSnackBarLongNoAction(errorString)
-                                    return@TextButton
-                                }
-
-                                //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-
-                                val modifyCase = ruleToEdit != null
-
-                                fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
-
-                                    RunUIThread {
-                                        //debug
-                                        for (res in result) {
-                                            res!!
-                                            print(res.Success)
-                                            print(res.FailureReason)
-                                            print(res.ResultingMapping?.Protocol)
-                                        }
-
-                                        val numFailed = result.count { !it?.Success!! }
-
-                                        val anyFailed = numFailed > 0
-
-                                        if (anyFailed) {
-
-                                            val verbString = if(modifyCase) "modify" else "create"
-
-                                            // all failed
-                                            if (numFailed == result.size) {
-                                                if (result.size == 1) {
-                                                    showSnackBarViewLog("Failed to $verbString rule.")
-                                                } else {
-                                                    showSnackBarViewLog("Failed to create rules.")
-                                                }
-                                            } else {
-                                                showSnackBarViewLog("Failed to create some rules.")
-                                            }
-
-
-//                                            var res = result[0]
-//                                            res!!
-//                                            // this will always be too long (text length) for a toast.
-//                                            Toast.makeText(
-//                                                PortForwardApplication.appContext,
-//                                                "Failure - ${res.FailureReason!!}",
-//                                                Toast.LENGTH_LONG
-//                                            ).show()
-                                        } else {
-                                            showSnackBarShortNoAction("Success!")
-                                        }
-                                    }
-                                }
-
-                                if(ruleToEdit != null)
-                                {
-                                    if(ruleToEdit == portMappingRequestInput)
-                                    {
-                                        PortForwardApplication.OurLogger.log(
-                                            Level.INFO,
-                                            "Rule has not changed. Nothing to do."
-                                        )
-                                        navController.popBackStack()
-                                    }
-                                    else
-                                    {
-                                        // delete old rule and add new rules...
-
-                                        fun onDeleteCallback(result: UPnPResult) {
-
-                                            try {
-                                                defaultRuleDeletedCallback(result)
-                                                RunUIThread {
-                                                    println("delete callback")
-                                                    if (result.Success!!) {
-
-                                                        // if successfully deleted original rule,
-                                                        //   add new rule.
-                                                        UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback)
-                                                    }
-                                                    else
-                                                    {
-                                                        // the old rule must still be remaining if it failed to delete
-                                                        // so nothing has changed.
-                                                        showSnackBarViewLog("Failed to modify entry.")
-
-                                                    }
-                                                }
-                                            } catch (exception: Exception) {
-                                                PortForwardApplication.OurLogger.log(
-                                                    Level.SEVERE,
-                                                    "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-                                                )
-                                                showSnackBarViewLog("Failed to modify entry.")
-                                                throw exception
-                                            }
-                                        }
-
-                                        val oldRulesToDelete = UpnpManager.splitUserInputIntoRules(ruleToEdit)
-
-                                        UpnpManager.DeletePortMapping(oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
-
-                                        navController.popBackStack()
-                                    }
-                                }
-                                else
-                                {
-                                    UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback) //spilts into rules
-                                    //showDialogMutable.value = false
-
-                                    navController.popBackStack()
-                                }
-                            }
-                        ) {
-                            Text(
-                                text = if(ruleToEdit == null) "CREATE" else "APPLY",
-                                color = AdditionalColors.TextColorStrong,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
-//                        Text("CREATE", modifier = Modifier.clickable {
-//                            // navigate
-//                        })
-//                        IconButton(onClick = {
-//
-//                        })
-//                        {
-//                            Icon(Icons.Default.Sort, contentDescription = "Sort")
-//                        }
-                    }
-                )
-            },
-            content = { it ->
-
-                Column(modifier = Modifier
-                    .padding(it)
-                    .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
-                {
-                    CreateRuleContents(
-                        hasSubmitted,
-                        internalPortText,
-                        internalPortTextEnd,
-                        externalPortText,
-                        externalPortTextEnd,
-                        leaseDuration,
-                        description,
-                        descriptionHasError,
-                        startInternalHasError,
-                        endInternalHasError,
-                        selectedProtocolMutable,
-                        startExternalHasError,
-                        endExternalHasError,
-                        internalIp,
-                        internalIpHasError,
-                        gatewayIps,
-                        externalDeviceText,
-                        expandedInternal,
-                        expandedExternal,
-                        wanIpVersionOfGatewayIsVersion1
-                    )
-                }
-
-            })
-    }
 }
-
-
-
 
 //caused weird visual artifacts at runtime
 //@OptIn(ExperimentalMaterial3Api::class)
@@ -1378,197 +1042,8 @@ class MainActivity : ComponentActivity() {
 //        }
 //}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Preview
-fun ourBar()
-{
-    val showDialogMutable = remember { mutableStateOf(false) }
-    TopAppBar(
-//                                modifier = Modifier.height(40.dp),
-        colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = null) // Your icon
-                Spacer(modifier = Modifier.width(8.dp)) // Optional space between icon and title
-                Text("1 Selected")
-            }
-        },
-        actions = {
-            IconButton(onClick = {  }) {
-                Icon(Icons.Default.Delete, contentDescription = "Clear Selection")
-            }
-
-            OverflowMenu(showDialogMutable, showDialogMutable)
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Preview
-fun BottomSheetSortBy() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "Sort By",
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 20.sp,
-            color = AdditionalColors.TextColorStrong,
-            modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
-        )
-
-        Column()
-        {
-            val numRow = 2
-            val numCol = 3
-            val curIndex = remember { mutableStateOf(SharedPrefValues.SortByPortMapping.sortByValue) }
-
-            for (i in 0 until numRow) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-//                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    //FilterField.values().forEach {
-                    for (j in 0 until numCol) {
-                        val index = i * numCol + j
-                        //todo if index is out of range of sortby.values then produce an empty
-                        SortSelectButton(
-                            modifier = Modifier.weight(1.0f),
-                            text = SortBy.from(index).getShortName(),//FilterField.from(i).name,
-                            isSelected = index == curIndex.value,
-                            onClick = {
-
-                                curIndex.value = index
-                                SharedPrefValues.SortByPortMapping = SortBy.from(index)
-                                UpnpManager.UpdateSorting()
-                                UpnpManager.invokeUpdateUIFromData()
-                                PortForwardApplication.instance.SaveSharedPrefs()
-
-                            })
-                    }
-                    //}
-                }
-            }
-
-            Divider(modifier = Modifier.fillMaxWidth())
-
-            val asc = remember { mutableStateOf(SharedPrefValues.Ascending) }
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-//                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                //FilterField.values().forEach {
-                for (j in 0 until 2) {
-                    val ascendingButton = j == 0
-                    SortSelectButton(
-                        modifier = Modifier.weight(1.0f),
-                        text = if(ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
-                        isSelected = ascendingButton == asc.value,
-                        onClick = {
-
-                            asc.value = ascendingButton
-                            SharedPrefValues.Ascending = ascendingButton
-                            UpnpManager.UpdateSorting()
-                            UpnpManager.invokeUpdateUIFromData()
-                            PortForwardApplication.instance.SaveSharedPrefs()
-
-                        })
-                }
-            }
-        }
-    }
-}
-
-enum class SortBy(val sortByValue : Int) {
-    Slot(0),
-    Description(1),
-    InternalPort(2),
-    ExternalPort(3),
-    Device(4),
-    Expiration(5);
-
-    companion object {
-        fun from(findValue: Int): SortBy = SortBy.values().first { it.sortByValue == findValue }
-    }
-
-    fun getName() : String
-    {
-        return if(this == InternalPort) {
-            "Internal Port"
-        } else if(this == ExternalPort) {
-            "External Port"
-        } else {
-            name
-        }
-    }
-
-    fun getShortName() : String
-    {
-        return if(this == InternalPort) {
-            "Int. Port"
-        } else if(this == ExternalPort) {
-            "Ext. Port"
-        } else {
-            name
-        }
-    }
-
-    fun getComparer(ascending : Boolean): PortMapperComparatorBase {
-        return when(this)
-        {
-            Slot -> PortMapperComparerSlot(ascending)
-            Description -> PortMapperComparatorDescription(ascending)
-            InternalPort -> PortMapperComparatorInternalPort(ascending)
-            ExternalPort -> PortMapperComparatorExternalPort(ascending)
-            Device -> PortMapperComparatorDevice(ascending)
-            Expiration -> PortMapperComparatorExpiration(ascending)
-        }
-    }
-}
-
-@ExperimentalMaterial3Api
-@Composable
-fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onClick: () -> Unit) {
-    val buttonColor: Color
-    val textColor: Color
-    if (isSelected) {
-        buttonColor = MaterialTheme.colorScheme.primary
-        textColor = MaterialTheme.colorScheme.onPrimary
-    } else {
-        buttonColor = MaterialTheme.colorScheme.secondaryContainer
-        textColor = MaterialTheme.colorScheme.onSecondaryContainer
-    }
-
-    Card(
-        modifier = modifier.then(
-            Modifier
-                .height(60.dp)
-                .padding(6.dp)),
-        colors = CardDefaults.cardColors(containerColor = buttonColor),
-        shape = RoundedCornerShape(14.dp),
-        onClick = onClick
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//            Row()
-//            {
-//                Icon(Icons.Filled.Ascending)
-                Text(
-                    modifier = Modifier.padding(2.dp),
-                    text = text,
-                    fontSize = 16.sp,
-                    fontStyle = MaterialTheme.typography.headlineMedium.fontStyle,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = textColor,
-                )
-            //}
-        }
-    }
-}
-
-//TODO: mock profile
+// TODO: expires in 5 minutes, autorenews in 5 minutes status symbols for each portmapping
+// TODO: mock profile
 fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPElementViewModel)
 {
     GlobalScope.launch {
@@ -1594,36 +1069,6 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Preview
-@Composable
-fun ScaffoldDemo() {
-    Color(0xFF1976D2)
-    Scaffold(
-        topBar = {
-
-
-
-            TopAppBar(
-                modifier = Modifier.height(36.dp),  // change the height here
-                title = { Text(text = "hello world") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Yellow))
-                 },
-        floatingActionButton = { FloatingActionButton(onClick = {}){
-            Text("X")
-        } },
-        content = { it  ->
-            Column(Modifier.padding(it)){
-            Text("BodyContent")
-            Text("BodyContent")
-            Text("BodyContent")
-            Text("BodyContent")
-            Text("BodyContent")}
- },
-    )
-}
-
-
 fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 {
     // recursively look through devices
@@ -1645,18 +1090,6 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
         deviceList.addAll(deviceInQuestion.embeddedDevices)
     }
 }
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Preview
-fun EnterContextMenu()
-{
-    remember { mutableStateOf(null) }
-    remember { mutableStateOf(false) }
-    //EnterContextMenu(showDialogMutable, showDialog, null)
-}
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1793,63 +1226,11 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Preview
-fun EnterPortDialog()
-{
-    SetupPreview()
-    val showDialogMutable = remember { mutableStateOf(false) }
-    EnterPortDialog(showDialogMutable, true)
-}
-
 //In IGD release 1.0, a value of 0 was used to create a static port mapping. In version 2.0, it is no longer
 //possible to create static port mappings via UPnP actions. Instead, an out-of-band mechanism is REQUIRED
 //to do so (cf. WWW-administration, remote management or local management). In order to be backward
 //compatible with legacy control points, the value of 0 MUST be interpreted as the maximum value (e.g.
 //604800 seconds, which corresponds to one week).
-
-@OptIn(ExperimentalComposeUiApi::class)
-@ExperimentalMaterial3Api
-@Composable
-fun EnterPortDialog(showDialogMutable : MutableState<Boolean>, isPreview : Boolean = false) {
-
-
-    val prop = DialogProperties(
-    dismissOnClickOutside = true,
-    dismissOnBackPress = true,
-    securePolicy = SecureFlagPolicy.SecureOff,
-    usePlatformDefaultWidth = false,
-    decorFitsSystemWindows = true,
-    )
-    MyApplicationTheme {
-        Dialog(
-            onDismissRequest = { showDialogMutable.value = false },
-            properties = prop,
-        ) {
-            Surface(
-                shape = RoundedCornerShape(size = 6.dp))
-            {
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-//                    .background(
-//                        color = Color.DarkGray, shape = RoundedCornerShape(16.dp)
-//                    )
-                        .fillMaxWidth(1.0f)
-                ) {
-                    Text("Create New Rule", style = MaterialTheme.typography.headlineLarge, modifier = Modifier
-                        .padding(6.dp, 6.dp)
-                        .align(Alignment.Start))
-                    Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp))
-
-                }
-            }
-        }
-        }
-    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2103,21 +1484,6 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                 },//isFocused.value = it.isFocused },
         )
 
-    }
-}
-
-// v1 - max is ui4 maxvalue (which is 100+ years, so just cap at signed int4 max)
-// v2 - max is 1 week (604800)
-fun capLeaseDur(leaseDurString : String, v1: Boolean) : String
-{
-    return if(v1)
-    {
-        leaseDurString.toIntOrMaxValue().toString()
-    }
-    else
-    {
-        val leaseInt = leaseDurString.toIntOrMaxValue()
-        minOf(leaseInt, 604800).toString()
     }
 }
 
@@ -2515,7 +1881,7 @@ fun DeviceRow(content: @Composable RowScope.() -> Unit) {
 }
 
 @Composable
-fun OverflowMenu(showDialog : MutableState<Boolean>, showAboutDialogState : MutableState<Boolean>) {
+fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
     var expanded by remember { mutableStateOf(false) }
 
 
@@ -2746,70 +2112,6 @@ data class Message(val name : String, val msg : String)
 fun _getDefaultPortMapping() : PortMapping
 {
     return PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
-}
-
-@Preview
-@Composable
-fun PreviewConversation() {
-    SetupPreview()
-    MyApplicationTheme {
-        val msgs = mutableListOf<UPnPViewElement>()
-        val pm = _getDefaultPortMapping()
-        val upnpViewEl = UPnPViewElement(pm)
-        for (i in 0..20)
-        {
-            msgs.add(upnpViewEl)
-        }
-        Conversation(msgs)
-    }
-}
-
-@Composable
-fun ConversationEntryPoint(modelView : UPnPElementViewModel)
-{
-    val items by modelView.items.observeAsState(emptyList())
-    Conversation(items)
-}
-
-//lazy column IS recycler view basically. both recycle.
-@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
-@Composable
-fun Conversation(messages: List<UPnPViewElement>) {
-
-        LazyColumn(
-            //modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            modifier = Modifier
-                .background(AdditionalColors.Background)
-                .fillMaxHeight()
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(0.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-
-            ) {
-
-            itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
-
-                if(message.IsSpecialEmpty)
-                {
-                    NoMappingsCard(message.GetUnderlyingIGDDevice())
-                }
-                else if(message.IsIGDDevice())
-                {
-                    DeviceHeader(message.GetUnderlyingIGDDevice())
-                }
-                else
-                {
-                    PortMappingCard(message.GetUnderlyingPortMapping(), Modifier.animateItemPlacement())
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(80.dp)) // so FAB doesnt get in way
-            }
-
-
-        }
-
 }
 
 // TODO: for mock purposes

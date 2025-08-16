@@ -1,4 +1,4 @@
-package com.shinjiindustrial.portmapper.ports
+package com.shinjiindustrial.portmapper.ui
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -9,23 +9,32 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -49,16 +58,17 @@ import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.PortMapping
 import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper.UPnPElementViewModel
-import com.shinjiindustrial.portmapper.common.CircleCheckbox
-import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.UPnPViewElement
+import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 
-@OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
+@OptIn(
+    ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class
 )
 @Composable
-fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier)
+fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier.Companion)
 {
     println("external ip test ${portMapping.ActualExternalIP}")
 
@@ -86,8 +96,9 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
                             ToggleSelection(portMapping)
                         } else {
                             // TODO cleanup
-                            PortForwardApplication.showContextMenu.value = true
-                            PortForwardApplication.currentSingleSelectedObject.value = portMapping
+                            PortForwardApplication.Companion.showContextMenu.value = true
+                            PortForwardApplication.Companion.currentSingleSelectedObject.value =
+                                portMapping
                         }
 
                     },
@@ -115,10 +126,10 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
         ) {
 
             Row(
-                modifier = Modifier
+                modifier = Modifier.Companion
                     .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
                 //.background(MaterialTheme.colorScheme.secondaryContainer),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Companion.CenterVertically
 
             ) {
 
@@ -162,9 +173,9 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
 
                     CircleCheckbox(
-                        MainActivity.MultiSelectItems!!.contains(portMapping),
+                        MainActivity.Companion.MultiSelectItems!!.contains(portMapping),
                         true,
-                        Modifier.padding(10.dp, 0.dp, 2.dp, 0.dp)
+                        Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
                     ) {
 
                         ToggleSelection(portMapping)
@@ -172,11 +183,13 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
                     }
                 }
 
-                Column(modifier = Modifier.weight(1f).padding(padLeft,0.dp,0.dp,0.dp)) {
+                Column(
+                    modifier = Modifier.Companion.weight(1f).padding(padLeft, 0.dp, 0.dp, 0.dp)
+                ) {
                     Text(
                         portMapping.Description,
-                        fontSize = TextUnit(20f, TextUnitType.Sp),
-                        fontWeight = FontWeight.SemiBold,
+                        fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                        fontWeight = FontWeight.Companion.SemiBold,
                         color = AdditionalColors.TextColor
                     )
                     Text("${portMapping.InternalIP}", color = AdditionalColors.TextColor)
@@ -194,11 +207,11 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
                     Text(text, color = AdditionalColors.TextColor)
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
                     Text(
                         "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
-                        fontSize = TextUnit(20f, TextUnitType.Sp),
-                        fontWeight = FontWeight.SemiBold,
+                        fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                        fontWeight = FontWeight.Companion.SemiBold,
                         color = AdditionalColors.TextColor
                     )
                     Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
@@ -264,7 +277,7 @@ fun PortMappingCardAltPreview() // TODO: rename?
 fun PortMappingCardAlt(portMapping: PortMapping)
 {
     Card(
-        modifier = Modifier
+        modifier = Modifier.Companion
             .fillMaxWidth()
             .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
@@ -276,14 +289,18 @@ fun PortMappingCardAlt(portMapping: PortMapping)
 
         ) {
         Row(
-            modifier = Modifier
+            modifier = Modifier.Companion
                 .padding(15.dp, 6.dp),//.background(Color(0xffc5dceb)),
             //.background(MaterialTheme.colorScheme.secondaryContainer),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Companion.CenterVertically
 
         ) {
-            Column(modifier = Modifier.weight(1f)){
-                Text(portMapping.Description, fontSize = TextUnit(20f, TextUnitType.Sp), fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.Companion.weight(1f)) {
+                Text(
+                    portMapping.Description,
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold
+                )
                 Text("${portMapping.InternalIP}")
                 Text("${portMapping.ExternalPort} ➝ ${portMapping.InternalPort} • ${portMapping.Protocol}")
             }
@@ -296,12 +313,12 @@ fun PortMappingCardAlt(portMapping: PortMapping)
 //                        append("Jetpack Compose Playground")
 //                    }
 //                }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
                 Text(
                     text = "On",
-                    fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold,
+                    modifier = Modifier.Companion
                         .padding(0.dp)
                         .background(color = Color(0xFF8FCE91), shape = RoundedCornerShape(10.dp))
                         .padding(16.dp, 8.dp),
@@ -323,9 +340,9 @@ fun PreviewDeviceHeader()
 @Composable
 fun DeviceHeader(device : IGDDevice)
 {
-    Spacer(modifier = Modifier.padding(2.dp))
+    Spacer(modifier = Modifier.Companion.padding(2.dp))
     Column(
-        modifier = Modifier
+        modifier = Modifier.Companion
 //                    .background(
 //                        MaterialTheme.colorScheme.secondaryContainer,
 //                        shape = RoundedCornerShape(16.dp, 16.dp, 0.dp, 0.dp)
@@ -337,33 +354,37 @@ fun DeviceHeader(device : IGDDevice)
 //                    Divider(color = Color.Gray, thickness = 1.dp)
         Text(
             device.displayName,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = TextUnit(24f, TextUnitType.Sp),
+            fontWeight = FontWeight.Companion.SemiBold,
+            fontSize = TextUnit(24f, TextUnitType.Companion.Sp),
             color = AdditionalColors.TextColor
 
         )
         Text(device.ipAddress, color = AdditionalColors.TextColor)
     }
-    Spacer(modifier = Modifier.padding(2.dp))
+    Spacer(modifier = Modifier.Companion.padding(2.dp))
 }
 
 @Preview
 @Composable
 fun LoadingIcon()
 {
-    LoadingIcon("Searching for devices", Modifier)
+    LoadingIcon("Searching for devices", Modifier.Companion)
 }
 
 @Composable
 fun LoadingIcon(label : String, modifier : Modifier)
 {
     Column(modifier = modifier.fillMaxWidth()) {
-        CircularProgressIndicator(modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
-        Text("Searching for devices", modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .padding(0.dp, 30.dp, 0.dp, 0.dp))
+        CircularProgressIndicator(
+            modifier = Modifier.Companion
+                .align(Alignment.Companion.CenterHorizontally)
+                .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary
+        )
+        Text(
+            "Searching for devices", modifier = Modifier.Companion
+                .align(Alignment.Companion.CenterHorizontally)
+                .padding(0.dp, 30.dp, 0.dp, 0.dp)
+        )
     }
 
 }
@@ -385,7 +406,7 @@ fun NoMappingsCard()
 //                PortForwardApplication.showPopup.value = true
 //            }
 //                  },
-            modifier = Modifier
+            modifier = Modifier.Companion
                 .fillMaxWidth()
                 .padding(4.dp, 4.dp),
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
@@ -403,13 +424,13 @@ fun NoMappingsCard()
             ) {
 
             Row(
-                modifier = Modifier
+                modifier = Modifier.Companion
                     .padding(15.dp, 36.dp),//.background(Color(0xffc5dceb)),
                 //.background(MaterialTheme.colorScheme.secondaryContainer),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Companion.CenterVertically
 
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.Companion.weight(1f)) {
 
 
                     // this one is awkward if one intentionally removes all port mappings
@@ -418,18 +439,18 @@ fun NoMappingsCard()
 
                     Text(
                         "No port mappings found \nfor this device",
-                        fontSize = TextUnit(20f, TextUnitType.Sp),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
+                        fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                        fontWeight = FontWeight.Companion.SemiBold,
+                        modifier = Modifier.Companion
+                            .align(Alignment.Companion.CenterHorizontally)
                             .padding(0.dp, 0.dp, 0.dp, 8.dp),
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.Companion.Center,
                         color = AdditionalColors.TextColor
                     )
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.Companion.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.Companion.fillMaxWidth()
                     ) {
                         Text(
                             text = "Tap ",
@@ -457,8 +478,6 @@ fun NoMappingsCard()
 }
 
 
-// TODO remove playground
-
 @Composable
 fun MyScreen(myViewModel: UPnPElementViewModel = UPnPElementViewModel()) {
     val items by myViewModel.items.observeAsState(emptyList())
@@ -468,4 +487,99 @@ fun MyScreen(myViewModel: UPnPElementViewModel = UPnPElementViewModel()) {
             Text(item.UnderlyingElement.toString())
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview
+@Composable
+fun ScaffoldDemo() {
+    Color(0xFF1976D2)
+    Scaffold(
+        topBar = {
+
+
+            TopAppBar(
+                modifier = Modifier.Companion.height(36.dp),  // change the height here
+                title = { Text(text = "hello world") },
+                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Companion.Yellow)
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {}) {
+                Text("X")
+            }
+        },
+        content = { it ->
+            Column(Modifier.Companion.padding(it)) {
+                Text("BodyContent")
+                Text("BodyContent")
+                Text("BodyContent")
+                Text("BodyContent")
+                Text("BodyContent")
+            }
+        },
+    )
+}
+@Preview
+@Composable
+fun PreviewConversation() {
+    SetupPreview()
+    MyApplicationTheme {
+        val msgs = mutableListOf<UPnPViewElement>()
+        val pm = _getDefaultPortMapping()
+        val upnpViewEl = UPnPViewElement(pm)
+        for (i in 0..20)
+        {
+            msgs.add(upnpViewEl)
+        }
+        Conversation(msgs)
+    }
+}
+
+@Composable
+fun ConversationEntryPoint(modelView : UPnPElementViewModel)
+{
+    val items by modelView.items.observeAsState(emptyList())
+    Conversation(items)
+}
+
+//lazy column IS recycler view basically. both recycle.
+@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
+@Composable
+fun Conversation(messages: List<UPnPViewElement>) {
+
+    LazyColumn(
+        //modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .background(AdditionalColors.Background)
+            .fillMaxHeight()
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(0.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+
+        ) {
+
+        itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
+
+            if(message.IsSpecialEmpty)
+            {
+                NoMappingsCard(message.GetUnderlyingIGDDevice())
+            }
+            else if(message.IsIGDDevice())
+            {
+                DeviceHeader(message.GetUnderlyingIGDDevice())
+            }
+            else
+            {
+                PortMappingCard(message.GetUnderlyingPortMapping(), Modifier.animateItemPlacement())
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(80.dp)) // so FAB doesnt get in way
+        }
+
+
+    }
+
 }

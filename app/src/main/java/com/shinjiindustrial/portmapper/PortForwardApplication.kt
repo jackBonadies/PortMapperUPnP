@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.dataStore
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.shinjiindustrial.portmapper.common.SortBy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.first

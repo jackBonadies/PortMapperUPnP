@@ -1,4 +1,4 @@
-package com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.PortMapping
+import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 @Preview
@@ -27,7 +28,7 @@ fun MoreInfoDialog()
 }
 
 @Composable
-fun MoreInfoDialog(portMapping : PortMapping,  showDialog : MutableState<Boolean>)
+fun MoreInfoDialog(portMapping : PortMapping, showDialog : MutableState<Boolean>)
 {
     if(showDialog.value) {
         AlertDialog(
