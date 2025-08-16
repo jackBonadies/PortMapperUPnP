@@ -1,6 +1,8 @@
 package com.shinjiindustrial.portmapper
 
- open class PortMapperComparatorBase(ascending : Boolean) : Comparator<PortMapping> {
+import com.shinjiindustrial.portmapper.domain.PortMapping
+
+open class PortMapperComparatorBase(ascending : Boolean) : Comparator<PortMapping> {
 
      val orderBySwitch = if(ascending) 1 else -1
 

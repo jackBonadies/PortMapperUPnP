@@ -1,16 +1,7 @@
 package com.shinjiindustrial.portmapper
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import org.fourthline.cling.support.igd.callback.GetExternalIP
-import org.junit.Assert.*
+import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.PortMapping
 import org.junit.Test
 import java.util.Random
 import java.util.TreeSet
@@ -28,12 +19,12 @@ class UPnPManagerTests {
     @Test
     fun addingAndReplaceRules()
     {
-        var igdDevice = IGDDevice(null, null)
+        val igdDevice = IGDDevice(null, null)
 
         // if compare returns equals then they are considered the same and will be replaced in the TreeSet
 
 
-        var portMappingsToAdd : MutableList<PortMapping> = mutableListOf()
+        val portMappingsToAdd : MutableList<PortMapping> = mutableListOf()
         for (i in 0..65000) {
             portMappingsToAdd.add(generateRule())
         }
@@ -65,13 +56,13 @@ class UPnPManagerTests {
     @Test
     fun groupRules()
     {
-        var igdDevice = IGDDevice(null, null)
+        val igdDevice = IGDDevice(null, null)
 
         // if compare returns equals then they are considered the same and will be replaced in the TreeSet
-        var groupByProtocol = false
+        val groupByProtocol = false
         var groupByRange = true
 
-        var portMappingsToAdd : MutableList<PortMapping> = mutableListOf()
+        val portMappingsToAdd : MutableList<PortMapping> = mutableListOf()
         for (i in 0..65000) {
             portMappingsToAdd.add(generateRule())
         }
@@ -91,7 +82,7 @@ class UPnPManagerTests {
 
             println(ss.size)
 
-            var curGroup = mutableListOf<PortMapping>()
+            val curGroup = mutableListOf<PortMapping>()
             //tempPortMapping.remove
             for (pm in ss)
             {

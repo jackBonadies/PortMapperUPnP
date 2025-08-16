@@ -51,15 +51,15 @@ import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
-import com.shinjiindustrial.portmapper.IGDDevice
 import com.shinjiindustrial.portmapper.IsMultiSelectMode
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.PortMapping
 import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper.UPnPElementViewModel
-import com.shinjiindustrial.portmapper.UPnPViewElement
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
+import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 

@@ -47,9 +47,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.shinjiindustrial.portmapper.DayHourMinSec
 import com.shinjiindustrial.portmapper.common.capLeaseDur
-import com.shinjiindustrial.portmapper.getDHMS
+import com.shinjiindustrial.portmapper.domain.DayHourMinSec
+import com.shinjiindustrial.portmapper.domain.getDHMS
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged

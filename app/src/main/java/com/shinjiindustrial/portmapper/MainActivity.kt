@@ -31,7 +31,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,7 +39,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -51,8 +49,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -102,7 +98,6 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -124,7 +119,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -146,7 +140,6 @@ import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
-import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.common.ValidationError
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.common.toMessage
@@ -154,14 +147,16 @@ import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
+import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
+import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.ConversationEntryPoint
-import com.shinjiindustrial.portmapper.ui.DeviceHeader
 import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
 import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
-import com.shinjiindustrial.portmapper.ui.NoMappingsCard
-import com.shinjiindustrial.portmapper.ui.PortMappingCard
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -886,7 +881,7 @@ class MainActivity : ComponentActivity() {
                                     )
 
                                     val interfacesUsedInSearch =
-                                        (UpnpManager.GetUPnPService().configuration as AndroidConfig).NetworkInterfacesUsedInfos
+                                        (UpnpManager.GetUPnPService().configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
                                     val anyInterfaces =
                                         UpnpManager.GetUPnPService().router.isEnabled
                                     if (!anyInterfaces) {
@@ -1055,7 +1050,22 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             delay(1000L)
             activity.runOnUiThread {
                 val index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(UPnPViewElement(PortMapping("Web Server $iter", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), GetPsuedoSlot())),index)
+                upnpElementsViewModel.insertItem(
+                    UPnPViewElement(
+                        PortMapping(
+                            "Web Server $iter",
+                            "",
+                            "192.168.18.13",
+                            80,
+                            80,
+                            "UDP",
+                            true,
+                            0,
+                            "192.168.18.1",
+                            System.currentTimeMillis(),
+                            GetPsuedoSlot()
+                        )
+                    ),index)
             }
 
         }

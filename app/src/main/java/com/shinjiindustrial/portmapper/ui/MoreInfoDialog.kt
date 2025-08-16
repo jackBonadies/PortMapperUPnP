@@ -15,8 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.shinjiindustrial.portmapper.PortMapping
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
+import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 @Preview

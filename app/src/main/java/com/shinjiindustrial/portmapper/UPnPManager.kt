@@ -4,17 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkInfo
-import android.net.wifi.WifiManager
-import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
+import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
+import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.formatShortName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -26,26 +25,18 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
-import org.fourthline.cling.android.AndroidNetworkAddressFactory
-import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
-import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
-import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
-import org.fourthline.cling.model.meta.Action
 import org.fourthline.cling.model.meta.LocalDevice
 import org.fourthline.cling.model.meta.RemoteDevice
-import org.fourthline.cling.model.meta.RemoteService
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
-import org.fourthline.cling.transport.spi.NetworkAddressFactory
 import java.util.TreeSet
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.logging.Level
-import kotlin.system.measureTimeMillis
 
 
 class UpnpManager {
@@ -112,7 +103,7 @@ class UpnpManager {
         )
 
         fun SubscibeToUpdateData(coroutineScope: CoroutineScope, eventHandler: () -> Unit) {
-            UpnpManager.UpdateUIFromDataCollating.conflate().onEach {
+            UpdateUIFromDataCollating.conflate().onEach {
                 eventHandler()
             }.launchIn(coroutineScope)
         }
@@ -128,14 +119,14 @@ class UpnpManager {
             HasSearched = true
             // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
             // 0-1 second response time intentional delay from devices
-            UpnpManager.GetUPnPService()?.controlPoint?.search(1)
+            GetUPnPService()?.controlPoint?.search(1)
             //launchMockUPnPSearch(this, upnpElementsViewModel)
             return true
         }
 
         fun ClearOldData() {
-            UpnpManager.GetUPnPService()?.registry?.removeAllLocalDevices()
-            UpnpManager.GetUPnPService()?.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
+            GetUPnPService()?.registry?.removeAllLocalDevices()
+            GetUPnPService()?.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
             AnyIgdDevices?.value = false
             synchronized(lockIgdDevices)
             {
@@ -145,9 +136,9 @@ class UpnpManager {
         }
 
         fun GetDeviceByExternalIp(gatewayIp: String): IGDDevice? {
-            synchronized(UpnpManager.lockIgdDevices)
+            synchronized(lockIgdDevices)
             {
-                for (device in UpnpManager.IGDDevices) {
+                for (device in IGDDevices) {
                     if (gatewayIp == device.ipAddress) {
                         return device
                     }
@@ -159,9 +150,9 @@ class UpnpManager {
         fun GetGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
             val gatewayIps: MutableList<String> = mutableListOf()
             var defaultGatewayIp = ""
-            synchronized(UpnpManager.lockIgdDevices)
+            synchronized(lockIgdDevices)
             {
-                for (device in UpnpManager.IGDDevices) {
+                for (device in IGDDevices) {
                     gatewayIps.add(device.ipAddress)
                     if (device.ipAddress == deviceGateway) {
                         defaultGatewayIp = device.ipAddress
@@ -177,39 +168,6 @@ class UpnpManager {
 
         fun GetUPnPService(): UpnpService {
             return _upnpService!!
-        }
-
-        fun splitUserInputIntoRules(portMappingUserInput: PortMappingUserInput): MutableList<PortMappingRequest> {
-            val portMappingRequests: MutableList<PortMappingRequest> = mutableListOf()
-            val (inStart, inEnd) = portMappingUserInput.getRange(true)
-            val (outStart, outEnd) = portMappingUserInput.getRange(false)
-            val protocols = portMappingUserInput.getProtocols()
-
-            val errorString = portMappingUserInput.validateRange()
-            if (errorString.isNotEmpty()) {
-                throw java.lang.Exception(errorString)
-            }
-
-
-
-            val inSize = inEnd - inStart + 1 // inclusive
-            val outSize = outEnd - outStart + 1
-            val sizeOfRange = maxOf(inSize, outSize) - 1 // if just 1 element then size is 0
-
-            for (i in 0..sizeOfRange) {
-                val inPort = if (inSize == 1) inStart else inStart + i
-                val outPort = if (outSize == 1) outStart else outStart + i
-                for (protocol in protocols) {
-                    portMappingRequests.add(
-                        portMappingUserInput.with(
-                            inPort.toString(),
-                            outPort.toString(),
-                            protocol.toString()
-                        )
-                    )
-                }
-            }
-            return portMappingRequests
         }
 
 
@@ -229,7 +187,7 @@ class UpnpManager {
                     try {
 
 
-                    val portMappingRequestRules = splitUserInputIntoRules(portMappingUserInput)
+                    val portMappingRequestRules = portMappingUserInput.splitIntoRules()
                     val listOfResults: MutableList<UPnPCreateMappingResult?> =
                         MutableList(portMappingRequestRules.size) { null }
 
@@ -257,7 +215,7 @@ class UpnpManager {
                     }
                     catch(exception : Exception)
                     {
-                        PortForwardApplication.OurLogger.log(
+                        OurLogger.log(
                             Level.SEVERE,
                             "Create Rule Failed: " + exception.message + exception.stackTraceToString()
                         )
@@ -303,7 +261,7 @@ class UpnpManager {
                     } catch (exception: Exception) {
 
                         val enableDisableString = if(enable) "Enable" else "Disable"
-                        PortForwardApplication.OurLogger.log(
+                        OurLogger.log(
                             Level.SEVERE,
                             "$enableDisableString Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                         )
@@ -351,7 +309,7 @@ class UpnpManager {
 //            }
 
 
-            _upnpService = UpnpServiceImpl(AndroidConfig(context))
+            _upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
             // initialization failed. no point in trying as even if we later get service, we
             //   do not re-intialize automatically
             FailedToInitialize = !(_upnpService!!.router.isEnabled)
@@ -383,7 +341,7 @@ class UpnpManager {
 
                     //println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
 
-                    if (rootDevice.type.type.equals(UpnpManager.Companion.UPnPNames.InternetGatewayDevice)) // version agnostic
+                    if (rootDevice.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
                     {
                         OurLogger.log(
                             Level.INFO,
@@ -394,18 +352,18 @@ class UpnpManager {
                         // Device Tree: InternetGatewayDevice > WANDevice > WANConnectionDevice
                         // Service is WANIPConnection
                         val wanDevice =
-                            rootDevice.embeddedDevices.firstOrNull { it.type.type == UpnpManager.Companion.UPnPNames.WANDevice }
+                            rootDevice.embeddedDevices.firstOrNull { it.type.type == UPnPNames.WANDevice }
                         if (wanDevice != null) {
                             val wanConnectionDevice =
-                                wanDevice.embeddedDevices.firstOrNull { it.type.type == UpnpManager.Companion.UPnPNames.WANConnectionDevice }
+                                wanDevice.embeddedDevices.firstOrNull { it.type.type == UPnPNames.WANConnectionDevice }
                             if (wanConnectionDevice != null) {
                                 val wanIPService =
-                                    wanConnectionDevice.services.firstOrNull { it.serviceType.type == UpnpManager.Companion.UPnPNames.WANIPConnection }
+                                    wanConnectionDevice.services.firstOrNull { it.serviceType.type == UPnPNames.WANIPConnection }
                                 if (wanIPService != null) {
                                     //get relevant actions here...
                                     //TODO add relevant service (and cause event)
                                     val igdDevice = IGDDevice(rootDevice, wanIPService)
-                                    UpnpManager.AddDevice(igdDevice)
+                                    AddDevice(igdDevice)
                                     //TODO get port mappings from this relevant service
                                     igdDevice.EnumeratePortMappings()
 
@@ -457,7 +415,7 @@ class UpnpManager {
                 override fun beforeShutdown(registry: Registry) {}
 
                 override fun afterShutdown() {}
-            });
+            })
 
             _initialized = true
             return true
@@ -489,7 +447,7 @@ class UpnpManager {
                 Level.INFO,
                 "Added Device ${igdDevice.displayName} at ${igdDevice.ipAddress}."
             )
-            UpnpManager.DeviceFoundEvent.invoke(igdDevice)
+            DeviceFoundEvent.invoke(igdDevice)
         }
 
         var lockIgdDevices = Any()
@@ -508,8 +466,8 @@ class UpnpManager {
 
         // returns anyEnabled, anyDisabled
         fun GetExistingRuleInfos(): Pair<Boolean, Boolean> {
-            var anyEnabled: Boolean = false;
-            var anyDisabled: Boolean = false;
+            var anyEnabled: Boolean = false
+            var anyDisabled: Boolean = false
             synchronized(lockIgdDevices)
             {
                 for (device in IGDDevices) {
@@ -532,7 +490,7 @@ class UpnpManager {
 
         // returns anyEnabled, anyDisabled
         fun GetEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMapping> {
-            val enableDisabledPortMappings: MutableList<PortMapping> = mutableListOf();
+            val enableDisabledPortMappings: MutableList<PortMapping> = mutableListOf()
             synchronized(lockIgdDevices)
             {
                 for (device in IGDDevices) {
@@ -562,8 +520,13 @@ class UpnpManager {
             }
         }
 
+        // TODO: we need a flow for just the IGD , port mappings that are available
+        // we need a flow for the sorting method
+        // autorenew can subscribe to the 1st
+        // UI can subscribe to both
+
         fun GetAllRules(): MutableList<PortMapping> {
-            val allRules: MutableList<PortMapping> = mutableListOf();
+            val allRules: MutableList<PortMapping> = mutableListOf()
             synchronized(lockIgdDevices)
             {
                 for (device in IGDDevices) {
@@ -594,7 +557,7 @@ class UpnpManager {
             actionInvocation.setInput("NewExternalPort", remotePort)
             actionInvocation.setInput("NewProtocol", protocol)
 
-            val future = UpnpManager.GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPService().controlPoint.execute(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
@@ -610,9 +573,9 @@ class UpnpManager {
                         description.toString(),
                         remoteHost,
                         internalClient.toString(),
-                        remotePort.toString().toInt(),
+                        remotePort.toInt(),
                         internalPort.toString().toInt(),
-                        protocol.toString(),
+                        protocol,
                         enabled.toString().toInt() == 1,
                         leaseDuration.toString().toInt(),
                         remoteIp,
@@ -620,7 +583,7 @@ class UpnpManager {
                         GetPsuedoSlot()
                     ) // best bet for DateTime.UtcNow
 
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.INFO,
                         "Successfully read back our new rule (${pm.shortName()})"
                     )
@@ -643,11 +606,11 @@ class UpnpManager {
                     println(operation.isFailed)
 
                     val rule = formatShortName(protocol, remoteIp, remotePort)
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.SEVERE,
                         "Failed to read back our new rule ($rule)."
                     )
-                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
                     val result = UPnPCreateMappingResult(false, true)
                     result.UPnPFailureResponse = operation
@@ -671,7 +634,7 @@ class UpnpManager {
             }
             catch (exception: Exception) {
                 val enableDisableString = if(enable) "Enable" else "Disable"
-                PortForwardApplication.OurLogger.log(
+                OurLogger.log(
                     Level.SEVERE,
                     "$enableDisableString Port Mapping Failed: " + exception.message + exception.stackTraceToString()
                 )
@@ -722,7 +685,7 @@ class UpnpManager {
             if (result.Success!!) {
                 result.ResultingMapping!!
                 val device =
-                    UpnpManager.getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
+                    getIGDDevice(result.ResultingMapping!!.ActualExternalIP)
                 device.addOrUpdate(result.ResultingMapping!!)
                 invokeUpdateUIFromData()
             }
@@ -749,7 +712,7 @@ class UpnpManager {
                             }
                         }
                     } catch (exception: Exception) {
-                        PortForwardApplication.OurLogger.log(
+                        OurLogger.log(
                             Level.SEVERE,
                             "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                         )
@@ -792,7 +755,7 @@ class UpnpManager {
 
                     portMappings
                 } catch (exception: Exception) {
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.SEVERE,
                         "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                     )
@@ -815,18 +778,18 @@ class UpnpManager {
             val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
             val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
             val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", "${portMapping.RemoteHost}"); //!!
+            actionInvocation.setInput("NewRemoteHost", "${portMapping.RemoteHost}") //!!
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-            actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}");
-            actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}");
+            actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
+            actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}")
 
-            val future = UpnpManager.GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPService().controlPoint.execute(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
                     println("Successfully deleted")
 
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.INFO,
                         "Successfully deleted rule (${portMapping.shortName()})."
                     )
@@ -850,11 +813,11 @@ class UpnpManager {
                     println(operation.statusCode)
                     println(operation.isFailed)
 
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.SEVERE,
                         "Failed to delete rule (${portMapping.shortName()})."
                     )
-                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
                     val result = UPnPResult(false)
                     result.FailureReason = defaultMsg
@@ -881,22 +844,22 @@ class UpnpManager {
             val device: IGDDevice = getIGDDevice(externalIp)
             val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
             val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost);
+            actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost)
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-            actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort);
-            actionInvocation.setInput("NewProtocol", portMappingRequest.protocol);
-            actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort);
-            actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp);
-            actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0");
-            actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description);
-            actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration);
+            actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort)
+            actionInvocation.setInput("NewProtocol", portMappingRequest.protocol)
+            actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort)
+            actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp)
+            actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0")
+            actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
+            actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
 
-            val future = UpnpManager.GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPService().controlPoint.execute(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
 
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.INFO,
                         "Successfully $createContext rule (${
                             portMappingRequest.realize().shortName()
@@ -933,11 +896,11 @@ class UpnpManager {
                     println(operation.statusCode)
                     println(operation.isFailed)
 
-                    PortForwardApplication.OurLogger.log(
+                    OurLogger.log(
                         Level.SEVERE,
                         "Failed to create rule (${portMappingRequest.realize().shortName()})."
                     )
-                    PortForwardApplication.OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
                     val result = UPnPCreateMappingResult(false, false)
                     result.FailureReason = defaultMsg
@@ -949,8 +912,8 @@ class UpnpManager {
             return future
         }
 
-        public fun getIGDDevice(ipAddr: String): IGDDevice {
-            return IGDDevices.first { it.ipAddress == ipAddr };
+        fun getIGDDevice(ipAddr: String): IGDDevice {
+            return IGDDevices.first { it.ipAddress == ipAddr }
         }
 
 
@@ -980,7 +943,7 @@ fun defaultRuleAddedCallback(result : UPnPCreateMappingResult) {
         if(firstRule)
         {
             // full refresh since we have to remove the old "no port mappings"
-            UpnpManager.invokeUpdateUIFromData()
+            invokeUpdateUIFromData()
         }
         else
         {
@@ -1006,57 +969,6 @@ fun defaultRuleDeletedCallback(result : UPnPResult) {
 }
 
 
-data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
-{
-    fun with(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
-    {
-        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled, "")
-    }
-
-    fun validateRange() : String
-    {
-        // many 1 to 1 makes sense
-        // many different external to 1 internal
-        // 1 external to many internal //this isnt a thing and it doesnt make sense with upnp port retrieval
-
-        val (inStart, inEnd) = getRange(true)
-        val (outStart, outEnd) = getRange(false)
-
-        val inSize = inEnd - inStart + 1 // inclusive
-        val outSize = outEnd - outStart + 1
-        val xToOne = (inSize == 1) // many out to 1 in
-        if (inSize != outSize && !xToOne)
-        {
-            return "Internal and External Ranges do not match up."
-        }
-        else
-        {
-            return ""
-        }
-    }
-
-    fun getRange(internal : Boolean) : Pair<Int, Int>
-    {
-        val rangeInQuestion = if(internal) internalRange else externalRange
-        if(rangeInQuestion.contains('-'))
-        {
-            val inRange = rangeInQuestion.split('-')
-            return Pair(inRange[0].toInt(), inRange[1].toInt())
-        }
-        else
-        {
-            return Pair(rangeInQuestion.toInt(), rangeInQuestion.toInt())
-        }
-    }
-
-    fun getProtocols() : List<String>
-    {
-        return when (protocol) {
-            Protocol.BOTH.str() -> listOf("TCP", "UDP")
-            else -> listOf(protocol)
-        }
-    }
-}
 data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String)
 {
     fun realize() : PortMapping
@@ -1068,38 +980,6 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 
 //CompletableFuture is api >=24
 //basic futures do not implement continuewith...
-
-//class UPnPCreateMappingResult : UPnPResult
-//{
-//    constructor() : super()
-//
-//    @Volatile
-//    var ResultingMapping : PortMapping? = null
-//}
-//
-//class UPnPGetSpecificMappingResult : UPnPResult
-//{
-//    constructor() : super()
-//
-//    @Volatile
-//    var ResultingMapping : PortMapping? = null
-//}
-//
-//open class UPnPResult constructor()
-//{
-//    var Future : Future<Any>? = null
-//
-//    @Volatile
-//    var Success : Boolean? = null
-//    @Volatile
-//    var FailureReason : String? = null
-//
-////    init
-////    {
-////        Success = success
-////        Future = future
-////    }
-//}
 
 class UPnPCreateMappingResult(success: Boolean, wasReadBack : Boolean) : UPnPResult(success)
 {
@@ -1116,7 +996,7 @@ class UPnPGetSpecificMappingResult : UPnPResult
     var ResultingMapping : PortMapping? = null
 }
 
-open class UPnPResult constructor(success : Boolean)
+open class UPnPResult(success : Boolean)
 {
     var Success : Boolean
     var FailureReason : String? = null
@@ -1129,197 +1009,7 @@ open class UPnPResult constructor(success : Boolean)
     }
 }
 
-data class OurNetworkInfoBundle(val networkType: NetworkType, val ourIp: String?, val gatewayIp : String?)
 
-class OurNetworkInfo {
-    companion object { //singleton
-
-        var retrieved: Boolean = false
-        var ourIp: String? = null
-        var gatewayIp: String? = null
-        var networkType: NetworkType? = null
-
-        fun GetNetworkInfo(context: Context, forceRefresh: Boolean): OurNetworkInfoBundle {
-            GetConnectionType(context, forceRefresh)
-            if (networkType == NetworkType.WIFI) {
-                GetLocalAndGatewayIpAddrWifi(context, forceRefresh)
-            } else {
-                ourIp = null
-                gatewayIp = null
-            }
-
-            return OurNetworkInfoBundle(networkType!!, ourIp, gatewayIp)
-        }
-
-        fun GetLocalAndGatewayIpAddrWifi(
-            context: Context,
-            forceRefresh: Boolean
-        ): Pair<String?, String?> {
-            if (!forceRefresh && retrieved) {
-                return Pair(ourIp, gatewayIp)
-            }
-
-            val wifiManager =
-                context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val ipAddress = wifiManager.connectionInfo.ipAddress
-
-            //var macAddress = wifiManager.connectionInfo.macAddress
-            val gatewayIpAddress = wifiManager.dhcpInfo.gateway
-
-            ourIp = formatIpv4(ipAddress)
-            gatewayIp = formatIpv4(gatewayIpAddress)
-            retrieved = true
-            return Pair(ourIp, gatewayIp)
-
-//        val byteBuffer = ByteBuffer.allocate(4)
-//        byteBuffer.order(ByteOrder.LITTLE_ENDIAN)
-//        byteBuffer.putInt(ipAddress)
-//        val inetAddress = InetAddress.getByAddress(null, byteBuffer.array())
-//        var hostAddress = inetAddress.hostAddress
-//        val macParts: List<String> = macAddress.split(":")
-//        val macBytes = ByteArray(macParts.size)
-//        for (i in macParts.indices) {
-//            macBytes[i] = macParts[i].toInt(16).toByte()
-//        }
-//
-//        val en = NetworkInterface.getNetworkInterfaces()
-//        while (en.hasMoreElements()) {
-//            val intf = en.nextElement()
-//            if (intf.hardwareAddress == macBytes) {
-//                val enumIpAddr = intf.inetAddresses
-//                while (enumIpAddr.hasMoreElements()) {
-//                    val inetAddress = enumIpAddr.nextElement()
-//                    if (!inetAddress.isLoopbackAddress) {
-//                        return inetAddress.hostAddress
-//                    }
-//                }
-//            }
-//        }
-//    } catch (ex: java.lang.Exception) {
-//        Log.e("IP Address", ex.toString())
-//    }
-//    return null
-        }
-
-        fun GetNameTypeMappings(context: Context) : MutableMap<String, NetworkType> {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val mappings : MutableMap<String, NetworkType> = mutableMapOf<String, NetworkType>()
-            for (net1 in cm.getAllNetworks()) {
-                val netInfo = cm.getNetworkInfo(net1)
-                val name = cm.getLinkProperties(net1)?.interfaceName
-                if(name == null)
-                {
-                    continue
-                }
-                val type = getNetworkType(cm, net1, netInfo)
-                mappings[name] = type
-            }
-            return mappings
-        }
-
-        fun GetTypeFromInterfaceName(_mappings : MutableMap<String, NetworkType>?, interfaceName : String) : NetworkType
-        {
-            var mappings = _mappings
-            if (mappings == null)
-            {
-                mappings = GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
-            }
-            mappings
-            if (mappings.containsKey(interfaceName))
-            {
-                return mappings[interfaceName] ?: NetworkType.NONE
-            }
-            else {
-                if (interfaceName.contains("wlan"))
-                {
-                    return NetworkType.WIFI
-                }
-                else if(interfaceName.contains("rmnet") || interfaceName.contains("data"))
-                {
-                    return NetworkType.DATA
-                }
-            }
-            return NetworkType.NONE
-        }
-
-        fun GetConnectionType(context: Context, forceRefresh: Boolean): NetworkType {
-
-            if (!forceRefresh && networkType != null) {
-                return networkType!!
-            }
-
-
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-
-            //get type
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-            {
-                networkType = getNetworkType(cm, cm.activeNetwork, cm.activeNetworkInfo)
-            }
-            else
-            {
-                networkType = getNetworkType(cm, null, cm.activeNetworkInfo)
-            }
-            return networkType as NetworkType
-        }
-
-        fun getNetworkType(cm: ConnectivityManager, network : Network?, networkInfo : NetworkInfo?) : NetworkType {
-            var result = NetworkType.NONE
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                cm.getNetworkCapabilities(network)?.run {
-                    when {
-                        hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
-                            result = NetworkType.WIFI
-                        }
-
-                        hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
-                            result = NetworkType.DATA
-                        }
-
-                        else -> {
-                            result = NetworkType.NONE
-                        }
-                    }
-                }
-            } else {
-                networkInfo?.run {
-                    when (type) {
-                        ConnectivityManager.TYPE_WIFI -> {
-                            result = NetworkType.WIFI
-                        }
-
-                        ConnectivityManager.TYPE_MOBILE -> {
-                            result = NetworkType.DATA
-                        }
-
-                        else -> {
-                            result = NetworkType.NONE
-                        }
-                    }
-                }
-            }
-            return result
-        }
-
-    }
-
-    // java.net.networkinterface does not have .type etc.
-//    fun test1(): String? {
-//        try {
-//            for (networkInterface in Collections.list(NetworkInterface.getNetworkInterfaces())) {
-//                for (inetAddress in Collections.list(networkInterface.inetAddresses)) {
-//                    if (!inetAddress.isLoopbackAddress && inetAddress is Inet4Address) {
-//                        return inetAddress.hostAddress
-//                    }
-//                }
-//            }
-//        } catch (ex: SocketException) {
-//            Log.e("IP Address", "Failed getting IP address", ex)
-//        }
-//        return null
-//    }
-}
 
 
 class ConnectionReceiver : BroadcastReceiver() {
@@ -1376,322 +1066,6 @@ enum class NetworkType(val networkTypeString: String) {
     }
 }
 
-
-class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteService?)
-{
-
-    var rootDevice : RemoteDevice?
-    var wanIPService : RemoteService?
-    var displayName : String //i.e. Nokia IGD Version 2.00
-    var friendlyDetailsName : String //i.e. Internet Home Gateway Device
-    var manufacturer : String //i.e. Nokia
-    var ipAddress : String //i.e. 192.168.18.1
-    var upnpType : String //i.e. InternetGatewayDevice
-    var upnpTypeVersion : Int //i.e. 2
-    var actionsMap : MutableMap<String, Action<RemoteService>>
-    var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
-    var lookUpExisting : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
-//    var hasAddPortMappingAction : Boolean
-//    var hasDeletePortMappingAction : Boolean
-
-//    fun getMappingIndex(externalPort : Int, protocol : String) : Int
-//    {
-//        return portMappings.indexOfFirst { it.ExternalPort == externalPort && it.Protocol == protocol }
-//    }
-
-    init {
-        this.rootDevice = _rootDevice
-        this.wanIPService = _wanIPService
-
-        if(_wanIPService != null && _rootDevice != null) // these are only nullable for unit test purposes
-        {
-            // nullrefs warning: this is SSDP response, very possible for some fields to be null, DeviceDetails constructor allows it.
-            // the best bet on ip is (rootDevice!!.identity.descriptorURL.host) imo.  since that is what we use in RetreiveRemoteDescriptors class
-            // which then calls remoteDeviceAdded (us). presentationURI can be and is null sometimes.
-
-            this.displayName = this.rootDevice!!.displayString
-            this.friendlyDetailsName = this.rootDevice!!.details.friendlyName
-            this.ipAddress = rootDevice!!.identity.descriptorURL.host //this.rootDevice!!.details.presentationURI.host
-            this.manufacturer = this.rootDevice!!.details.manufacturerDetails?.manufacturer ?: ""
-            this.upnpType = this.rootDevice!!.type.type
-            this.upnpTypeVersion = this.rootDevice!!.type.version
-            this.actionsMap = mutableMapOf()
-            for (action in _wanIPService.actions)
-            {
-                if(UpnpManager.ActionNames.contains(action.name))
-                {
-                    // are easy to call and parse output
-                    actionsMap[action.name] = action
-                }
-            }
-        }
-        else
-        {
-            this.displayName = ""
-            this.friendlyDetailsName = ""
-            this.ipAddress = ""
-            this.manufacturer = ""
-            this.upnpType = ""
-            this.upnpTypeVersion = 1
-            this.actionsMap = mutableMapOf()
-        }
-    }
-
-
-
-    fun EnumeratePortMappings()
-    {
-        // we enumerate port mappings later
-        portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
-        var finishedEnumeratingPortMappings = false
-
-        val timeTakenMillis = measureTimeMillis {
-
-//        if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings))
-//        {
-//            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetListOfPortMappings")
-//            var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings]!!
-//            getAllPortMappingsUsingListPortMappings(getPortMapping)
-//        }
-        if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry))
-        {
-            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
-            val getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry]!!
-            getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping)
-        }
-        else{
-            OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
-        }
-
-        }
-        OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
-
-
-        finishedEnumeratingPortMappings = true
-        UpnpManager.FinishedListingPortsEvent.invoke(this)
-    }
-
-//    private fun getAllPortMappingsUsingListPortMappings(getPortMapping : Action<RemoteService>) {
-//
-//        // this method doesnt work.
-//        // if I specify a small range it returns
-//        // but anything more than 100 entries it gives 500
-//
-//
-//        var slotIndex : Int = 0;
-//        var retryCount : Int = 0
-//        while(true)
-//        {
-//            var shouldRetry : Boolean = false
-//            var success : Boolean = false;
-//            var actionInvocation = ActionInvocation(getPortMapping)
-//            println("requesting slot $slotIndex")
-//
-//            actionInvocation.setInput("NewStartPort", "$MIN_PORT");
-//            actionInvocation.setInput("NewEndPort", "$MAX_PORT");
-//            actionInvocation.setInput("NewProtocol", "TCP");
-//            actionInvocation.setInput("NewManage", "1");
-//            actionInvocation.setInput("NewNumberOfPorts", "0");
-//            var future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
-//                override fun success(invocation: ActionInvocation<*>?) {
-//                    invocation!!
-//
-//                    var dbFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-//                    val dBuilder = dbFactory.newDocumentBuilder()
-//                    val inputSource = InputSource(StringReader(actionInvocation.getOutput("A_ARG_TYPE_PortListing").toString()))
-//                    val doc = dBuilder.parse(inputSource)
-//                    doc.documentElement.normalize()
-//
-//                    retryCount = 0
-//                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
-//
-//                    var remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
-//                    var externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
-//                    var internalClient = invocation.getOutput("NewInternalClient") //string datatype
-//                    var internalPort = invocation.getOutput("NewInternalPort")
-//                    var protocol = invocation.getOutput("NewProtocol")
-//                    var description = invocation.getOutput("NewPortMappingDescription")
-//                    var enabled = invocation.getOutput("NewEnabled")
-//                    var leaseDuration = invocation.getOutput("NewLeaseDuration")
-//                    var portMapping = PortMapping(
-//                        description.toString(),
-//                        remoteHost.toString(),
-//                        internalClient.toString(),
-//                        externalPort.toString().toInt(),
-//                        internalPort.toString().toInt(),
-//                        protocol.toString(),
-//                        enabled.toString().toInt() == 1,
-//                        leaseDuration.toString().toInt(),
-//                        ipAddress)
-//                    portMappings.add(portMapping)
-//                    // TODO: new port mapping added event
-//                    UpnpManager.PortFoundEvent.invoke(portMapping)
-//                    success = true
-//                }
-//
-//                override fun failure(
-//                    invocation: ActionInvocation<*>?,
-//                    operation: UpnpResponse,
-//                    defaultMsg: String
-//                ) {
-//                    retryCount = 0
-//                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg")
-//                    // Handle failure
-//                }
-//            })
-//
-//            try {
-//                future.get() // SYNCHRONOUS (note this can, and does, throw)
-//            }
-//            catch(e : Exception)
-//            {
-//                if(retryCount == 0) // if two exceptions in a row then stop.
-//                {
-//                    shouldRetry = true // network issue.. retrying does work.
-//                    retryCount++
-//                }
-//                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
-//            }
-//
-//            if(shouldRetry)
-//            {
-//                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
-//                continue
-//            }
-//
-//
-//            if (!success)
-//            {
-//                break
-//            }
-//
-//            slotIndex++
-//
-//            if (slotIndex > MAX_PORT)
-//            {
-//                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
-//            }
-//        }
-//    }
-
-
-
-    private fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
-        var slotIndex : Int = 0;
-        var retryCount : Int = 0
-        while(true)
-        {
-            var shouldRetry : Boolean = false
-            var success : Boolean = false;
-            val actionInvocation = ActionInvocation(getPortMapping)
-            println("requesting slot $slotIndex")
-            actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
-            val future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
-                    retryCount = 0
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
-
-                    val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
-                    val externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
-                    val internalClient = invocation.getOutput("NewInternalClient") //string datatype
-                    val internalPort = invocation.getOutput("NewInternalPort")
-                    val protocol = invocation.getOutput("NewProtocol")
-                    val description = invocation.getOutput("NewPortMappingDescription")
-                    val enabled = invocation.getOutput("NewEnabled")
-                    val leaseDuration = invocation.getOutput("NewLeaseDuration")
-                    val portMapping = PortMapping(
-                        description.toString(),
-                        remoteHost.toString(), //TODO standardize remote host so null == string.empty
-                        internalClient.toString(),
-                        externalPort.toString().toInt(),
-                        internalPort.toString().toInt(),
-                        protocol.toString(),
-                        enabled.toString().toInt() == 1,
-                        leaseDuration.toString().toInt(),
-                        ipAddress,
-                        System.currentTimeMillis(),
-                        slotIndex)
-                    addOrUpdate(portMapping)
-                    UpnpManager.PortInitialFoundEvent.invoke(portMapping)
-                    success = true
-                }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
-                    retryCount = 0
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg.  NOTE: This is normal.")
-                    // Handle failure
-                }
-            })
-
-            try {
-                future.get() // SYNCHRONOUS (note this can, and does, throw)
-            }
-            catch(e : Exception)
-            {
-                if(retryCount == 0) // if two exceptions in a row then stop.
-                {
-                    shouldRetry = true // network issue.. retrying does work.
-                    retryCount++
-                }
-                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
-            }
-
-            if(shouldRetry)
-            {
-                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
-                continue
-            }
-
-
-            if (!success)
-            {
-                break
-            }
-
-            slotIndex++
-
-            if (slotIndex > 65535)
-            {
-                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
-            }
-        }
-    }
-
-    fun addOrUpdate(mapping : PortMapping)
-    {
-        synchronized(lockIgdDevices)
-        {
-            val key = mapping.getKey()
-            if (this.lookUpExisting.containsKey(key)) {
-                val existing = this.lookUpExisting[key]
-                this.portMappings.remove(existing) //TODO
-
-                if (existing != null && MainActivity.MultiSelectItems?.remove(existing) ?: false) {
-                    MainActivity.MultiSelectItems!!.add(mapping)
-                }
-            }
-            this.lookUpExisting[key] = mapping
-            this.portMappings.add(mapping)
-        }
-
-    }
-
-    fun removeMapping(mapping : PortMapping)
-    {
-        synchronized(lockIgdDevices)
-        {
-            this.lookUpExisting.remove(mapping.getKey())
-            this.portMappings.remove(mapping)
-            MainActivity.MultiSelectItems?.remove(mapping)
-        }
-    }
-}
-
 class Event<T> {
     private val observers = mutableSetOf<(T) -> Unit>()
 
@@ -1707,213 +1081,4 @@ class Event<T> {
         for (observer in observers)
             observer(value)
     }
-}
-
-class UPnPViewElement constructor(
-    underlyingElement : kotlin.Any,
-    isSpecialEmpty : Boolean = false)
-{
-    var UnderlyingElement : kotlin.Any
-    var IsSpecialEmpty : kotlin.Boolean
-
-    init
-    {
-        IsSpecialEmpty = isSpecialEmpty
-        UnderlyingElement = underlyingElement
-    }
-
-    fun IsIGDDevice() : Boolean
-    {
-        return UnderlyingElement is IGDDevice
-    }
-
-    fun GetUnderlyingIGDDevice() : IGDDevice
-    {
-        return UnderlyingElement as IGDDevice
-    }
-
-    fun IsPortMapping() : Boolean
-    {
-        return UnderlyingElement is PortMapping
-    }
-
-    fun GetUnderlyingPortMapping() : PortMapping
-    {
-        return UnderlyingElement as PortMapping
-    }
-}
-
-class PortMapping constructor(
-    val _Description: String,
-    val _RemoteHost: String,
-    val _LocalIP: String,
-    val _ExternalPort: Int,
-    val _InternalPort: Int,
-    val _Protocol: String,
-    val _Enabled: Boolean,
-    val _LeaseDuration: Int,
-    val _ActionExternalIP : String,
-    val _timeReadLeaseDurationMs : Long,
-    val _pseudoSlot : Int)
-{
-    // the returned ip from get port mapping
-    // https://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf page 17
-    // (this is an optional filter for another device on the network that is trying to reach you.)
-    // "The NAT Traversal or port mapping functionality allows creation of mappings for both TCP and UDP
-    //protocols between an external IGD port (called ExternalPort) and an internal client address associated with
-    //one of its ports (respectively called InternalClient and InternalPort). It is also possible to narrow the
-    //mapping by limiting the mapping to a specific remote host1"
-    // (this means that the external ip is a given, it is the igd device)
-    // "2.3.17 RemoteHost
-    //This variable represents the source of inbound IP packets. This variable can contain a host name or a
-    //standard IPv4 address representation. This state variable MUST be formatted as:
-    //• a domain name of a network host like it is defined in [RFC 1035],
-    //• or as a set of four decimal digit groups separated by "." as defined in [RFC 3986],
-    //• or an empty string.
-    //This will be a wildcard in most cases (an empty string). In version 2.0, NAT vendors are REQUIRED to
-    //support non-wildcarded IP addresses in addition to wildcards. A non-wildcard value will allow for “narrow”
-    //port mappings, which MAY be desirable in some usage scenarios. When RemoteHost is a wildcard, all
-    //traffic sent to the ExternalPort on the WAN interface of the gateway is forwarded to the InternalClient on
-    //the InternalPort (this corresponds to the endpoint independent filtering behaviour defined in the [RFC
-    //4787]). When RemoteHost is specified as a specific external IP address as opposed to a wildcard, the NAT
-    //will only forward inbound packets from this RemoteHost to the InternalClient. All other packets will
-    //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
-    var RemoteHost : String = _RemoteHost
-    // the actual ip of the IGD device
-    var ActualExternalIP : String = _ActionExternalIP
-    var InternalIP : String = _LocalIP
-    var ExternalPort : Int = _ExternalPort
-    var InternalPort : Int= _InternalPort
-    var Protocol : String = _Protocol
-    var Enabled : Boolean = _Enabled
-    var LeaseDuration : Int  = _LeaseDuration
-    var Description : String = _Description
-
-    var TimeReadLeaseDurationMs : Long = _timeReadLeaseDurationMs
-    var Slot : Int = _pseudoSlot
-
-    fun getKey() : Pair<Int, String>
-    {
-        return Pair<Int, String>(this.ExternalPort, this.Protocol)
-    }
-
-    fun shortName() : String
-    {
-        return formatShortName(Protocol,ActualExternalIP,ExternalPort.toString())
-    }
-
-    fun getRemainingLeaseTime() : Int
-    {
-        val secondsPassed = (System.currentTimeMillis() - TimeReadLeaseDurationMs)/1000L
-        val timeToExpiration = (LeaseDuration.toLong() - secondsPassed)
-        return timeToExpiration.toInt()
-    }
-
-
-
-    fun getRemainingLeaseTimeString() : String
-    {
-        // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
-        val totalSecs = getRemainingLeaseTime()
-
-        val dhms = getDHMS(totalSecs)
-
-        val hasDays = dhms.days >= 1
-        val hasHours = dhms.hours >= 1
-        val hasMinutes = dhms.mins >= 1
-        val hasSeconds = dhms.seconds >= 1
-
-        if (hasDays)
-        {
-            return "${dhms.days} day${_plural(dhms.days)}, ${dhms.hours} hour${_plural(dhms.hours)}"
-        }
-        else if(hasHours)
-        {
-            return "${dhms.hours} hour${_plural(dhms.hours)}, ${dhms.mins} minute${_plural(dhms.mins)}"
-        }
-        else if(hasMinutes)
-        {
-            return "${dhms.mins} minute${_plural(dhms.mins)}, ${dhms.seconds} second${_plural(dhms.seconds)}"
-        }
-        else if(hasSeconds)
-        {
-            return "${dhms.seconds} second${_plural(dhms.seconds)}"
-        }
-        else
-        {
-            return "Expired"
-        }
-    }
-
-    fun _plural(value : Int) : String
-    {
-        return if (value > 1) "s" else ""
-    }
-}
-
-data class DayHourMinSec(val days : Int, val hours : Int, val mins : Int, val seconds : Int)
-{
-    fun totalSeconds() : Int
-    {
-        return days * 3600 * 24 + hours * 3600 + mins * 60 + seconds
-    }
-}
-
-fun getDHMS(totalSeconds : Int) : DayHourMinSec
-{
-    val days = totalSeconds / (24*3600)
-    val hours = (totalSeconds % (24*3600)) / 3600
-    val mins =  (totalSeconds % (3600)) / 60
-    val secs = (totalSeconds % (60))
-    return DayHourMinSec(days, hours, mins, secs)
-}
-
-fun formatShortName(protocol: String, externalIp: String, externalPort: String) : String
-{
-    return "$protocol rule at $externalIp:$externalPort"
-}
-
-class AndroidConfig(context : Context) : AndroidUpnpServiceConfiguration() {
-
-    var Context : Context
-    init {
-        Context = context
-    }
-
-    override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder {
-        return UDA10ServiceDescriptorBinderImpl()
-    }
-
-    // in case you want to get additional info from initialization
-    // we can then maybe check if they support multicast (i.e. data typically does not)
-    // and throw away.  also we can use connectionmanager to enumerate interfaces
-    // by default this returns new AndroidNetworkAddressFactory
-    // AndroidNetworkAddressFactory has a method discoverNetworkInterfaces() which
-    //   calls the java NetworkInterface.getNetworkInterfaces();
-
-    override fun createNetworkAddressFactory(streamListenPort: Int): NetworkAddressFactory? {
-        //return NetworkAddressFactoryImpl(streamListenPort)
-        val addressFactory = AndroidNetworkAddressFactory(streamListenPort);
-
-        // the final set of usable interfaces and bind addresses
-        val iterator = addressFactory.networkInterfaces
-        val networkInterfaces: MutableList<java.net.NetworkInterface> = ArrayList()
-        while (iterator.hasNext()) {
-            networkInterfaces.add(iterator.next())
-        }
-        NetworkInterfacesUsed = networkInterfaces
-        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(Context)
-
-        NetworkInterfacesUsedInfos = mutableListOf()
-        for (netInterface in networkInterfaces)
-        {
-            NetworkInterfacesUsedInfos?.add(Pair<java.net.NetworkInterface, NetworkType>(netInterface, OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)))
-        }
-
-        return addressFactory
-    }
-
-    var NetworkInterfacesUsed : MutableList<java.net.NetworkInterface>? = null
-    var NetworkMappings : MutableMap<String, NetworkType>? = null
-    var NetworkInterfacesUsedInfos : MutableList<Pair<java.net.NetworkInterface, NetworkType>>? = null
 }

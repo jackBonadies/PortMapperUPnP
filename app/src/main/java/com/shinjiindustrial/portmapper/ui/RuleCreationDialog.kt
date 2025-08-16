@@ -30,9 +30,7 @@ import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
 import com.shinjiindustrial.portmapper.MainActivity.Companion.showSnackBarShortNoAction
 import com.shinjiindustrial.portmapper.MainActivity.Companion.showSnackBarViewLog
-import com.shinjiindustrial.portmapper.OurNetworkInfo
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.PortMappingUserInput
 import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.RunUIThread
 import com.shinjiindustrial.portmapper.UPnPCreateMappingResult
@@ -43,6 +41,8 @@ import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.defaultRuleDeletedCallback
+import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
+import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import java.util.logging.Level
 
@@ -295,7 +295,7 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                                         }
                                     }
 
-                                    val oldRulesToDelete = UpnpManager.splitUserInputIntoRules(ruleToEdit)
+                                    val oldRulesToDelete = ruleToEdit.splitIntoRules()
 
                                     UpnpManager.DeletePortMapping(oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
 
