@@ -9,4 +9,9 @@ PortMapper is a free and open source app for Android.  Its function is to set up
 ]]>
   </string>
 
+    <string name="error_empty">Cannot be empty</string>
+    <string name="error_invalid_port_range">Port must be between %1$d and %2$d</string>
+    <string name="error_end_before_start">End port must be after start port</string>
+    <string name="error_invalid_ip_address">Invalid IP address</string>
+
 </resources>

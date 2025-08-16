@@ -153,6 +153,8 @@ import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.common.ValidationError
+import com.shinjiindustrial.portmapper.common.toMessage
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
@@ -1881,8 +1883,8 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
         DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
     }
 
-    val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).errorMessage) }
-    val interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).errorMessage) }
+    val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).validationError) }
+    val interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).validationError) }
 
     Row(
         modifier = Modifier
@@ -1896,7 +1898,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             onValueChange = {
                 description.value = it
                 descriptionHasError.value = validateDescription(description.value).hasError
-                descriptionErrorString.value = validateDescription(description.value).errorMessage
+                descriptionErrorString.value = validateDescription(description.value).validationError
             },
             label = { Text("Description") },
             singleLine = true,
@@ -1906,13 +1908,13 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             isError = hasSubmitted.value && descriptionHasError.value,
             trailingIcon = {
                 if (hasSubmitted.value && descriptionHasError.value) {
-                    Icon(Icons.Filled.Error, descriptionErrorString.value, tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Error, descriptionErrorString.value.toMessage(), tint = MaterialTheme.colorScheme.error)
                 }
             },
             supportingText = {
                 if(hasSubmitted.value && descriptionHasError.value) {
                     Text(
-                        descriptionErrorString.value,
+                        descriptionErrorString.value.toMessage(),
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -1937,20 +1939,20 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             onValueChange = {
                 internalIp.value = it.filter { charIt -> charIt.isDigit() || charIt == '.' }
                 internalIpHasError.value = validateInternalIp(internalIp.value).hasError
-                interalIpErrorString.value = validateInternalIp(internalIp.value).errorMessage
+                interalIpErrorString.value = validateInternalIp(internalIp.value).validationError
             },
             isError = hasSubmitted.value && internalIpHasError.value,
             supportingText = {
                 if(hasSubmitted.value && internalIpHasError.value) {
                     Text(
-                        interalIpErrorString.value,
+                        interalIpErrorString.value.toMessage(),
                         color = MaterialTheme.colorScheme.error
                     )
                 }
             },
             trailingIcon = {
                 if (hasSubmitted.value && internalIpHasError.value) {
-                    Icon(Icons.Filled.Error, interalIpErrorString.value, tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Error, interalIpErrorString.value.toMessage(), tint = MaterialTheme.colorScheme.error)
                 }
             },
             singleLine = true,
@@ -1979,7 +1981,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 
         //pass in expanded, pass in startHasErrorString, pass in internalPortText, pass in StartExternalHasError
     // port start
-        val startHasErrorString = remember { mutableStateOf(validateStartPort(internalPortText.value).errorMessage) }
+        val startHasErrorString = remember { mutableStateOf(validateStartPort(internalPortText.value).validationError) }
         StartPortExpandable(internalPortText, startInternalHasError, startHasErrorString, hasSubmitted, expandedInternal, portStartSize)
     }
 
@@ -2016,7 +2018,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 //            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
         DropDownOutline(defaultModifier, externalDeviceText, gatewayIps, "External Device")
         Spacer(modifier = Modifier.width(8.dp))
-        val startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).errorMessage) }
+        val startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).validationError) }
         StartPortExpandable(externalPortText, startExternalHasError, startHasErrorString, hasSubmitted, expandedExternal, portStartSize)
 
     }
@@ -2121,7 +2123,7 @@ fun capLeaseDur(leaseDurString : String, v1: Boolean) : String
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState<Boolean>, errorString : MutableState<String>, hasSubmitted: MutableState<Boolean>, expanded : MutableState<Boolean>, startPortSize : MutableState<IntSize>)
+fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState<Boolean>, errorString : MutableState<ValidationError>, hasSubmitted: MutableState<Boolean>, expanded : MutableState<Boolean>, startPortSize : MutableState<IntSize>)
 {
     OutlinedTextField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -2134,7 +2136,7 @@ fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState
         onValueChange = {
             portText.value = it.filter { charIt -> charIt.isDigit() }
             hasError.value = validateStartPort(portText.value).hasError
-            errorString.value = validateStartPort(portText.value).errorMessage
+            errorString.value = validateStartPort(portText.value).validationError
         },
         label = { if(expanded.value) Text("Port Start") else Text("Port") },
         //modifier = Modifier.then(modifier),
@@ -2143,13 +2145,13 @@ fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState
         supportingText = {
             if(hasSubmitted.value && hasError.value)
             {
-                Text(errorString.value, color = MaterialTheme.colorScheme.error)
+                Text(errorString.value.toMessage(), color = MaterialTheme.colorScheme.error)
             }
         },
         trailingIcon = {
             if(hasSubmitted.value && hasError.value)
             {
-                Icon(Icons.Filled.Error, contentDescription = errorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+                Icon(Icons.Filled.Error, contentDescription = errorString.value.toMessage(), tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
             }
             else
             {
@@ -2325,7 +2327,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
     DeviceRow()
     {
 
-        val endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value,endPortText.value).errorMessage) }
+        val endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value, endPortText.value).validationError) }
 
         Spacer(modifier = Modifier.weight(0.5f, true))
 
@@ -2343,7 +2345,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
             onValueChange = {
                 endPortText.value = it.filter { charIt -> charIt.isDigit() }
                 endHasError.value = validateEndPort(startPortText.value, endPortText.value).hasError
-                endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).errorMessage
+                endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).validationError
                             },
             label = { Text("Port End") },
             modifier = Modifier.width(with(LocalDensity.current) { portSize.width.toDp() }),
@@ -2351,7 +2353,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
             supportingText = {
                 if(hasSubmitted.value && endHasError.value)
                 {
-                    Text(endHasErrorString.value, color = MaterialTheme.colorScheme.error)
+                    Text(endHasErrorString.value.toMessage(), color = MaterialTheme.colorScheme.error)
                 }
             },
 
@@ -2361,7 +2363,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
                     @Composable {
                         if(hasSubmitted.value && endHasError.value)
                         {
-                            Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value, tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
+                            Icon(Icons.Filled.Error, contentDescription = endHasErrorString.value.toMessage(), tint = MaterialTheme.colorScheme.error) //TODO set error on main theme if not already.
                         }
                     }
                 } else {
