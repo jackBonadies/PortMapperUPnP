@@ -6,7 +6,6 @@ package com.shinjiindustrial.portmapper
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -32,11 +31,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,13 +50,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
@@ -70,7 +64,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
@@ -79,7 +72,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -88,7 +80,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -134,23 +125,13 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
-import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
@@ -158,7 +139,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -167,11 +147,20 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
-import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
-
+import com.shinjiindustrial.portmapper.common.MAX_PORT
+import com.shinjiindustrial.portmapper.common.SetupPreview
+import com.shinjiindustrial.portmapper.common.validateDescription
+import com.shinjiindustrial.portmapper.common.validateEndPort
+import com.shinjiindustrial.portmapper.common.validateInternalIp
+import com.shinjiindustrial.portmapper.common.validateStartPort
+import com.shinjiindustrial.portmapper.ports.DeviceHeader
+import com.shinjiindustrial.portmapper.ports.LoadingIcon
+import com.shinjiindustrial.portmapper.ports.NoMappingsCard
+import com.shinjiindustrial.portmapper.ports.PortMappingCard
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -182,11 +171,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.io.IOException
-import java.lang.Exception
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.logging.*
+import java.util.logging.FileHandler
+import java.util.logging.Level
+import java.util.logging.LogRecord
+import java.util.logging.Logger
+import java.util.logging.SimpleFormatter
 import kotlin.random.Random
 
 var PseudoSlotCounter : Int = MAX_PORT // as starting slot
@@ -196,33 +188,6 @@ fun GetPsuedoSlot() : Int
     return PseudoSlotCounter
 }
 
-private val Context.dataStore by preferencesDataStore("preferences")
-
-object SharedPrefKeys
-{
-    val dayNightPref = "dayNightPref"
-    val materialYouPref = "materialYouPref"
-    val sortOrderPref = "sortOrderPref"
-    val descAscPref = "descAscPref"
-}
-
-object SharedPrefValues
-{
-    var DayNightPref : DayNightMode = DayNightMode.FOLLOW_SYSTEM
-    var MaterialYouTheme : Boolean = false
-    var SortByPortMapping : SortBy = SortBy.Slot
-    var Ascending : Boolean = true
-}
-
-enum class DayNightMode(val intVal : Int) {
-    FOLLOW_SYSTEM(0),
-    FORCE_DAY(1),
-    FORCE_NIGHT(2);
-
-    companion object {
-        fun from(findValue: Int): DayNightMode = DayNightMode.values().first { it.intVal == findValue }
-    }
-}
 
 class StringBuilderHandler(private val stringBuilder: SnapshotStateList<String>) : java.util.logging.Handler() {
 
@@ -1061,12 +1026,12 @@ class MainActivity : ComponentActivity() {
         val externalPortTextEnd = remember { mutableStateOf("") }
         val leaseDuration = remember { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
         val description = remember { mutableStateOf(ruleToEdit?.description ?: "") }
-        val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).first) }
-        val startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).first) }
-        val endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).first) }
+        val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).hasError) }
+        val startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).hasError) }
+        val endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).hasError) }
         val selectedProtocolMutable = remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
-        val startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).first) }
-        val endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).first) }
+        val startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).hasError) }
+        val endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).hasError) }
         val (ourIp, ourGatewayIp) = remember {
             if (isPreview) Pair<String, String>(
                 "192.168.0.1",
@@ -1077,7 +1042,7 @@ class MainActivity : ComponentActivity() {
             )
         }
         val internalIp = remember { mutableStateOf(ruleToEdit?.internalIp ?: ourIp!!) }
-        val internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).first) }
+        val internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
         val (gatewayIps, defaultGatewayIp) = remember { UpnpManager.GetGatewayIpsWithDefault(ourGatewayIp!!) }
         val externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
         val expandedInternal = remember { mutableStateOf(false) }
@@ -1916,8 +1881,8 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
         DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
     }
 
-    val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).second) }
-    val interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).second) }
+    val descriptionErrorString = remember { mutableStateOf(validateDescription(description.value).errorMessage) }
+    val interalIpErrorString = remember { mutableStateOf(validateInternalIp(internalIp.value).errorMessage) }
 
     Row(
         modifier = Modifier
@@ -1930,8 +1895,8 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             value = description.value,
             onValueChange = {
                 description.value = it
-                descriptionHasError.value = validateDescription(description.value).first
-                descriptionErrorString.value = validateDescription(description.value).second
+                descriptionHasError.value = validateDescription(description.value).hasError
+                descriptionErrorString.value = validateDescription(description.value).errorMessage
             },
             label = { Text("Description") },
             singleLine = true,
@@ -1971,8 +1936,8 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
             value = internalIp.value,
             onValueChange = {
                 internalIp.value = it.filter { charIt -> charIt.isDigit() || charIt == '.' }
-                internalIpHasError.value = validateInternalIp(internalIp.value).first
-                interalIpErrorString.value = validateInternalIp(internalIp.value).second
+                internalIpHasError.value = validateInternalIp(internalIp.value).hasError
+                interalIpErrorString.value = validateInternalIp(internalIp.value).errorMessage
             },
             isError = hasSubmitted.value && internalIpHasError.value,
             supportingText = {
@@ -2014,7 +1979,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 
         //pass in expanded, pass in startHasErrorString, pass in internalPortText, pass in StartExternalHasError
     // port start
-        val startHasErrorString = remember { mutableStateOf(validateStartPort(internalPortText.value).second) }
+        val startHasErrorString = remember { mutableStateOf(validateStartPort(internalPortText.value).errorMessage) }
         StartPortExpandable(internalPortText, startInternalHasError, startHasErrorString, hasSubmitted, expandedInternal, portStartSize)
     }
 
@@ -2051,7 +2016,7 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 //            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
         DropDownOutline(defaultModifier, externalDeviceText, gatewayIps, "External Device")
         Spacer(modifier = Modifier.width(8.dp))
-        val startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).second) }
+        val startHasErrorString = remember { mutableStateOf(validateStartPort(externalPortText.value).errorMessage) }
         StartPortExpandable(externalPortText, startExternalHasError, startHasErrorString, hasSubmitted, expandedExternal, portStartSize)
 
     }
@@ -2168,8 +2133,8 @@ fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState
         singleLine = true,
         onValueChange = {
             portText.value = it.filter { charIt -> charIt.isDigit() }
-            hasError.value = validateStartPort(portText.value).first
-            errorString.value = validateStartPort(portText.value).second
+            hasError.value = validateStartPort(portText.value).hasError
+            errorString.value = validateStartPort(portText.value).errorMessage
         },
         label = { if(expanded.value) Text("Port Start") else Text("Port") },
         //modifier = Modifier.then(modifier),
@@ -2209,65 +2174,6 @@ fun StartPortExpandable(portText : MutableState<String>, hasError : MutableState
 
 val createNewRuleRowWidth = 1.0f
 
-fun validateDescription(description : String) : Pair<Boolean, String>
-{
-    if(description.isEmpty())
-    {
-        return Pair(true, "Cannot be empty")
-    }
-    return Pair(false, "")
-}
-
-fun validateStartPort(startPort : String) : Pair<Boolean, String>
-{
-    if(startPort.isEmpty())
-    {
-        return Pair(true, "Port cannot be empty")
-    }
-    val portInt = startPort.toIntOrMaxValue()
-    if(portInt < MIN_PORT || portInt > MAX_PORT)
-    {
-        return Pair(true, "Port must be between $MIN_PORT and $MAX_PORT")
-    }
-    return Pair(false, "")
-}
-
-fun validateEndPort(startPort : String, endPort : String) : Pair<Boolean, String>
-{
-    if(startPort.isEmpty())
-    {
-        // let them deal with that error first
-        return Pair(false, "")
-    }
-    if(endPort.isEmpty())
-    {
-        //valid
-        return Pair(false, "")
-    }
-
-    if(endPort.isEmpty())
-    {
-        //valid
-        return Pair(false, "")
-    }
-
-    val startPortInt = startPort.toIntOrMaxValue()
-    val endPortInt = startPort.toIntOrMaxValue()
-
-    if(endPortInt < MIN_PORT || endPortInt > MAX_PORT)
-    {
-        return Pair(true, "Port must be between $MIN_PORT and $MAX_PORT")
-    }
-
-    if(startPortInt > endPortInt)
-    {
-        return Pair(true, "End port must be after start")
-    }
-
-
-    return Pair(false, "")
-}
-
 fun String.toIntOrMaxValue(): Int {
     return try {
         this.toInt()
@@ -2277,6 +2183,7 @@ fun String.toIntOrMaxValue(): Int {
         Int.MAX_VALUE
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
@@ -2409,14 +2316,6 @@ fun outlineTextWithPicker()
             )
         }
     }
-
-
-}
-
-fun validateInternalIp(ip : String) : Pair<Boolean, String>
-{
-    val regexIPv4 = """^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$""".toRegex()
-    return if(regexIPv4.matches(ip)) Pair(false, "") else Pair(true, "Must be valid IP address")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2426,7 +2325,7 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
     DeviceRow()
     {
 
-        val endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value,endPortText.value).second) }
+        val endHasErrorString = remember { mutableStateOf(validateEndPort(startPortText.value,endPortText.value).errorMessage) }
 
         Spacer(modifier = Modifier.weight(0.5f, true))
 
@@ -2443,8 +2342,8 @@ fun PortRangeRow(startPortText : MutableState<String>, endPortText : MutableStat
             value = endPortText.value,
             onValueChange = {
                 endPortText.value = it.filter { charIt -> charIt.isDigit() }
-                endHasError.value = validateEndPort(startPortText.value, endPortText.value).first
-                endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).second
+                endHasError.value = validateEndPort(startPortText.value, endPortText.value).hasError
+                endHasErrorString.value = validateEndPort(startPortText.value, endPortText.value).errorMessage
                             },
             label = { Text("Port End") },
             modifier = Modifier.width(with(LocalDensity.current) { portSize.width.toDp() }),
@@ -2822,29 +2721,6 @@ fun formatIpv4(ipAddr : Int) : String
     return inetAddress.hostAddress
 }
 
-//fun getLocalIpAddress(context: Context): InetAddress? {
-//    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-//    var ipAddress = wifiManager.connectionInfo.ipAddress
-//    var macAddress = wifiManager.connectionInfo.macAddress
-//
-//    // Convert little-endian to big-endian if needed
-////    if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
-////        ipAddress = Integer.reverseBytes(ipAddress)
-////    }
-//
-//    val ipByteArray = ByteArray(4)
-//    ipByteArray[0] = (ipAddress and 0xff).toByte()
-//    ipByteArray[1] = (ipAddress shr 8 and 0xff).toByte()
-//    ipByteArray[2] = (ipAddress shr 16 and 0xff).toByte()
-//    ipByteArray[3] = (ipAddress shr 24 and 0xff).toByte()
-//
-//    return try {
-//        InetAddress.getByAddress(ipByteArray)
-//    } catch (e: UnknownHostException) {
-//        null
-//    }
-//}
-
 class UPnPElementViewModel: ViewModel() {
     private val _items = MutableLiveData<List<UPnPViewElement>>(emptyList())
     val items: LiveData<List<UPnPViewElement>> get() = _items
@@ -2863,21 +2739,6 @@ class UPnPElementViewModel: ViewModel() {
     }
 }
 
-
-
-
-
-fun main() {
-    GlobalScope.launch {
-        delay(5000L) // non-blocking delay for 5 seconds (5000 milliseconds)
-        println("Hello from a separate thread after 5 seconds!")
-    }
-
-    // Keep the main thread alive, otherwise the program will exit before the separate thread gets a chance to print
-    Thread.sleep(6000L)
-}
-
-
 data class Message(val name : String, val msg : String)
 
 fun _getDefaultPortMapping() : PortMapping
@@ -2888,8 +2749,8 @@ fun _getDefaultPortMapping() : PortMapping
 @Preview
 @Composable
 fun PreviewConversation() {
+    SetupPreview()
     MyApplicationTheme {
-
         val msgs = mutableListOf<UPnPViewElement>()
         val pm = _getDefaultPortMapping()
         val upnpViewEl = UPnPViewElement(pm)
@@ -2899,8 +2760,6 @@ fun PreviewConversation() {
         }
         Conversation(msgs)
     }
-
-    //}
 }
 
 @Composable
@@ -2915,7 +2774,6 @@ fun ConversationEntryPoint(modelView : UPnPElementViewModel)
 @Composable
 fun Conversation(messages: List<UPnPViewElement>) {
 
-
         LazyColumn(
             //modifier = Modifier.background(MaterialTheme.colorScheme.background),
             modifier = Modifier
@@ -2926,13 +2784,6 @@ fun Conversation(messages: List<UPnPViewElement>) {
             verticalArrangement = Arrangement.spacedBy(0.dp),
 
             ) {
-//        stickyHeader {
-//            Column( modifier = Modifier.background(MaterialTheme.colorScheme.background).fillMaxWidth())
-//            {
-//                Text("DEVICE IS THIS")
-//                Text("DEVICE IS THIS")
-//            }
-//        }
 
             itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
 
@@ -2948,30 +2799,6 @@ fun Conversation(messages: List<UPnPViewElement>) {
                 {
                     PortMappingCard(message.GetUnderlyingPortMapping(), Modifier.animateItemPlacement())
                 }
-
-
-//            Box(modifier = Modifier.background(MaterialTheme.colorScheme.tertiaryContainer))
-//            {
-                //PortMapping("Web Server", "192.168.18.1","192.168.18.13",80,80, "UDP", true, 0))
-                //}
-
-//            if(index == 2)
-//            {
-//                Column( modifier = Modifier
-//                    .background(
-//                        MaterialTheme.colorScheme.tertiaryContainer,
-//                        shape = RoundedCornerShape(0.dp, 0.dp, 16.dp, 16.dp)
-//                    )
-//                    .fillMaxWidth()
-//                    .padding(4.dp, 0.dp))
-//                {
-////                    Divider(color = Color.Gray, thickness = 1.dp)
-//                    Spacer(modifier = Modifier.padding(4.dp))
-//                }
-//                Spacer(modifier = Modifier.padding(4.dp))
-//            }
-
-
             }
 
             item {
@@ -2983,141 +2810,6 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
 }
 
-@Composable
-fun MyScreen(myViewModel: UPnPElementViewModel = UPnPElementViewModel()) {
-    val items by myViewModel.items.observeAsState(emptyList())
-
-    LazyColumn {
-        items(items) { item ->
-            Text(item.UnderlyingElement.toString())
-        }
-    }
-}
-
-
-
-
-@Composable
-fun MessageCard(name: String, message : String, even : Boolean) {
-    Row {
-        Text("row I guess\r\ntest\r\ntest1", style = TextStyle(fontSize = 10.sp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(text = "Hello $name!", color = if (even) Color.Blue else Color.Red)
-            Text(text = "$message!", color =  if (even) Color.Blue else Color.Red)
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MessageCard() {
-    SetupPreview()
-    MessageCard("Android", "I want to chat", true)
-}
-
-@Preview(showBackground = true)
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun PortMappingCard() //TODO: rename?
-{
-    SetupPreview()
-        PortMappingCard(
-            PortMapping(
-                "Web Server",
-                "",
-                "192.168.18.13",
-                80,
-                80,
-                "UDP",
-                true,
-                0,
-                "192.168.18.1",
-                System.currentTimeMillis(),
-                0
-            )
-        )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PortMappingCardAlt() // TODO: rename?
-{
-    SetupPreview()
-    MyApplicationTheme {
-
-    PortMappingCardAlt(
-        PortMapping(
-            "Web Server",
-            "",
-            "192.168.18.13",
-            80,
-            80,
-            "UDP",
-            true,
-            0,
-            "192.168.18.1",
-            System.currentTimeMillis(),
-            0
-        )
-    )
-
-    }
-}
-
-@OptIn(ExperimentalUnitApi::class)
-@Composable
-fun PortMappingCardAlt(portMapping: PortMapping)
-{
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp, 4.dp)
-//            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .clickable { },
-        elevation = CardDefaults.cardElevation(),
-        colors = CardDefaults.cardColors(
-//            containerColor = Color(0xffc5dceb),
-        ),
-
-        ) {
-        Row(
-            modifier = Modifier
-                .padding(15.dp, 6.dp),//.background(Color(0xffc5dceb)),
-            //.background(MaterialTheme.colorScheme.secondaryContainer),
-            verticalAlignment = Alignment.CenterVertically
-
-        ) {
-            Column(modifier = Modifier.weight(1f)){
-                Text(portMapping.Description, fontSize = TextUnit(20f, TextUnitType.Sp), fontWeight = FontWeight.SemiBold)
-                Text("${portMapping.InternalIP}")
-                Text("${portMapping.ExternalPort} ➝ ${portMapping.InternalPort} • ${portMapping.Protocol}")
-            }
-
-
-//                buildAnnotatedString {
-//                    append("welcome to ")
-//                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
-//                    ) {
-//                        append("Jetpack Compose Playground")
-//                    }
-//                }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "On",
-                    fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .padding(0.dp)
-                        .background(color = Color(0xFF8FCE91), shape = RoundedCornerShape(10.dp))
-                        .padding(16.dp, 8.dp),
-                )
-
-            }
-        }
-    }
-}
-
 // TODO: for mock purposes
 class IGDDeviceHolder
 {
@@ -3127,306 +2819,6 @@ class IGDDeviceHolder
             return ""
         }
 
-}
-
-@OptIn(ExperimentalUnitApi::class)
-@Composable
-fun DeviceHeader(device : IGDDevice)
-{
-    Spacer(modifier = Modifier.padding(2.dp))
-    Column(
-        modifier = Modifier
-//                    .background(
-//                        MaterialTheme.colorScheme.secondaryContainer,
-//                        shape = RoundedCornerShape(16.dp, 16.dp, 0.dp, 0.dp)
-//                    )
-            .fillMaxWidth()
-            .padding(6.dp, 4.dp)
-    )
-    {
-//                    Divider(color = Color.Gray, thickness = 1.dp)
-        Text(
-            device.displayName,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = TextUnit(24f, TextUnitType.Sp),
-            color = AdditionalColors.TextColor
-
-        )
-        Text(device.ipAddress, color = AdditionalColors.TextColor)
-    }
-    Spacer(modifier = Modifier.padding(2.dp))
-}
-
-@Preview
-@Composable
-fun LoadingIcon()
-{
-    LoadingIcon("Searching for devices", Modifier)
-}
-
-@Composable
-fun LoadingIcon(label : String, modifier : Modifier)
-{
-    Column(modifier = modifier.fillMaxWidth()) {
-        CircularProgressIndicator(modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary)
-        Text("Searching for devices", modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .padding(0.dp, 30.dp, 0.dp, 0.dp))
-    }
-
-}
-
-@Composable
-fun NoMappingsCard(remoteDevice : IGDDevice) {
-    NoMappingsCard()
-}
-
-@Preview
-@Composable
-fun NoMappingsCard()
-{
-    MyApplicationTheme {
-        Card(
-//        onClick = {
-//            if(PortForwardApplication.showPopup != null)
-//            {
-//                PortForwardApplication.showPopup.value = true
-//            }
-//                  },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(4.dp, 4.dp),
-//            .background(MaterialTheme.colorScheme.secondaryContainer)
-//                .clickable {
-//
-//                    showAddRuleDialogState.value =
-//                    //PortForwardApplication.currentSingleSelectedObject.value = portMapping
-//                },
-            elevation = CardDefaults.cardElevation(),
-            colors = CardDefaults.cardColors(
-                containerColor = AdditionalColors.CardContainerColor,
-            ),
-            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
-
-            ) {
-
-            Row(
-                modifier = Modifier
-                    .padding(15.dp, 36.dp),//.background(Color(0xffc5dceb)),
-                //.background(MaterialTheme.colorScheme.secondaryContainer),
-                verticalAlignment = Alignment.CenterVertically
-
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-
-
-                    // this one is awkward if one intentionally removes all port mappings
-                    //var deviceHasNoPortMappings = "No port mappings found \nfor this device"
-                    "Device has no UPnP port mappings"
-
-                    Text(
-                        "No port mappings found \nfor this device",
-                        fontSize = TextUnit(20f, TextUnitType.Sp),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(0.dp, 0.dp, 0.dp, 8.dp),
-                        textAlign = TextAlign.Center,
-                        color = AdditionalColors.TextColor
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Tap ",
-                            color = AdditionalColors.TextColor
-                            //color = MaterialTheme.colors.onSurface
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add icon",
-                            tint = AdditionalColors.TextColor
-                            //tint = MaterialTheme.colors.secondary
-                        )
-                        Text(
-                            text = " to add new rules",
-                            //style = MaterialTheme.typography.body1,
-                            color = AdditionalColors.TextColor
-                        )
-                    }
-
-                }
-
-        }
-        }
-    }
-}
-
-@OptIn(ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
-    ExperimentalFoundationApi::class
-)
-@Composable
-fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier)
-{
-    println("external ip test ${portMapping.ActualExternalIP}")
-
-    MyApplicationTheme {
-
-        //var isRound by remember { mutableStateOf(true)}
-        //val borderRadius by animateIntAsState(targetValue = if(isRound) 100 else 0, animationSpec = tween(durationMillis = 2000))
-
-    Card(
-//        onClick = {
-//            if(PortForwardApplication.showPopup != null)
-//            {
-//                PortForwardApplication.showPopup.value = true
-//            }
-//                  },
-        modifier = additionalModifier
-            .fillMaxWidth()
-            //.clip(RoundedCornerShape(borderRadius))
-            .padding(4.dp, 4.dp)
-//            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .combinedClickable(
-                onClick = {
-
-                    if (IsMultiSelectMode()) {
-                        ToggleSelection(portMapping)
-                    } else {
-                        PortForwardApplication.showContextMenu.value = true
-                        PortForwardApplication.currentSingleSelectedObject.value = portMapping
-                    }
-
-                },
-                onLongClick = {
-                    ToggleSelection(portMapping)
-                }
-            ),
-
-
-//                Snackbar
-//                    .make(parentlayout, "This is main activity", Snackbar.LENGTH_LONG)
-//                    .setAction("CLOSE", object : OnClickListener() {
-//                        fun onClick(view: View?) {}
-//                    })
-//                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
-//                    .show()
-                //isRound = !isRound
-
-
-            elevation = CardDefaults.cardElevation(),
-            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
-            colors = CardDefaults.cardColors(
-                containerColor = AdditionalColors.CardContainerColor,
-            ),
-    ) {
-
-        Row(
-            modifier = Modifier
-                .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
-            //.background(MaterialTheme.colorScheme.secondaryContainer),
-            verticalAlignment = Alignment.CenterVertically
-
-        ) {
-
-            val multiSelectMode = IsMultiSelectMode()
-            //var padLeft = if(multiSelectMode) 5.dp else 13.dp
-
-            //TODO need to do existing content slide to right and fade new element in
-
-            val padLeft = 13.dp
-            //val transition = updateTransition(multiSelectMode, label = "transition")
-
-//            val offsetState = remember { MutableTransitionState(initialState = false) }
-//            val visState = remember { MutableTransitionState(initialState = false) }
-//
-////            val padLeft by transition.animateDp(
-////                transitionSpec = {
-////                    if (false isTransitioningTo true) {
-////                        spring(stiffness = Spring.StiffnessLow)
-////                    } else {
-////                        spring(stiffness = Spring.StiffnessLow)
-////                    }
-////                },
-////                label = "offset transition",
-////            ) { isVisible -> if (isVisible) 5.dp else 13.dp}
-//
-//
-//            val padLeft by animateDpAsState(
-//                if (offsetState.currentState) 30.dp else 5.dp,
-//                finishedListener = {
-//                   if (it == 30.dp) {
-//                       offsetState.targetState = false
-//                   }
-//                }
-//            )
-//
-//            offsetState.targetState = multiSelectMode
-
-            AnimatedVisibility(
-                visible = multiSelectMode,
-            ) {
-
-
-                CircleCheckbox(
-                    MainActivity.MultiSelectItems!!.contains(portMapping),
-                    true,
-                    Modifier.padding(10.dp, 0.dp, 2.dp, 0.dp)
-                ) {
-
-                    ToggleSelection(portMapping)
-
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f).padding(padLeft,0.dp,0.dp,0.dp)) {
-                Text(
-                    portMapping.Description,
-                    fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = AdditionalColors.TextColor
-                )
-                Text("${portMapping.InternalIP}", color = AdditionalColors.TextColor)
-
-                val text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
-                        append("⬤")
-                    }
-                    withStyle(style = SpanStyle()) {
-                        append(if (portMapping.Enabled) " Enabled" else " Disabled")
-                    }
-                }
-
-
-                Text(text, color = AdditionalColors.TextColor)
-            }
-
-
-//                buildAnnotatedString {
-//                    append("welcome to ")
-//                    withStyle(style = SpanStyle(fontWeight = FontWeight.W900, color = Color(0xFF4552B8))
-//                    ) {
-//                        append("Jetpack Compose Playground")
-//                    }
-//                }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
-                    fontSize = TextUnit(20f, TextUnitType.Sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = AdditionalColors.TextColor
-                )
-                Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
-
-            }
-        }
-    }
-
-    }
 }
 
 fun ToggleSelection(portMapping : PortMapping)
@@ -3445,130 +2837,4 @@ fun ToggleSelection(portMapping : PortMapping)
 fun IsMultiSelectMode() : Boolean
 {
     return MainActivity.MultiSelectItems!!.isNotEmpty()
-}
-
-@Composable
-fun CircleCheckbox(selected: Boolean, enabled: Boolean = true, modifier : Modifier = Modifier, onChecked: () -> Unit) {
-
-    val color = MaterialTheme.colorScheme
-    val imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle
-    val tint = if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
-    val background = if (selected) Color.White else Color.Transparent
-
-    IconButton(onClick = {  },
-        enabled = enabled, modifier = modifier.then(Modifier.size(28.dp))) {
-
-        Icon(imageVector = imageVector, tint = tint,
-            modifier = Modifier.background(background, shape = CircleShape).size(28.dp),
-            contentDescription = "checkbox")
-    }
-}
-
-@Preview
-@Composable
-fun CircleCheckboxPreview()
-{
-    val selected = remember { mutableStateOf(false)}
-    CircleCheckbox(selected.value, true) { selected.value = !selected.value }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    var text by remember { mutableStateOf("Click me") }
-    Text(
-        text = text,
-        modifier = Modifier.clickable {
-            if (text.equals("Click me"))
-            {
-                text = "testing clicked"
-            }
-            else
-            {
-                text = "Click me"
-            }
-
-            println("clicked...")
-        }
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MyApplicationTheme {
-        Greeting("Android")
-    }
-}
-
-@Preview
-@Composable
-fun MoreInfoDialog()
-{
-    SetupPreview()
-    MoreInfoDialog(_getDefaultPortMapping(), remember { mutableStateOf(true) })
-}
-
-@Composable
-fun MoreInfoDialog(portMapping : PortMapping,  showDialog : MutableState<Boolean>)
-{
-    if(showDialog.value) {
-        AlertDialog(
-            onDismissRequest = { showDialog.value = false },
-            title = { Text("Info") },
-            text = {
-                val pairs = mutableListOf<Pair<String, String>>()
-                pairs.add(Pair("Internal IP", portMapping.InternalIP))
-                pairs.add(Pair("Internal Port", portMapping.InternalPort.toString()))
-                pairs.add(Pair("External IP", portMapping.ActualExternalIP))
-                pairs.add(Pair("External Port", portMapping.ExternalPort.toString()))
-                pairs.add(Pair("Protocol", portMapping.Protocol))
-                pairs.add(Pair("Enabled", if (portMapping.Enabled) "True" else "False"))
-                pairs.add(Pair("Expires", portMapping.getRemainingLeaseTimeString()))
-                Column {
-                    for (p in pairs) {
-                        Row()
-                        {
-                            Text(
-                                p.first,
-                                modifier = Modifier
-                                    .padding(0.dp, 0.dp, 10.dp, 4.dp)
-                                    .width(100.dp),
-                                textAlign = TextAlign.Right,
-                                color = AdditionalColors.TextColorWeak
-                            )
-                            Text(p.second, color = AdditionalColors.TextColorStrong)
-                        }
-                    }
-                }
-
-            },
-            confirmButton = {
-                Button(onClick = { showDialog.value = false }) {
-                    Text("OK")
-                }
-            })
-    }
-}
-
-class PlaceholderTransformation(val placeholder: String) : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        return PlaceholderFilter(text, placeholder)
-    }
-}
-
-fun PlaceholderFilter(text: AnnotatedString, placeholder: String): TransformedText {
-
-    var out = placeholder
-
-    val numberOffsetTranslator = object : OffsetMapping {
-        override fun originalToTransformed(offset: Int): Int {
-            return 0
-        }
-
-        override fun transformedToOriginal(offset: Int): Int {
-            return 0
-        }
-    }
-
-    return TransformedText(AnnotatedString(placeholder), numberOffsetTranslator)
 }

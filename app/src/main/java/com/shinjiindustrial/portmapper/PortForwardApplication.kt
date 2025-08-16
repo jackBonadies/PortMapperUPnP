@@ -45,6 +45,7 @@ class PortForwardApplication : Application() {
         println("PortForwardApplication onCreate Finished")
     }
 
+    // TODO move these
     fun RestoreSharedPrefs()
     {
         runBlocking {

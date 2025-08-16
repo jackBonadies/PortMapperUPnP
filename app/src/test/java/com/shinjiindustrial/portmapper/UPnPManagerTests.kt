@@ -149,6 +149,6 @@ class UPnPManagerTests {
         val _protocol = "TCP"
         val _enabled = true
 
-        return PortMapping(_description, null, _internalIP.toString(), _externalPort, _internalPort, _protocol, _enabled, _leaseDuration, _externalIP, 0, GetPsuedoSlot())
+        return PortMapping(_description, "", _internalIP.toString(), _externalPort, _internalPort, _protocol, _enabled, _leaseDuration, _externalIP, 0, GetPsuedoSlot())
     }
 }

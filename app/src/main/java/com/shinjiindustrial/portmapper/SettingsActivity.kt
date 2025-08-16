@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.shinjiindustrial.portmapper.common.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 
@@ -258,15 +259,6 @@ fun RadioGroupExample() {
                 }
             }
         }
-}
-
-@Composable
-@Preview
-fun SetupPreview()
-{
-    SharedPrefValues.DayNightPref = DayNightMode.FORCE_NIGHT
-    SharedPrefValues.MaterialYouTheme = false
-    PortForwardApplication.appContext = LocalContext.current
 }
 
 @Composable

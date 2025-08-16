@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.LocalTextStyle
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.shinjiindustrial.portmapper.common.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -185,27 +185,9 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
             )
 
             chosenValue.value = DayHourMinSec(dayValuesPickerState.selectedItem.toInt(),hoursValuesPickerState.selectedItem.toInt(), minsValuesPickerState.selectedItem.toInt(),0).totalSeconds().toString()
-//                Picker(
-//                    header = "Seconds",
-//                    infinite = infiniteScroll,
-//                    state = secsValuesPickerState,
-//                    items = secsValues,
-//                    visibleItemsCount = 3,
-//                    modifier = Modifier.width(120.dp),
-//                    textModifier = Modifier.padding(8.dp),
-//                    textStyle = TextStyle(fontSize = 32.sp),
-//                    startIndex = dhms.seconds,
-//                )
         }
-
-//            Text(
-//                text = "Interval: ${dayValuesPickerState.selectedItem} ${hoursValuesPickerState.selectedItem}",
-//                modifier = Modifier.padding(vertical = 16.dp)
-//            )
-
     }
 }
-
 
 class PickerState(initialValue : Int) {
     var selectedItem by mutableStateOf(initialValue.toString())
