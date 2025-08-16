@@ -771,6 +771,11 @@ class UpnpManager {
 
         //TODO: if List all port mappings exists, that should be used instead of getgeneric.
 
+        // needs to be * for Verizon Router - CR1000B, but only for delete call
+        // else one will get InvalidArgs exception
+        private fun normalizeRemoteHostForDelete(remoteHost: String): String =
+            remoteHost.ifBlank { "*" }
+
         fun DeletePortMapping(
             portMapping: PortMapping,
             callback: (UPnPResult) -> Unit
@@ -778,10 +783,10 @@ class UpnpManager {
             val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
             val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
             val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", "${portMapping.RemoteHost}") //!!
+            actionInvocation.setInput("NewRemoteHost", normalizeRemoteHostForDelete(portMapping.RemoteHost))
             // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
             actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
-            actionInvocation.setInput("NewProtocol", "${portMapping.Protocol}")
+            actionInvocation.setInput("NewProtocol", portMapping.Protocol)
 
             val future = GetUPnPService().controlPoint.execute(object :
                 ActionCallback(actionInvocation) {

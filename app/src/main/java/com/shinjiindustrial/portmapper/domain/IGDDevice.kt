@@ -134,7 +134,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                     val leaseDuration = invocation.getOutput("NewLeaseDuration")
                     val portMapping = PortMapping(
                         description.toString(),
-                        remoteHost.toString(), //TODO standardize remote host so null == string.empty
+                        remoteHost.toString(),
                         internalClient.toString(),
                         externalPort.toString().toInt(),
                         internalPort.toString().toInt(),
@@ -144,9 +144,10 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                         ipAddress,
                         System.currentTimeMillis(),
                         slotIndex)
-                    addOrUpdate(portMapping)
+                    addOrUpdate(portMapping) //!!
                     UpnpManager.PortInitialFoundEvent.invoke(portMapping)
                     success = true
+                    OurLogger.log(Level.INFO, portMapping.toStringFull())
                 }
 
                 override fun failure(

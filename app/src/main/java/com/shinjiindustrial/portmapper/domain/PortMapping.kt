@@ -105,6 +105,11 @@ class PortMapping(
     {
         return if (value > 1) "s" else ""
     }
+
+    fun toStringFull() : String
+    {
+        return "PortMapping(RemoteHost=$RemoteHost, ActualExternalIP=$ActualExternalIP, InternalIP=$InternalIP, ExternalPort=$ExternalPort, InternalPort=$InternalPort, Protocol=$Protocol, Enabled=$Enabled, LeaseDuration=$LeaseDuration, Description=$Description, TimeReadLeaseDurationMs=$TimeReadLeaseDurationMs, Slot=$Slot)"
+    }
 }
 
 data class DayHourMinSec(val days : Int, val hours : Int, val mins : Int, val seconds : Int)
