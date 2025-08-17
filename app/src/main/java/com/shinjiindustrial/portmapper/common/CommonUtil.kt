@@ -17,3 +17,31 @@ fun capLeaseDur(leaseDurString : String, v1: Boolean) : String
         minOf(leaseInt, 604800).toString()
     }
 }
+
+class Event<T> {
+    private val observers = mutableSetOf<(T) -> Unit>()
+
+    operator fun plusAssign(observer: (T) -> Unit) {
+        observers.add(observer)
+    }
+
+    operator fun minusAssign(observer: (T) -> Unit) {
+        observers.remove(observer)
+    }
+
+    operator fun invoke(value: T) {
+        for (observer in observers)
+            observer(value)
+    }
+}
+
+
+enum class NetworkType(val networkTypeString: String) {
+    NONE("None"),
+    WIFI("Wifi"),
+    DATA("Data");
+
+    override fun toString(): String {
+        return networkTypeString
+    }
+}

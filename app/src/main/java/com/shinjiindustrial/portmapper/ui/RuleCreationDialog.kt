@@ -33,10 +33,10 @@ import com.shinjiindustrial.portmapper.MainActivity.Companion.showSnackBarViewLo
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.RunUIThread
-import com.shinjiindustrial.portmapper.UPnPCreateMappingResult
-import com.shinjiindustrial.portmapper.UPnPResult
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.getIGDDevice
+import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
+import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
@@ -208,18 +208,27 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
 
                             val modifyCase = ruleToEdit != null
 
-                            fun batchCallback(result: MutableList<UPnPCreateMappingResult?>) {
+                            fun batchCallback(result: MutableList<UPnPCreateMappingWrapperResult?>) {
 
                                 RunUIThread {
                                     //debug
                                     for (res in result) {
                                         res!!
-                                        print(res.Success)
-                                        print(res.FailureReason)
-                                        print(res.ResultingMapping?.Protocol)
+                                        when (res)
+                                        {
+                                            is UPnPCreateMappingWrapperResult.Failure -> {
+                                                println("Failure")
+                                                println(res.reason)
+                                                println(res.response)
+                                            }
+                                            is UPnPCreateMappingWrapperResult.Success -> {
+                                                println("Success")
+                                                println(res.resultingMapping.Protocol)
+                                            }
+                                        }
                                     }
 
-                                    val numFailed = result.count { !it?.Success!! }
+                                    val numFailed = result.count { it is UPnPCreateMappingWrapperResult.Failure }
 
                                     val anyFailed = numFailed > 0
 
@@ -273,18 +282,20 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                                             defaultRuleDeletedCallback(result)
                                             RunUIThread {
                                                 println("delete callback")
-                                                if (result.Success!!) {
-
-                                                    // if successfully deleted original rule,
-                                                    //   add new rule.
-                                                    UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback)
-                                                }
-                                                else
+                                                when(result)
                                                 {
-                                                    // the old rule must still be remaining if it failed to delete
-                                                    // so nothing has changed.
-                                                    showSnackBarViewLog("Failed to modify entry.")
-
+                                                    is UPnPResult.Success ->
+                                                    {
+                                                        // if successfully deleted original rule,
+                                                        //   add new rule.
+                                                        UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback)
+                                                    }
+                                                    is UPnPResult.Failure ->
+                                                    {
+                                                        // the old rule must still be remaining if it failed to delete
+                                                        // so nothing has changed.
+                                                        showSnackBarViewLog("Failed to modify entry.")
+                                                    }
                                                 }
                                             }
                                         } catch (exception: Exception) {

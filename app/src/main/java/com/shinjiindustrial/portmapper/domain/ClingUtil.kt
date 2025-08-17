@@ -1,10 +1,48 @@
 package com.shinjiindustrial.portmapper.domain
 
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.AddDevice
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.UPnPNames
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.util.logging.Level
+
+object UPnPNames {
+    val InternetGatewayDevice = "InternetGatewayDevice"
+    val WANDevice = "WANDevice"
+    val WANConnectionDevice = "WANConnectionDevice"
+    val WANIPConnection = "WANIPConnection"
+//            val IGD_DEVICE_TYPE: DeviceType = UDADeviceType(InternetGatewayDevice, 1)
+//            val IGD_DEVICE_TYPE_2: DeviceType = UDADeviceType(InternetGatewayDevice, 2)
+//
+//            val CONNECTION_DEVICE_TYPE: DeviceType = UDADeviceType(WANConnectionDevice, 1)
+//            val CONNECTION_DEVICE_TYPE_2: DeviceType = UDADeviceType(WANConnectionDevice, 2)
+}
+
+object ACTION_NAMES {
+    // these actions are all Required in v1, v2
+    val AddPortMapping: String = "AddPortMapping"
+    val GetExternalIPAddress: String = "GetExternalIPAddress"
+    val DeletePortMapping: String = "DeletePortMapping"
+    val GetStatusInfo: String = "GetStatusInfo"
+    val GetGenericPortMappingEntry: String = "GetGenericPortMappingEntry"
+    val GetSpecificPortMappingEntry: String = "GetSpecificPortMappingEntry"
+
+    // this action is required in v2, not present in v1
+    var AddAnyPortMapping: String = "AddAnyPortMapping"
+
+    // this action is required for device, optional for control point in v2, not present in v1
+    var GetListOfPortMappings: String = "GetListOfPortMappings"
+}
+
+val ActionNames: List<String> = listOf(
+    ACTION_NAMES.AddPortMapping,
+    ACTION_NAMES.GetExternalIPAddress,
+    ACTION_NAMES.DeletePortMapping,
+    ACTION_NAMES.GetStatusInfo,
+    ACTION_NAMES.GetGenericPortMappingEntry,
+    ACTION_NAMES.GetSpecificPortMappingEntry,
+
+    ACTION_NAMES.AddAnyPortMapping,
+    ACTION_NAMES.GetListOfPortMappings,
+)
 
 fun RemoteDevice.getIGDDevice(): IGDDevice? {
 
@@ -30,7 +68,7 @@ fun RemoteDevice.getIGDDevice(): IGDDevice? {
                     //get relevant actions here...
                     //TODO add relevant service (and cause event)
                     val igdDevice = IGDDevice(this, wanIPService)
-                    return igdDevice;
+                    return igdDevice
 
                 } else {
                     OurLogger.log(
@@ -56,5 +94,5 @@ fun RemoteDevice.getIGDDevice(): IGDDevice? {
             "Device ${this.displayString} is NOT of interest, type is ${this.type}"
         )
     }
-    return null;
+    return null
 }

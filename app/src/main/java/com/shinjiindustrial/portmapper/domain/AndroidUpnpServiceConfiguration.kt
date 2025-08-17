@@ -1,7 +1,7 @@
 package com.shinjiindustrial.portmapper.domain
 
 import android.content.Context
-import com.shinjiindustrial.portmapper.NetworkType
+import com.shinjiindustrial.portmapper.common.NetworkType
 import org.fourthline.cling.android.AndroidNetworkAddressFactory
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
 import org.fourthline.cling.binding.xml.ServiceDescriptorBinder

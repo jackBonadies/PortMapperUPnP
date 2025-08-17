@@ -1,14 +1,10 @@
 package com.shinjiindustrial.portmapper.client
 
-import com.shinjiindustrial.portmapper.Event
 import com.shinjiindustrial.portmapper.GetPsuedoSlot
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.PortMappingRequest
-import com.shinjiindustrial.portmapper.UPnPCreateMappingResult
-import com.shinjiindustrial.portmapper.UPnPCreateMappingResult2
-import com.shinjiindustrial.portmapper.UPnPGetSpecificMappingResult
-import com.shinjiindustrial.portmapper.UPnPResult
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.ACTION_NAMES
+import com.shinjiindustrial.portmapper.common.Event
+import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
@@ -86,7 +82,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
     override fun createPortMappingRule(
         device: IGDDevice,
         portMappingRequest: PortMappingRequest,
-        callback: (UPnPCreateMappingResult2) -> Unit
+        callback: (UPnPCreateMappingResult) -> Unit
     ): Future<Any> {
         val externalIp = portMappingRequest.externalIp
         val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
@@ -105,8 +101,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
             ActionCallback(actionInvocation) {
             override fun success(invocation: ActionInvocation<*>?) {
                 invocation!!
-                val result = UPnPCreateMappingResult2(true, false)
-                result.RequestedMapping = portMappingRequest.realize()
+                val result = UPnPCreateMappingResult.Success(portMappingRequest.realize())
                 callback(result)
             }
 
@@ -129,9 +124,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 )
                 OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
-                val result = UPnPCreateMappingResult2(false, false)
-                result.FailureReason = defaultMsg
-                result.UPnPFailureResponse = operation
+                val result = UPnPCreateMappingResult.Failure(defaultMsg, operation)
                 callback(result)
             }
         })
@@ -162,8 +155,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                     "Successfully deleted rule (${portMapping.shortName()})."
                 )
 
-                val result = UPnPResult(true)
-                result.RequestInfo = portMapping
+                val result = UPnPResult.Success(portMapping)
                 callback(result)
 
             }
@@ -187,9 +179,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 )
                 OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
-                val result = UPnPResult(false)
-                result.FailureReason = defaultMsg
-                result.UPnPFailureResponse = operation
+                val result = UPnPResult.Failure(defaultMsg, operation)
                 callback(result)
             }
         })
@@ -203,7 +193,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
         remoteHost: String,
         remotePort: String,
         protocol: String,
-        callback: (UPnPCreateMappingResult) -> Unit
+        callback: (UPnPCreateMappingWrapperResult) -> Unit
     ): Future<Any> {
 
         val remoteIp = device.ipAddress
@@ -244,8 +234,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                     "Successfully read back our new rule (${pm.shortName()})"
                 )
 
-                val result = UPnPCreateMappingResult(true, true)
-                result.ResultingMapping = pm
+                val result = UPnPCreateMappingWrapperResult.Success(pm, pm, true)
                 callback(result)
             }
 
@@ -268,9 +257,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 )
                 OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
-                val result = UPnPCreateMappingResult(false, true)
-                result.UPnPFailureResponse = operation
-                result.FailureReason = defaultMsg
+                val result = UPnPCreateMappingWrapperResult.Failure(defaultMsg, operation)
                 callback(result)
             }
         })
@@ -314,7 +301,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                     ipAddress,
                     System.currentTimeMillis(),
                     slotIndex)
-                val result = UPnPGetSpecificMappingResult(portMapping, true)
+                val result = UPnPGetSpecificMappingResult.Success(portMapping, portMapping)
                 callback(result)
             }
 
@@ -323,8 +310,7 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 operation: UpnpResponse,
                 defaultMsg: String
             ) {
-                val result = UPnPGetSpecificMappingResult(false)
-                result.FailureReason = defaultMsg
+                val result = UPnPGetSpecificMappingResult.Failure(defaultMsg, operation)
                 callback(result)
             }
         })

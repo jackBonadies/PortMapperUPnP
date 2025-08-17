@@ -7,8 +7,8 @@ import android.net.NetworkCapabilities
 import android.net.NetworkInfo
 import android.net.wifi.WifiManager
 import android.os.Build
-import com.shinjiindustrial.portmapper.NetworkType
 import com.shinjiindustrial.portmapper.PortForwardApplication
+import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.formatIpv4
 
 data class OurNetworkInfoBundle(val networkType: NetworkType, val ourIp: String?, val gatewayIp : String?)

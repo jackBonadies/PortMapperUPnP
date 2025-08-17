@@ -139,7 +139,10 @@ import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
+import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.MAX_PORT
+import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.common.ValidationError
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.common.toMessage
@@ -147,7 +150,7 @@ import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
-import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
+import com.shinjiindustrial.portmapper.domain.ActionNames
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
@@ -915,8 +918,7 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     // if no wifi
-                                    if (interfacesUsedInSearch == null ||
-                                        !interfacesUsedInSearch.any { it.networkType == NetworkType.WIFI }
+                                    if (!interfacesUsedInSearch.any { it.networkType == NetworkType.WIFI }
                                     ) {
                                         Text(
                                             "Enable WiFi and retry",
@@ -1091,7 +1093,7 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
         {
             for (action in service.actions)
             {
-                if (UpnpManager.ActionNames.contains(action.name))
+                if (ActionNames.contains(action.name))
                 {
                     println("Service ${service.serviceType} contains relevant action ${action}")
                 }
@@ -1164,22 +1166,26 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                 if (portMapping.Enabled) "Disable" else "Enable"
                             ) {
 
-                                fun enableDisableCallback(result: UPnPCreateMappingResult) {
+                                fun enableDisableCallback(result: UPnPCreateMappingWrapperResult) {
                                     //portMapping : PortMapping,
                                     UpnpManager.enableDisableDefaultCallback(result)
                                     RunUIThread {
-                                        if (result.Success!!) {
-                                            Toast.makeText(
-                                                PortForwardApplication.appContext,
-                                                "Success",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        } else {
-                                            Toast.makeText(
-                                                PortForwardApplication.appContext,
-                                                "Failure - ${result.FailureReason!!}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+                                        when (result)
+                                        {
+                                            is UPnPCreateMappingWrapperResult.Success -> {
+                                                Toast.makeText(
+                                                    PortForwardApplication.appContext,
+                                                    "Success",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                            is UPnPCreateMappingWrapperResult.Failure -> {
+                                                Toast.makeText(
+                                                    PortForwardApplication.appContext,
+                                                    "Failure - ${result.reason}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
                                         }
                                     }
                                 }
@@ -2010,19 +2016,28 @@ fun deleteAll(chosenOnly : List<PortMapping>? = null)
             for (res in result)
             {
                 res!!
-                print(res.Success)
-                print(res.FailureReason)
-                print(res.RequestInfo?.Description)
+                when (res)
+                {
+                    is UPnPResult.Success -> {
+                        print("success")
+                        print(res.requestInfo.Description)
+                    }
+                    is UPnPResult.Failure -> {
+                        print("failure")
+                        print(res.reason)
+                        print(res.response)
+                    }
+                }
             }
 
-            val anyFailed = result.any {!it?.Success!!}
+            val anyFailed = result.any { it is UPnPResult.Failure }
 
             if(anyFailed) {
-                val res = result.first {!it?.Success!!}
+                val res = result.first { it is UPnPResult.Failure }
                 res!!
                 Toast.makeText(
                     PortForwardApplication.appContext,
-                    "Failure - ${res.FailureReason!!}",
+                    "Failure - ${(res as UPnPResult.Failure).reason}",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -2044,27 +2059,37 @@ fun deleteAll(chosenOnly : List<PortMapping>? = null)
 
 fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null)
 {
-    fun batchCallback(result : MutableList<UPnPCreateMappingResult?>) {
+    fun batchCallback(result : MutableList<UPnPCreateMappingWrapperResult?>) {
 
         RunUIThread {
 
             //debug
             for (res in result)
             {
-                res!!
-                print(res.Success)
-                print(res.FailureReason)
-                print(res.ResultingMapping?.Protocol)
+                when (res)
+                {
+                    is UPnPCreateMappingWrapperResult.Success -> {
+                        print("success")
+                        print(res.resultingMapping.Protocol)
+                    }
+                    is UPnPCreateMappingWrapperResult.Failure -> {
+                        print("failure")
+                        print(res.reason)
+                        print(res.response)
+                    }
+
+                    null -> TODO()
+                }
             }
 
-            val anyFailed = result.any {!it?.Success!!}
+            val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
 
             if(anyFailed) {
-                val res = result.first {!it?.Success!!}
+                val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
                 res!!
                 Toast.makeText(
                     PortForwardApplication.appContext,
-                    "Failure - ${res.FailureReason!!}",
+                    "Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}",
                     Toast.LENGTH_LONG
                 ).show()
             }

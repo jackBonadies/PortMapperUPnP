@@ -3,10 +3,10 @@ package com.shinjiindustrial.portmapper.domain
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.SharedPrefValues
-import com.shinjiindustrial.portmapper.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.GetUPnPClient
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
+import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
@@ -58,7 +58,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             this.actionsMap = mutableMapOf()
             for (action in _wanIPService.actions)
             {
-                if(UpnpManager.ActionNames.contains(action.name))
+                if(ActionNames.contains(action.name))
                 {
                     // are easy to call and parse output
                     actionsMap[action.name] = action
@@ -91,13 +91,14 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 //            var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings]!!
 //            getAllPortMappingsUsingListPortMappings(getPortMapping)
 //        }
-            if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry))
+            if(actionsMap.containsKey(ACTION_NAMES.GetGenericPortMappingEntry))
             {
                 OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
-                val getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetGenericPortMappingEntry]!!
+                val getPortMapping = actionsMap[ACTION_NAMES.GetGenericPortMappingEntry]!!
                 getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping)
             }
             else{
+                //TODO firebase integration
                 OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
             }
 
@@ -118,23 +119,21 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
         {
             var shouldRetry : Boolean = false
             var success : Boolean = false;
-            val actionInvocation = ActionInvocation(getPortMapping)
-            println("requesting slot $slotIndex")
-            actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
             fun callback(result : UPnPGetSpecificMappingResult)
             {
-                if (result.Success)
-                {
-                    val portMapping = result.ResultingMapping!!
-                    addOrUpdate(portMapping) //!!
-                    UpnpManager.PortInitialFoundEvent.invoke(portMapping)
-                    success = true
-                    OurLogger.log(Level.INFO, portMapping.toStringFull())
-                    retryCount = 0
-                }
-                else
-                {
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: ${result.FailureReason}.  NOTE: This is normal.")
+                when (result) {
+                    is UPnPGetSpecificMappingResult.Success -> {
+                        val portMapping = result.resultingMapping
+                        addOrUpdate(portMapping) //!!
+                        UpnpManager.PortInitialFoundEvent.invoke(portMapping)
+                        success = true
+                        OurLogger.log(Level.INFO, portMapping.toStringFull())
+                        retryCount = 0
+
+                    }
+                    is UPnPGetSpecificMappingResult.Failure -> {
+                        OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: ${result.reason}.  NOTE: This is normal.")
+                    }
                 }
             }
             val future = GetUPnPClient().getGenericPortMappingRule(this, slotIndex, ::callback)
