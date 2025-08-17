@@ -81,6 +81,24 @@ android {
         }
         exclude 'META-INF/beans.xml'
     }
+    flavorDimensions 'env'
+    productFlavors {
+        prod {
+            dimension 'env'
+        }
+        mock {
+            dimension 'env'
+        }
+    }
+    variantFilter { variant ->
+        def env = variant.flavors.find { it.dimension == "env" }?.name
+        if (variant.buildType.name == "release" && env != "prod") {
+            setIgnore(true)
+        }
+        if (variant.buildType.name == "release_no_gps" && env != "prod") {
+            setIgnore(true)
+        }
+    }
 }
 
 
