@@ -8,17 +8,24 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.AddDevice
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.UPnPNames
+import com.shinjiindustrial.portmapper.UpnpManager.Companion._initialized
+import com.shinjiindustrial.portmapper.UpnpManager.Companion._upnpService
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.formatShortName
+import com.shinjiindustrial.portmapper.domain.getIGDDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -37,6 +44,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.logging.Level
+import kotlin.math.max
 
 
 class UpnpManager {
@@ -119,14 +127,13 @@ class UpnpManager {
             HasSearched = true
             // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
             // 0-1 second response time intentional delay from devices
-            GetUPnPService()?.controlPoint?.search(1)
+            GetUPnPClient().search(1)
             //launchMockUPnPSearch(this, upnpElementsViewModel)
             return true
         }
 
         fun ClearOldData() {
-            GetUPnPService()?.registry?.removeAllLocalDevices()
-            GetUPnPService()?.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
+            GetUPnPClient().clearOldDevices()
             AnyIgdDevices?.value = false
             synchronized(lockIgdDevices)
             {
@@ -166,10 +173,11 @@ class UpnpManager {
             return Pair<MutableList<String>, String>(gatewayIps, defaultGatewayIp)
         }
 
-        fun GetUPnPService(): UpnpService {
-            return _upnpService!!
+        fun GetUPnPClient(): UpnpClient {
+            return upnpClient!!
         }
 
+        var upnpClient : UpnpClient? = null
 
         data class PortMappingFullResult(
             val description: String,
@@ -309,113 +317,19 @@ class UpnpManager {
 //            }
 
 
+            // TODO
             _upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
+            upnpClient = UpnpClient(_upnpService!!)
+            GetUPnPClient().deviceFoundEvent += { device ->
+                AddDevice(device)
+                device.EnumeratePortMappings()
+            }
             // initialization failed. no point in trying as even if we later get service, we
             //   do not re-intialize automatically
-            FailedToInitialize = !(_upnpService!!.router.isEnabled)
+            FailedToInitialize = !GetUPnPClient().isInitialized()
             if (FailedToInitialize) {
                 return false
             }
-
-            // Add a listener for device registration events
-            _upnpService!!.registry?.addListener(object : RegistryListener {
-                // ssdp datagrams have been alive and processed
-                // services are unhydrated, service descriptors not yet retrieved
-                override fun remoteDeviceDiscoveryStarted(
-                    registry: Registry,
-                    device: RemoteDevice
-                ) {
-                    println("Discovery started: " + device.displayString)
-                }
-
-                override fun remoteDeviceDiscoveryFailed(
-                    registry: Registry,
-                    device: RemoteDevice,
-                    ex: Exception
-                ) {
-                    println("Discovery failed: " + device.displayString + " => " + ex)
-                }
-
-                // complete metadata
-                override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
-
-                    //println("Device added: ${rootDevice.displayString}.  Fully Initialized? {device.isFullyHydrated()}")
-
-                    if (rootDevice.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
-                    {
-                        OurLogger.log(
-                            Level.INFO,
-                            "Device ${rootDevice.displayString} is of interest, type is ${rootDevice.type}"
-                        )
-
-                        // http://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v1-Service.pdf
-                        // Device Tree: InternetGatewayDevice > WANDevice > WANConnectionDevice
-                        // Service is WANIPConnection
-                        val wanDevice =
-                            rootDevice.embeddedDevices.firstOrNull { it.type.type == UPnPNames.WANDevice }
-                        if (wanDevice != null) {
-                            val wanConnectionDevice =
-                                wanDevice.embeddedDevices.firstOrNull { it.type.type == UPnPNames.WANConnectionDevice }
-                            if (wanConnectionDevice != null) {
-                                val wanIPService =
-                                    wanConnectionDevice.services.firstOrNull { it.serviceType.type == UPnPNames.WANIPConnection }
-                                if (wanIPService != null) {
-                                    //get relevant actions here...
-                                    //TODO add relevant service (and cause event)
-                                    val igdDevice = IGDDevice(rootDevice, wanIPService)
-                                    AddDevice(igdDevice)
-                                    //TODO get port mappings from this relevant service
-                                    igdDevice.EnumeratePortMappings()
-
-                                } else {
-                                    OurLogger.log(
-                                        Level.SEVERE,
-                                        "WanConnectionDevice does not have WanIPConnection service"
-                                    )
-                                }
-                            } else {
-                                OurLogger.log(
-                                    Level.SEVERE,
-                                    "WanConnectionDevice not found under WanDevice"
-                                )
-                            }
-                        } else {
-                            OurLogger.log(
-                                Level.SEVERE,
-                                "WanDevice not found under InternetGatewayDevice"
-                            )
-                        }
-                    } else {
-                        OurLogger.log(
-                            Level.INFO,
-                            "Device ${rootDevice.displayString} is NOT of interest, type is ${rootDevice.type}"
-                        )
-                    }
-
-                }
-
-                // expiration timestamp updated
-                override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
-
-                    println("Device updated: " + device.displayString)
-                }
-
-                override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
-                    println("Device removed: " + device.displayString)
-                }
-
-                override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
-                    println("Added local device: " + device.displayString)
-                }
-
-                override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
-                    println("Removed local device: " + device.displayString)
-                }
-
-                override fun beforeShutdown(registry: Registry) {}
-
-                override fun afterShutdown() {}
-            })
 
             _initialized = true
             return true
@@ -557,7 +471,7 @@ class UpnpManager {
             actionInvocation.setInput("NewExternalPort", remotePort)
             actionInvocation.setInput("NewProtocol", protocol)
 
-            val future = GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPClient().executeAction(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
@@ -670,7 +584,7 @@ class UpnpManager {
             )
             return CreatePortMappingRule(
                 portMappingRequest,
-                true,
+                false,
                 getEnabledDisabledString(enable).lowercase(),
                 onDisableEnableCompleteCallback
             )
@@ -680,6 +594,7 @@ class UpnpManager {
             return if (enabled) "enabled" else "disabled"
         }
 
+        // !!
         fun enableDisableDefaultCallback(result: UPnPCreateMappingResult) {
             println("adding rule callback")
             if (result.Success!!) {
@@ -788,7 +703,7 @@ class UpnpManager {
             actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
             actionInvocation.setInput("NewProtocol", portMapping.Protocol)
 
-            val future = GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPClient().executeAction(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
@@ -859,7 +774,7 @@ class UpnpManager {
             actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
             actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
 
-            val future = GetUPnPService().controlPoint.execute(object :
+            val future = GetUPnPClient().executeAction(object :
                 ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
@@ -1087,3 +1002,109 @@ class Event<T> {
             observer(value)
     }
 }
+
+// Wrapper around cling provided upnp service
+// allows us to better mock interactions
+// so we need an interface for this
+// this is our proxy for ALL cling network upnp calls
+interface IUpnpClient {
+    fun executeAction(callback: ActionCallback): Future<Any>
+
+    fun search(maxSeconds: Int)
+
+    fun clearOldDevices()
+
+    fun isInitialized(): Boolean
+
+    fun getInterfacesUsedInSearch(): MutableList<NetworkInterfaceInfo>
+
+    val deviceFoundEvent: Event<IGDDevice>
+}
+
+class UpnpClient(private val upnpService: UpnpService) : IUpnpClient
+{
+    init {
+        upnpService.registry?.addListener(object : RegistryListener {
+            // ssdp datagrams have been alive and processed
+            // services are unhydrated, service descriptors not yet retrieved
+            override fun remoteDeviceDiscoveryStarted(
+                registry: Registry,
+                device: RemoteDevice
+            ) {
+                println("Discovery started: " + device.displayString)
+            }
+
+            override fun remoteDeviceDiscoveryFailed(
+                registry: Registry,
+                device: RemoteDevice,
+                ex: Exception
+            ) {
+                println("Discovery failed: " + device.displayString + " => " + ex)
+            }
+
+            // complete metadata
+            override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
+                val igdDevice = rootDevice.getIGDDevice()
+                if (igdDevice != null) {
+                    deviceFoundEvent.invoke(igdDevice)
+                }
+            }
+
+
+            // expiration timestamp updated
+            override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
+
+                println("Device updated: " + device.displayString)
+            }
+
+            override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
+                println("Device removed: " + device.displayString)
+            }
+
+            override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
+                println("Added local device: " + device.displayString)
+            }
+
+            override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
+                println("Removed local device: " + device.displayString)
+            }
+
+            override fun beforeShutdown(registry: Registry) {}
+
+            override fun afterShutdown() {}
+        })
+    }
+
+    override fun executeAction(callback : ActionCallback): Future<Any> {
+        return upnpService.controlPoint.execute(callback)
+    }
+
+    override fun search(maxSeconds : Int)
+    {
+        return upnpService.controlPoint.search(maxSeconds)
+    }
+
+    override fun clearOldDevices()
+    {
+        upnpService.registry?.removeAllLocalDevices()
+        upnpService.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
+    }
+
+    override fun isInitialized() : Boolean
+    {
+        return upnpService.router.isEnabled
+    }
+
+    override fun getInterfacesUsedInSearch() : MutableList<NetworkInterfaceInfo>
+    {
+        return (upnpService.configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
+    }
+
+    override val deviceFoundEvent = Event<IGDDevice>()
+//    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
+//        replay = 0, extraBufferCapacity = 1
+//    )
+//    val deviceFoundEvent: SharedFlow<DeviceFoundEvent> = _deviceFoundEvent
+}
+
+//data class DeviceFoundEvent(val remoteDevice: RemoteDevice)

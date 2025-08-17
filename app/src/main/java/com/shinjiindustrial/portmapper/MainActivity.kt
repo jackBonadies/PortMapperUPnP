@@ -881,9 +881,9 @@ class MainActivity : ComponentActivity() {
                                     )
 
                                     val interfacesUsedInSearch =
-                                        (UpnpManager.GetUPnPService().configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
+                                        UpnpManager.GetUPnPClient().getInterfacesUsedInSearch()
                                     val anyInterfaces =
-                                        UpnpManager.GetUPnPService().router.isEnabled
+                                        UpnpManager.GetUPnPClient().isInitialized()
                                     if (!anyInterfaces) {
                                         Text(
                                             "No valid interfaces",
@@ -905,7 +905,7 @@ class MainActivity : ComponentActivity() {
 
                                         for (interfaceUsed in interfacesUsedInSearch!!) {
                                             Text(
-                                                "${interfaceUsed.first.displayName} (${interfaceUsed.second.networkTypeString.lowercase()})",
+                                                "${interfaceUsed.networkInterface.displayName} (${interfaceUsed.networkType.networkTypeString.lowercase()})",
                                                 modifier = Modifier
                                                     .padding(0.dp, 0.dp)
                                                     .align(Alignment.CenterHorizontally),
@@ -916,7 +916,7 @@ class MainActivity : ComponentActivity() {
 
                                     // if no wifi
                                     if (interfacesUsedInSearch == null ||
-                                        !interfacesUsedInSearch.any { it.second == NetworkType.WIFI }
+                                        !interfacesUsedInSearch.any { it.networkType == NetworkType.WIFI }
                                     ) {
                                         Text(
                                             "Enable WiFi and retry",

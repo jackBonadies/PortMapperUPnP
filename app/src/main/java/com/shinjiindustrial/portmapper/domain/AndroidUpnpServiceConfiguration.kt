@@ -42,13 +42,15 @@ class AndroidUpnpServiceConfigurationImpl(context : Context) : AndroidUpnpServic
         NetworkInterfacesUsedInfos = mutableListOf()
         for (netInterface in networkInterfaces)
         {
-            NetworkInterfacesUsedInfos?.add(Pair<java.net.NetworkInterface, NetworkType>(netInterface, OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)))
+            NetworkInterfacesUsedInfos.add(NetworkInterfaceInfo(netInterface, OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)))
         }
 
         return addressFactory
     }
 
-    var NetworkInterfacesUsed : MutableList<java.net.NetworkInterface>? = null
-    var NetworkMappings : MutableMap<String, NetworkType>? = null
-    var NetworkInterfacesUsedInfos : MutableList<Pair<java.net.NetworkInterface, NetworkType>>? = null
+    private var NetworkInterfacesUsed : MutableList<java.net.NetworkInterface>? = null
+    private var NetworkMappings : MutableMap<String, NetworkType>? = null
+    var NetworkInterfacesUsedInfos : MutableList<NetworkInterfaceInfo> = mutableListOf()
 }
+
+data class NetworkInterfaceInfo(val networkInterface : java.net.NetworkInterface, val networkType : NetworkType)

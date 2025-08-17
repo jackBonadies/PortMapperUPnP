@@ -3,7 +3,9 @@ package com.shinjiindustrial.portmapper.domain
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.SharedPrefValues
+import com.shinjiindustrial.portmapper.UpnpClient
 import com.shinjiindustrial.portmapper.UpnpManager
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.GetUPnPClient
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
@@ -108,6 +110,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     }
 
     // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
+    // TODO I dont like that this is here but the other classes that interact with Client are in UPnp manager
     private fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
         var slotIndex : Int = 0;
         var retryCount : Int = 0
@@ -118,7 +121,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             val actionInvocation = ActionInvocation(getPortMapping)
             println("requesting slot $slotIndex")
             actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
-            val future = UpnpManager.GetUPnPService().controlPoint.execute(object : ActionCallback(actionInvocation) {
+            val future = GetUPnPClient().executeAction(object : ActionCallback(actionInvocation) {
                 override fun success(invocation: ActionInvocation<*>?) {
                     invocation!!
                     retryCount = 0
