@@ -50,6 +50,11 @@ class PortMapping(
     var TimeReadLeaseDurationMs : Long = timeReadLeaseDurationMs
     var Slot : Int = pseudoSlot
 
+    // needs to be * for Verizon Router - CR1000B, but only for delete call
+    // else one will get InvalidArgs exception
+    fun getRemoteHostNormalizedForDelete(): String =
+        this.RemoteHost.ifBlank { "*" }
+
     fun getKey() : Pair<Int, String>
     {
         return Pair<Int, String>(this.ExternalPort, this.Protocol)

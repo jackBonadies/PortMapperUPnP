@@ -36,11 +36,13 @@ import com.shinjiindustrial.portmapper.RunUIThread
 import com.shinjiindustrial.portmapper.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.UPnPResult
 import com.shinjiindustrial.portmapper.UpnpManager
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.getIGDDevice
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.defaultRuleDeletedCallback
+import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
@@ -297,7 +299,8 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
 
                                     val oldRulesToDelete = ruleToEdit.splitIntoRules()
 
-                                    UpnpManager.DeletePortMapping(oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
+                                    val device: IGDDevice = getIGDDevice(oldRulesToDelete[0].externalIp)
+                                    UpnpManager.GetUPnPClient().deletePortMapping(device, oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
 
                                     navController.popBackStack()
                                 }

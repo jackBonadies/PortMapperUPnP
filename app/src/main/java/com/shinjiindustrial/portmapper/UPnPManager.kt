@@ -8,11 +8,15 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.ACTION_NAMES
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.AddDevice
+import com.shinjiindustrial.portmapper.UpnpManager.Companion.GetUPnPClient
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.UPnPNames
 import com.shinjiindustrial.portmapper.UpnpManager.Companion._initialized
 import com.shinjiindustrial.portmapper.UpnpManager.Companion._upnpService
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
+import com.shinjiindustrial.portmapper.client.IUpnpClient
+import com.shinjiindustrial.portmapper.client.UpnpClient
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
@@ -173,11 +177,11 @@ class UpnpManager {
             return Pair<MutableList<String>, String>(gatewayIps, defaultGatewayIp)
         }
 
-        fun GetUPnPClient(): UpnpClient {
+        fun GetUPnPClient(): IUpnpClient {
             return upnpClient!!
         }
 
-        var upnpClient : UpnpClient? = null
+        var upnpClient : IUpnpClient? = null
 
         data class PortMappingFullResult(
             val description: String,
@@ -207,7 +211,7 @@ class UpnpManager {
                             listOfResults[i] = result
                         }
 
-                        val future = CreatePortMappingRule(
+                        val future = CreatePortMappingRuleWrapper(
                             portMappingRequestRules[i],
                             false,
                             "created",
@@ -453,90 +457,6 @@ class UpnpManager {
         var IGDDevices: MutableList<IGDDevice> = mutableListOf()
 
 
-        fun GetSpecificPortMappingRule(
-            remoteIp: String,
-            remoteHost: String,
-            remotePort: String,
-            protocol: String,
-            callback: (UPnPCreateMappingResult) -> Unit
-        )
-                : Future<Any> {
-
-
-            val device: IGDDevice = getIGDDevice(remoteIp)
-            val action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
-            val actionInvocation = ActionInvocation(action)
-            // this is actually remote host
-            actionInvocation.setInput("NewRemoteHost", remoteHost)
-            actionInvocation.setInput("NewExternalPort", remotePort)
-            actionInvocation.setInput("NewProtocol", protocol)
-
-            val future = GetUPnPClient().executeAction(object :
-                ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
-
-
-                    val internalPort = actionInvocation.getOutput("NewInternalPort")
-                    val internalClient = actionInvocation.getOutput("NewInternalClient")
-                    val enabled = actionInvocation.getOutput("NewEnabled")
-                    val description = actionInvocation.getOutput("NewPortMappingDescription")
-                    val leaseDuration = actionInvocation.getOutput("NewLeaseDuration")
-
-                    val pm = PortMapping(
-                        description.toString(),
-                        remoteHost,
-                        internalClient.toString(),
-                        remotePort.toInt(),
-                        internalPort.toString().toInt(),
-                        protocol,
-                        enabled.toString().toInt() == 1,
-                        leaseDuration.toString().toInt(),
-                        remoteIp,
-                        System.currentTimeMillis(),
-                        GetPsuedoSlot()
-                    ) // best bet for DateTime.UtcNow
-
-                    OurLogger.log(
-                        Level.INFO,
-                        "Successfully read back our new rule (${pm.shortName()})"
-                    )
-
-                    val result = UPnPCreateMappingResult(true, true)
-                    result.ResultingMapping = pm
-                    callback(result)
-                }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
-                    println(defaultMsg)
-
-                    println(operation.statusMessage)
-                    println(operation.responseDetails)
-                    println(operation.statusCode)
-                    println(operation.isFailed)
-
-                    val rule = formatShortName(protocol, remoteIp, remotePort)
-                    OurLogger.log(
-                        Level.SEVERE,
-                        "Failed to read back our new rule ($rule)."
-                    )
-                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
-
-                    val result = UPnPCreateMappingResult(false, true)
-                    result.UPnPFailureResponse = operation
-                    result.FailureReason = defaultMsg
-                    callback(result)
-                }
-            })
-
-
-            return future
-        }
-
         fun DisableEnablePortMappingEntry(
             portMapping: PortMapping,
             enable: Boolean,
@@ -582,7 +502,7 @@ class UpnpManager {
                 enable,
                 portMapping.RemoteHost
             )
-            return CreatePortMappingRule(
+            return CreatePortMappingRuleWrapper(
                 portMappingRequest,
                 false,
                 getEnabledDisabledString(enable).lowercase(),
@@ -636,10 +556,9 @@ class UpnpManager {
                     }
                 }
 
-                val future = DeletePortMapping(portMapping, ::callback)
-                return future
-
-
+            val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
+            val future =  GetUPnPClient().deletePortMapping(device, portMapping, ::callback)
+            return future
         }
 
         fun DeletePortMappingsEntry(
@@ -662,7 +581,8 @@ class UpnpManager {
 
                         println("Requesting Delete: $i")
 
-                        val future = DeletePortMapping(portMappings[i], ::callback)
+                        val device: IGDDevice = getIGDDevice(portMappings[i].ActualExternalIP)
+                        val future = GetUPnPClient().deletePortMapping(device,portMappings[i], ::callback)
                         future.get()
                     }
 
@@ -686,72 +606,10 @@ class UpnpManager {
 
         //TODO: if List all port mappings exists, that should be used instead of getgeneric.
 
-        // needs to be * for Verizon Router - CR1000B, but only for delete call
-        // else one will get InvalidArgs exception
-        private fun normalizeRemoteHostForDelete(remoteHost: String): String =
-            remoteHost.ifBlank { "*" }
 
-        fun DeletePortMapping(
-            portMapping: PortMapping,
-            callback: (UPnPResult) -> Unit
-        ): Future<Any> {
-            val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
-            val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
-            val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", normalizeRemoteHostForDelete(portMapping.RemoteHost))
-            // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-            actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
-            actionInvocation.setInput("NewProtocol", portMapping.Protocol)
-
-            val future = GetUPnPClient().executeAction(object :
-                ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
-                    println("Successfully deleted")
-
-                    OurLogger.log(
-                        Level.INFO,
-                        "Successfully deleted rule (${portMapping.shortName()})."
-                    )
-
-                    val result = UPnPResult(true)
-                    result.RequestInfo = portMapping
-                    callback(result)
-
-                }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
-                    // Handle failure
-                    println(defaultMsg)
-
-                    println(operation.statusMessage)
-                    println(operation.responseDetails)
-                    println(operation.statusCode)
-                    println(operation.isFailed)
-
-                    OurLogger.log(
-                        Level.SEVERE,
-                        "Failed to delete rule (${portMapping.shortName()})."
-                    )
-                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
-
-                    val result = UPnPResult(false)
-                    result.FailureReason = defaultMsg
-                    result.UPnPFailureResponse = operation
-                    callback(result)
-                }
-            })
-
-            return future
-
-        }
 
         // this method creates a rule, then grabs it again to verify it.
-        fun CreatePortMappingRule(
+        fun CreatePortMappingRuleWrapper(
             portMappingRequest: PortMappingRequest,
             skipReadingBack: Boolean,
             createContext: String,
@@ -760,25 +618,11 @@ class UpnpManager {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
 
             val externalIp = portMappingRequest.externalIp
-
             val device: IGDDevice = getIGDDevice(externalIp)
-            val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
-            val actionInvocation = ActionInvocation(action)
-            actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost)
-            // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-            actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort)
-            actionInvocation.setInput("NewProtocol", portMappingRequest.protocol)
-            actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort)
-            actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp)
-            actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0")
-            actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
-            actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
+            fun createCallback(createMappingResult: UPnPCreateMappingResult2) {
 
-            val future = GetUPnPClient().executeAction(object :
-                ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
-
+                if (createMappingResult.Success)
+                {
                     OurLogger.log(
                         Level.INFO,
                         "Successfully $createContext rule (${
@@ -791,8 +635,8 @@ class UpnpManager {
                         result.ResultingMapping = portMappingRequest.realize()
                         callback(result)
                     } else {
-                        val specificFuture = GetSpecificPortMappingRule(
-                            portMappingRequest.externalIp,
+                        val specificFuture = GetUPnPClient().getSpecificPortMappingRule(
+                            device,
                             portMappingRequest.remoteHost,
                             portMappingRequest.externalPort,
                             portMappingRequest.protocol,
@@ -800,35 +644,19 @@ class UpnpManager {
                         )
                         specificFuture.get()
                     }
-
                 }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
-                    // Handle failure
-                    println(defaultMsg)
-
-                    println(operation.statusMessage)
-                    println(operation.responseDetails)
-                    println(operation.statusCode)
-                    println(operation.isFailed)
-
-                    OurLogger.log(
-                        Level.SEVERE,
-                        "Failed to create rule (${portMappingRequest.realize().shortName()})."
-                    )
-                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
-
+                else
+                {
+                    // TODO: 1 should derive from 2
                     val result = UPnPCreateMappingResult(false, false)
-                    result.FailureReason = defaultMsg
-                    result.UPnPFailureResponse = operation
+                    result.FailureReason = createMappingResult.FailureReason
+                    result.RequestInfo = createMappingResult.RequestInfo
+                    result.ResultingMapping = createMappingResult.RequestedMapping
+                    result.UPnPFailureResponse = createMappingResult.UPnPFailureResponse
                     callback(result)
                 }
-            })
-
+            }
+            var future = GetUPnPClient().createPortMappingRule(device, portMappingRequest, ::createCallback)
             return future
         }
 
@@ -901,6 +729,11 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 //CompletableFuture is api >=24
 //basic futures do not implement continuewith...
 
+class UPnPCreateMappingResult2(success: Boolean, wasReadBack : Boolean) : UPnPResult(success)
+{
+    var RequestedMapping : PortMapping? = null
+}
+
 class UPnPCreateMappingResult(success: Boolean, wasReadBack : Boolean) : UPnPResult(success)
 {
     var ResultingMapping : PortMapping? = null
@@ -912,6 +745,9 @@ class UPnPCreateMappingResult(success: Boolean, wasReadBack : Boolean) : UPnPRes
 
 class UPnPGetSpecificMappingResult : UPnPResult
 {
+    constructor(portMapping : PortMapping, success: Boolean) : this(success) {
+        ResultingMapping = portMapping
+    }
     constructor(success : Boolean) : super(success)
     var ResultingMapping : PortMapping? = null
 }
@@ -1002,109 +838,3 @@ class Event<T> {
             observer(value)
     }
 }
-
-// Wrapper around cling provided upnp service
-// allows us to better mock interactions
-// so we need an interface for this
-// this is our proxy for ALL cling network upnp calls
-interface IUpnpClient {
-    fun executeAction(callback: ActionCallback): Future<Any>
-
-    fun search(maxSeconds: Int)
-
-    fun clearOldDevices()
-
-    fun isInitialized(): Boolean
-
-    fun getInterfacesUsedInSearch(): MutableList<NetworkInterfaceInfo>
-
-    val deviceFoundEvent: Event<IGDDevice>
-}
-
-class UpnpClient(private val upnpService: UpnpService) : IUpnpClient
-{
-    init {
-        upnpService.registry?.addListener(object : RegistryListener {
-            // ssdp datagrams have been alive and processed
-            // services are unhydrated, service descriptors not yet retrieved
-            override fun remoteDeviceDiscoveryStarted(
-                registry: Registry,
-                device: RemoteDevice
-            ) {
-                println("Discovery started: " + device.displayString)
-            }
-
-            override fun remoteDeviceDiscoveryFailed(
-                registry: Registry,
-                device: RemoteDevice,
-                ex: Exception
-            ) {
-                println("Discovery failed: " + device.displayString + " => " + ex)
-            }
-
-            // complete metadata
-            override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
-                val igdDevice = rootDevice.getIGDDevice()
-                if (igdDevice != null) {
-                    deviceFoundEvent.invoke(igdDevice)
-                }
-            }
-
-
-            // expiration timestamp updated
-            override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
-
-                println("Device updated: " + device.displayString)
-            }
-
-            override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
-                println("Device removed: " + device.displayString)
-            }
-
-            override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
-                println("Added local device: " + device.displayString)
-            }
-
-            override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
-                println("Removed local device: " + device.displayString)
-            }
-
-            override fun beforeShutdown(registry: Registry) {}
-
-            override fun afterShutdown() {}
-        })
-    }
-
-    override fun executeAction(callback : ActionCallback): Future<Any> {
-        return upnpService.controlPoint.execute(callback)
-    }
-
-    override fun search(maxSeconds : Int)
-    {
-        return upnpService.controlPoint.search(maxSeconds)
-    }
-
-    override fun clearOldDevices()
-    {
-        upnpService.registry?.removeAllLocalDevices()
-        upnpService.registry?.removeAllRemoteDevices() // otherwise Add wont be called again (just Update)
-    }
-
-    override fun isInitialized() : Boolean
-    {
-        return upnpService.router.isEnabled
-    }
-
-    override fun getInterfacesUsedInSearch() : MutableList<NetworkInterfaceInfo>
-    {
-        return (upnpService.configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
-    }
-
-    override val deviceFoundEvent = Event<IGDDevice>()
-//    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
-//        replay = 0, extraBufferCapacity = 1
-//    )
-//    val deviceFoundEvent: SharedFlow<DeviceFoundEvent> = _deviceFoundEvent
-}
-
-//data class DeviceFoundEvent(val remoteDevice: RemoteDevice)

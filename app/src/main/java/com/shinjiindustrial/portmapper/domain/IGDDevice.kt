@@ -3,7 +3,7 @@ package com.shinjiindustrial.portmapper.domain
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.SharedPrefValues
-import com.shinjiindustrial.portmapper.UpnpClient
+import com.shinjiindustrial.portmapper.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.GetUPnPClient
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
@@ -121,49 +121,23 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             val actionInvocation = ActionInvocation(getPortMapping)
             println("requesting slot $slotIndex")
             actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
-            val future = GetUPnPClient().executeAction(object : ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
-                    retryCount = 0
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
-
-                    val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
-                    val externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
-                    val internalClient = invocation.getOutput("NewInternalClient") //string datatype
-                    val internalPort = invocation.getOutput("NewInternalPort")
-                    val protocol = invocation.getOutput("NewProtocol")
-                    val description = invocation.getOutput("NewPortMappingDescription")
-                    val enabled = invocation.getOutput("NewEnabled")
-                    val leaseDuration = invocation.getOutput("NewLeaseDuration")
-                    val portMapping = PortMapping(
-                        description.toString(),
-                        remoteHost.toString(),
-                        internalClient.toString(),
-                        externalPort.toString().toInt(),
-                        internalPort.toString().toInt(),
-                        protocol.toString(),
-                        enabled.toString().toInt() == 1,
-                        leaseDuration.toString().toInt(),
-                        ipAddress,
-                        System.currentTimeMillis(),
-                        slotIndex)
+            fun callback(result : UPnPGetSpecificMappingResult)
+            {
+                if (result.Success)
+                {
+                    val portMapping = result.ResultingMapping!!
                     addOrUpdate(portMapping) //!!
                     UpnpManager.PortInitialFoundEvent.invoke(portMapping)
                     success = true
                     OurLogger.log(Level.INFO, portMapping.toStringFull())
-                }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
                     retryCount = 0
-                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: $defaultMsg.  NOTE: This is normal.")
-                    // Handle failure
                 }
-            })
-
+                else
+                {
+                    OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: ${result.FailureReason}.  NOTE: This is normal.")
+                }
+            }
+            val future = GetUPnPClient().getGenericPortMappingRule(this, slotIndex, ::callback)
             try {
                 future.get() // SYNCHRONOUS (note this can, and does, throw)
             }
