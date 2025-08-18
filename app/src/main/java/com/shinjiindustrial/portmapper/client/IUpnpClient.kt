@@ -13,11 +13,11 @@ import java.util.concurrent.Future
 // so we need an interface for this
 // this is our proxy for ALL cling network upnp calls
 interface IUpnpClient {
-    fun createPortMappingRule(
+
+    suspend fun createPortMappingRule(
         device: IGDDevice,
         portMappingRequest: PortMappingRequest,
-        callback: (UPnPCreateMappingResult) -> Unit
-    ): Future<Any>
+    ) : UPnPCreateMappingResult
 
     fun deletePortMapping(
         device: IGDDevice,

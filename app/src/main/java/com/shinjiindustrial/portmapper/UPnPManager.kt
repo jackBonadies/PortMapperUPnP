@@ -25,11 +25,13 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.model.message.UpnpResponse
 import java.util.TreeSet
 import java.util.concurrent.Callable
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.logging.Level
@@ -149,13 +151,12 @@ class UpnpManager {
                             listOfResults[i] = result
                         }
 
-                        val future = CreatePortMappingRuleWrapper(
+                        runBlocking { CreatePortMappingRuleWrapper(
                             portMappingRequestRules[i],
                             false,
                             "created",
                             ::callback
-                        )
-                        future.get()
+                        ) }
                     }
 
                     onCompleteBatchCallback(listOfResults)
@@ -417,12 +418,16 @@ class UpnpManager {
                 enable,
                 portMapping.RemoteHost
             )
-            return CreatePortMappingRuleWrapper(
-                portMappingRequest,
-                false,
-                getEnabledDisabledString(enable).lowercase(),
-                onDisableEnableCompleteCallback
-            )
+//            Future.CompletedFuture(null)
+//            return CreatePortMappingRuleWrapper(
+//                portMappingRequest,
+//                false,
+//                getEnabledDisabledString(enable).lowercase(),
+//                onDisableEnableCompleteCallback
+//            )
+//            val completedFuture = CompletableFuture.completedFuture("");
+//            return completedFuture
+            return DisableEnablePortMapping(portMapping, enable,onDisableEnableCompleteCallback)//TODO revert
         }
 
         fun getEnabledDisabledString(enabled: Boolean): String {
@@ -512,7 +517,7 @@ class UpnpManager {
                 }
             }
 
-            val task = FutureTask(callable)
+            val task = FutureTask(callable) //TODO
             Thread(task).start()
             return task // a FutureTask is a Future
         }
@@ -522,52 +527,48 @@ class UpnpManager {
 
 
         // this method creates a rule, then grabs it again to verify it.
-        fun CreatePortMappingRuleWrapper(
+        suspend fun CreatePortMappingRuleWrapper(
             portMappingRequest: PortMappingRequest,
             skipReadingBack: Boolean,
             createContext: String,
             callback: (UPnPCreateMappingWrapperResult) -> Unit
-        ): Future<Any> {
+        ) {
             //var completeableFuture = CompletableFuture<UPnPCreateMappingResult>()
 
             val externalIp = portMappingRequest.externalIp
             val device: IGDDevice = getIGDDevice(externalIp)
-            fun createCallback(createMappingResult: UPnPCreateMappingResult) {
-
-                when (createMappingResult)
+            val createMappingResult = GetUPnPClient().createPortMappingRule(device, portMappingRequest)
+            when (createMappingResult)
+            {
+                is UPnPCreateMappingResult.Success ->
                 {
-                    is UPnPCreateMappingResult.Success ->
-                    {
-                        OurLogger.log(
-                            Level.INFO,
-                            "Successfully $createContext rule (${
-                                portMappingRequest.realize().shortName()
-                            })."
-                        )
-                        println("Successfully added, now reading back")
-                        if (skipReadingBack) {
-                            val result = UPnPCreateMappingWrapperResult.Success(portMappingRequest.realize(), portMappingRequest.realize(), false)
-                            callback(result)
-                        } else {
-                            val specificFuture = GetUPnPClient().getSpecificPortMappingRule(
-                                device,
-                                portMappingRequest.remoteHost,
-                                portMappingRequest.externalPort,
-                                portMappingRequest.protocol,
-                                callback
-                            )
-                            specificFuture.get()
-                        }
-                    }
-                    is UPnPCreateMappingResult.Failure ->
-                    {
-                        val result = UPnPCreateMappingWrapperResult.Failure(createMappingResult.reason, createMappingResult.response)
+                    OurLogger.log(
+                        Level.INFO,
+                        "Successfully $createContext rule (${
+                            portMappingRequest.realize().shortName()
+                        })."
+                    )
+                    println("Successfully added, now reading back")
+                    if (skipReadingBack) {
+                        val result = UPnPCreateMappingWrapperResult.Success(portMappingRequest.realize(), portMappingRequest.realize(), false)
                         callback(result)
+                    } else {
+                        val specificFuture = GetUPnPClient().getSpecificPortMappingRule(
+                            device,
+                            portMappingRequest.remoteHost,
+                            portMappingRequest.externalPort,
+                            portMappingRequest.protocol,
+                            callback
+                        )
+                        specificFuture.get()
                     }
                 }
+                is UPnPCreateMappingResult.Failure ->
+                {
+                    val result = UPnPCreateMappingWrapperResult.Failure(createMappingResult.reason, createMappingResult.response)
+                    callback(result)
+                }
             }
-            var future = GetUPnPClient().createPortMappingRule(device, portMappingRequest, ::createCallback)
-            return future
         }
 
         fun getIGDDevice(ipAddr: String): IGDDevice {

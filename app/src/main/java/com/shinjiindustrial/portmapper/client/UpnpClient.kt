@@ -11,6 +11,7 @@ import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getIGDDevice
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fourthline.cling.UpnpService
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
@@ -21,6 +22,7 @@ import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import java.util.concurrent.Future
 import java.util.logging.Level
+import kotlin.coroutines.resume
 
 class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
     init {
@@ -79,58 +81,58 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
         return upnpService.controlPoint.execute(callback)
     }
 
-    override fun createPortMappingRule(
+    override suspend fun createPortMappingRule(
         device: IGDDevice,
         portMappingRequest: PortMappingRequest,
-        callback: (UPnPCreateMappingResult) -> Unit
-    ): Future<Any> {
-        val externalIp = portMappingRequest.externalIp
-        val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
-        val actionInvocation = ActionInvocation(action)
-        actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost)
-        // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
-        actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort)
-        actionInvocation.setInput("NewProtocol", portMappingRequest.protocol)
-        actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort)
-        actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp)
-        actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0")
-        actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
-        actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
+    ) : UPnPCreateMappingResult =
+        suspendCancellableCoroutine { cont ->
+                val externalIp = portMappingRequest.externalIp
+                val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
+                val actionInvocation = ActionInvocation(action)
+                actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost)
+                // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
+                actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort)
+                actionInvocation.setInput("NewProtocol", portMappingRequest.protocol)
+                actionInvocation.setInput("NewInternalPort", portMappingRequest.internalPort)
+                actionInvocation.setInput("NewInternalClient", portMappingRequest.internalIp)
+                actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0")
+                actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
+                actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
+            val future = this.executeAction(object :
+                ActionCallback(actionInvocation) {
+                override fun success(invocation: ActionInvocation<*>?) {
+                    invocation!!
+                    val result = UPnPCreateMappingResult.Success(portMappingRequest.realize())
+                    cont.resume(result)
+                    //callback(result)
+                }
 
-        val future = this.executeAction(object :
-            ActionCallback(actionInvocation) {
-            override fun success(invocation: ActionInvocation<*>?) {
-                invocation!!
-                val result = UPnPCreateMappingResult.Success(portMappingRequest.realize())
-                callback(result)
-            }
+                override fun failure(
+                    invocation: ActionInvocation<*>?,
+                    operation: UpnpResponse,
+                    defaultMsg: String
+                ) {
+                    // Handle failure
+                    println(defaultMsg)
 
-            override fun failure(
-                invocation: ActionInvocation<*>?,
-                operation: UpnpResponse,
-                defaultMsg: String
-            ) {
-                // Handle failure
-                println(defaultMsg)
+                    println(operation.statusMessage)
+                    println(operation.responseDetails)
+                    println(operation.statusCode)
+                    println(operation.isFailed)
 
-                println(operation.statusMessage)
-                println(operation.responseDetails)
-                println(operation.statusCode)
-                println(operation.isFailed)
+                    OurLogger.log(
+                        Level.SEVERE,
+                        "Failed to create rule (${portMappingRequest.realize().shortName()})."
+                    )
+                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
 
-                OurLogger.log(
-                    Level.SEVERE,
-                    "Failed to create rule (${portMappingRequest.realize().shortName()})."
-                )
-                OurLogger.log(Level.SEVERE, "\t$defaultMsg")
-
-                val result = UPnPCreateMappingResult.Failure(defaultMsg, operation)
-                callback(result)
-            }
-        })
-
-        return future
-    }
+                    val result = UPnPCreateMappingResult.Failure(defaultMsg, operation)
+                    cont.resume(result)
+                    //callback(result)
+                }
+            })
+            cont.invokeOnCancellation { future.cancel(true) }
+        }
 
     override fun deletePortMapping(
         device: IGDDevice,
