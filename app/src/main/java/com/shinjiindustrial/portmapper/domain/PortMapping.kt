@@ -74,6 +74,10 @@ class PortMapping(
 
     fun getRemainingLeaseTimeString() : String
     {
+        if (this.LeaseDuration == 0)
+        {
+            return "Never"
+        }
         // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
         val totalSecs = getRemainingLeaseTime()
 
