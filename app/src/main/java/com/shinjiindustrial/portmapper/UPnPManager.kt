@@ -35,13 +35,14 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.logging.Level
+import javax.inject.Inject
 
 
 class UpnpManager {
 
-
     companion object { //singleton
-        private var _upnpService: UpnpService? = null
+
+        lateinit var upnpClient : IUpnpClient
         private var _initialized: Boolean = false
         var HasSearched: Boolean = false
         var AnyIgdDevices: MutableState<Boolean>? = null
@@ -124,10 +125,8 @@ class UpnpManager {
         }
 
         fun GetUPnPClient(): IUpnpClient {
-            return upnpClient!!
+            return upnpClient
         }
-
-        var upnpClient : IUpnpClient? = null
 
         suspend fun CreatePortMappingRulesEntry(
             portMappingUserInput: PortMappingUserInput,
@@ -216,8 +215,8 @@ class UpnpManager {
             }
 
             // TODO
-            _upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
-            upnpClient = UpnpClient(_upnpService!!)
+            val _upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
+            upnpClient = UpnpClient(_upnpService)
             GetUPnPClient().deviceFoundEvent += { device ->
                 // this is on the cling thread
                 AddDevice(device)

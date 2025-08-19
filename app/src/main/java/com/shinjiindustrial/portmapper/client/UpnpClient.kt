@@ -22,9 +22,10 @@ import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import java.util.concurrent.Future
 import java.util.logging.Level
+import javax.inject.Inject
 import kotlin.coroutines.resume
 
-class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
+class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUpnpClient {
 
     sealed class ClingExecutionResult {
         data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()

@@ -139,6 +139,7 @@ import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.MAX_PORT
@@ -163,6 +164,7 @@ import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -179,6 +181,7 @@ import java.util.logging.Level
 import java.util.logging.LogRecord
 import java.util.logging.Logger
 import java.util.logging.SimpleFormatter
+import javax.inject.Inject
 import kotlin.random.Random
 
 var PseudoSlotCounter : Int = MAX_PORT // as starting slot
@@ -213,31 +216,6 @@ class StringBuilderHandler(private val stringBuilder: SnapshotStateList<String>)
       }
 }
 
-class FileHandlerExample {
-
-    fun setupLogger() {
-        val logger = Logger.getLogger("")
-        val fh: FileHandler
-
-        try {
-            // This block configure the logger with handler and formatter
-            fh = FileHandler("MyLogFile.log")
-            logger.addHandler(fh)
-            val formatter = SimpleFormatter()
-            fh.formatter = formatter
-
-            // the following statement is used to log any messages
-            logger.info("My first log")
-
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-    }
-}
-
-
 enum class Protocol(val protocol: String) {
     TCP("TCP"),
     UDP("UDP"),
@@ -249,6 +227,7 @@ enum class Protocol(val protocol: String) {
 }
 
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     fun deviceFoundHandler(remoteDevice: IGDDevice) {
@@ -256,37 +235,20 @@ class MainActivity : ComponentActivity() {
             mainSearchInProgressAndNothingFoundYet?.value = false
         }
         UpnpManager.invokeUpdateUIFromData()
-        //updateUIFromData()
-//        runOnUiThread {
-//            mainSearchInProgressAndNothingFoundYet?.value = false
-//            Log.i("portmapperUI", "deviceFoundHandler add device")
-//            upnpElementsViewModel.addItem(UPnPViewElement(remoteDevice)) // calls LiveData.setValue i.e. must be done on UI thread
-//        }
     }
 
     fun portMappingAddedHandler(portMapping: PortMapping) {
-//        runOnUiThread {
-//            upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
-//        }
         UpnpManager.invokeUpdateUIFromData()
-        // we dont know if this rule already exists. and so we dont want to add it twice.
-        //updateUIFromData(null)
     }
 
     fun portMappingFoundHandler(portMapping: PortMapping) {
         UpnpManager.invokeUpdateUIFromData()
-        //updateUIFromData()
-//        runOnUiThread {
-//            upnpElementsViewModel.addItem(UPnPViewElement(portMapping)) // calls LiveData.setValue i.e. must be done on UI thread
-//        }
     }
 
     fun deviceFinishedListingPortsHandler(remoteDevice: IGDDevice) {
         if (remoteDevice.portMappings.isEmpty()) {
             UpnpManager.invokeUpdateUIFromData()
         }
-        //updateUIFromData()
-
     }
 
     fun searchStarted(o: Any?) {

@@ -13,6 +13,7 @@ import androidx.datastore.dataStore
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.shinjiindustrial.portmapper.common.SortBy
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ private val Context.dataStore by preferencesDataStore("preferences")
 //TODO group by algorithm. way to convert from grouped port mappings to individial
 //TODO are "slots" ordering important?
 //TODO swipe to refresh still broken...
+@HiltAndroidApp
 class PortForwardApplication : Application() {
 
     override fun onCreate() {
