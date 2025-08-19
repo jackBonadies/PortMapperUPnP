@@ -7,6 +7,7 @@ import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.GetUPnPClient
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.lockIgdDevices
 import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
+import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
@@ -77,7 +78,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
         }
     }
 
-    fun EnumeratePortMappings()
+    suspend fun EnumeratePortMappings()
     {
         // we enumerate port mappings later
         portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
@@ -112,15 +113,16 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 
     // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
     // TODO I dont like that this is here but the other classes that interact with Client are in UPnp manager
-    private fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
+    private suspend fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
         var slotIndex : Int = 0;
         var retryCount : Int = 0
         while(true)
         {
             var shouldRetry : Boolean = false
             var success : Boolean = false;
-            fun callback(result : UPnPGetSpecificMappingResult)
-            {
+            try {
+                //future.get() // SYNCHRONOUS (note this can, and does, throw)
+                val result = GetUPnPClient().getGenericPortMappingRule(this, slotIndex)
                 when (result) {
                     is UPnPGetSpecificMappingResult.Success -> {
                         val portMapping = result.resultingMapping
@@ -135,10 +137,6 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
                         OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: ${result.reason}.  NOTE: This is normal.")
                     }
                 }
-            }
-            val future = GetUPnPClient().getGenericPortMappingRule(this, slotIndex, ::callback)
-            try {
-                future.get() // SYNCHRONOUS (note this can, and does, throw)
             }
             catch(e : Exception)
             {

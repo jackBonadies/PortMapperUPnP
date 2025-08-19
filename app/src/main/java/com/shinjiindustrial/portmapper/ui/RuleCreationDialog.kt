@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -46,7 +47,12 @@ import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.logging.Level
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,12 +61,12 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
     val isPreview = false
 
     val hasSubmitted = remember { mutableStateOf(false) }
-    val internalPortText = remember { mutableStateOf(ruleToEdit?.internalRange ?: "") }
-    val internalPortTextEnd = remember { mutableStateOf("") }
-    val externalPortText = remember { mutableStateOf(ruleToEdit?.externalRange ?: "") }
-    val externalPortTextEnd = remember { mutableStateOf("") }
-    val leaseDuration = remember { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
-    val description = remember { mutableStateOf(ruleToEdit?.description ?: "") }
+    val internalPortText = rememberSaveable  { mutableStateOf(ruleToEdit?.internalRange ?: "") }
+    val internalPortTextEnd = rememberSaveable  { mutableStateOf("") }
+    val externalPortText = rememberSaveable  { mutableStateOf(ruleToEdit?.externalRange ?: "") }
+    val externalPortTextEnd = rememberSaveable  { mutableStateOf("") }
+    val leaseDuration = rememberSaveable { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
+    val description = rememberSaveable { mutableStateOf(ruleToEdit?.description ?: "") }
     val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).hasError) }
     val startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).hasError) }
     val endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).hasError) }
@@ -86,6 +92,15 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
         val version = UpnpManager.GetDeviceByExternalIp(defaultGatewayIp)?.upnpTypeVersion ?: 2
         version == 1
     } }
+
+
+    // TODO
+    // var description by rememberSaveable { mutableStateOf(ruleToEdit?.description ?: "") }
+    //val descriptionHasError by remember(description) {
+    //  derivedStateOf { validateDescription(description).hasError }
+    //}
+
+    //
     //END
 
     // this can be null as its possible to start at this navhost
@@ -208,12 +223,15 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
 
                             val modifyCase = ruleToEdit != null
 
-                            fun batchCallback(result: MutableList<UPnPCreateMappingWrapperResult?>) {
+
+                            // TODO vm.createRule
+                            // TODO vm.events -> UiEvents that are collected then launch effect
+
+                            fun batchCallback(result: List<UPnPCreateMappingWrapperResult>) {
 
                                 RunUIThread {
                                     //debug
                                     for (res in result) {
-                                        res!!
                                         when (res)
                                         {
                                             is UPnPCreateMappingWrapperResult.Failure -> {
@@ -241,26 +259,19 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                                             if (result.size == 1) {
                                                 showSnackBarViewLog("Failed to $verbString rule.")
                                             } else {
-                                                showSnackBarViewLog("Failed to create rules.")
+                                                showSnackBarViewLog("Failed to create rules.") // emit these
                                             }
                                         } else {
                                             showSnackBarViewLog("Failed to create some rules.")
                                         }
-
-
-//                                            var res = result[0]
-//                                            res!!
-//                                            // this will always be too long (text length) for a toast.
-//                                            Toast.makeText(
-//                                                PortForwardApplication.appContext,
-//                                                "Failure - ${res.FailureReason!!}",
-//                                                Toast.LENGTH_LONG
-//                                            ).show()
                                     } else {
                                         showSnackBarShortNoAction("Success!")
                                     }
                                 }
                             }
+
+                            GlobalScope.launch(Dispatchers.Main) {
+
 
                             if(ruleToEdit != null)
                             {
@@ -276,52 +287,55 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                                 {
                                     // delete old rule and add new rules...
 
-                                    fun onDeleteCallback(result: UPnPResult) {
-
-                                        try {
-                                            defaultRuleDeletedCallback(result)
-                                            RunUIThread {
-                                                println("delete callback")
-                                                when(result)
-                                                {
-                                                    is UPnPResult.Success ->
-                                                    {
-                                                        // if successfully deleted original rule,
-                                                        //   add new rule.
-                                                        UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback)
-                                                    }
-                                                    is UPnPResult.Failure ->
-                                                    {
-                                                        // the old rule must still be remaining if it failed to delete
-                                                        // so nothing has changed.
-                                                        showSnackBarViewLog("Failed to modify entry.")
-                                                    }
-                                                }
-                                            }
-                                        } catch (exception: Exception) {
-                                            PortForwardApplication.OurLogger.log(
-                                                Level.SEVERE,
-                                                "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-                                            )
-                                            showSnackBarViewLog("Failed to modify entry.")
-                                            throw exception
-                                        }
-                                    }
 
                                     val oldRulesToDelete = ruleToEdit.splitIntoRules()
 
                                     val device: IGDDevice = getIGDDevice(oldRulesToDelete[0].externalIp)
-                                    UpnpManager.GetUPnPClient().deletePortMapping(device, oldRulesToDelete[0].realize(), ::onDeleteCallback) //TODO: handle delete multiple (when that becomes a thing)
+                                    val result = UpnpManager.GetUPnPClient().deletePortMapping(device, oldRulesToDelete[0].realize()) //TODO: handle delete multiple (when that becomes a thing)
+
+                                    try {
+                                        defaultRuleDeletedCallback(result)
+                                        RunUIThread {
+                                            println("delete callback")
+                                            when(result)
+                                            {
+                                                is UPnPResult.Success ->
+                                                {
+                                                    // if successfully deleted original rule,
+                                                    //   add new rule.
+                                                    runBlocking {
+                                                        val result = UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput)
+                                                        batchCallback(result)
+                                                    }
+                                                }
+                                                is UPnPResult.Failure ->
+                                                {
+                                                    // the old rule must still be remaining if it failed to delete
+                                                    // so nothing has changed.
+                                                    showSnackBarViewLog("Failed to modify entry.")
+                                                }
+                                            }
+                                        }
+                                    } catch (exception: Exception) {
+                                        PortForwardApplication.OurLogger.log(
+                                            Level.SEVERE,
+                                            "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                                        )
+                                        showSnackBarViewLog("Failed to modify entry.")
+                                        throw exception
+                                    }
 
                                     navController.popBackStack()
                                 }
                             }
                             else
                             {
-                                UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput, ::batchCallback) //spilts into rules
+                                val result = UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput) //spilts into rules
+                                batchCallback(result)
                                 //showDialogMutable.value = false
 
                                 navController.popBackStack()
+                            }
                             }
                         }
                     ) {

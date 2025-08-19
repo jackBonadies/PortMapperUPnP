@@ -19,24 +19,21 @@ interface IUpnpClient {
         portMappingRequest: PortMappingRequest,
     ) : UPnPCreateMappingResult
 
-    fun deletePortMapping(
+    suspend fun deletePortMapping(
         device: IGDDevice,
         portMapping: PortMapping,
-        callback: (UPnPResult) -> Unit
-    ): Future<Any>
+    ): UPnPResult
 
-    fun getSpecificPortMappingRule(
+    suspend fun getSpecificPortMappingRule(
         device: IGDDevice,
         remoteHost: String,
         remotePort: String,
         protocol: String,
-        callback: (UPnPCreateMappingWrapperResult) -> Unit
-    ) : Future<Any>
+    ) : UPnPCreateMappingWrapperResult
 
-    fun getGenericPortMappingRule(device : IGDDevice,
+    suspend fun getGenericPortMappingRule(device : IGDDevice,
         slotIndex : Int,
-        callback: (UPnPGetSpecificMappingResult) -> Unit
-    ) : Future<Any>
+    ) : UPnPGetSpecificMappingResult
 
     fun search(maxSeconds: Int)
 

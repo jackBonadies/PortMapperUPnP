@@ -804,7 +804,9 @@ class MainActivity : ComponentActivity() {
                             else
                             {
                                 IconButton(onClick = {
-                                    deleteAll(MultiSelectItems)
+                                    GlobalScope.launch {
+                                        deleteAll(MultiSelectItems)
+                                    }
                                 })
                                 {
                                     Icon(Icons.Default.Delete, contentDescription = "Sort")
@@ -1201,7 +1203,9 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 "Delete"
                             ) {
-                                UpnpManager.DeletePortMappingEntry(portMapping)
+                                GlobalScope.launch {
+                                    UpnpManager.DeletePortMappingEntry(portMapping)
+                                }
                             }
                         )
                         menuItems.add(
@@ -1981,7 +1985,9 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
                     }
                     "Delete All" ->
                     {
-                        deleteAll()
+                        GlobalScope.launch(Dispatchers.Main) {
+                            deleteAll()
+                        }
                     }
                     "View Log" ->
                     {
@@ -2006,55 +2012,52 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
     }
 }
 
-fun deleteAll(chosenOnly : List<PortMapping>? = null)
+suspend fun deleteAll(chosenOnly : List<PortMapping>? = null)
 {
-    fun batchCallback(result : MutableList<UPnPResult?>) {
-
-        RunUIThread {
-
-            //debug
-            for (res in result)
-            {
-                res!!
-                when (res)
-                {
-                    is UPnPResult.Success -> {
-                        print("success")
-                        print(res.requestInfo.Description)
-                    }
-                    is UPnPResult.Failure -> {
-                        print("failure")
-                        print(res.reason)
-                        print(res.response)
-                    }
-                }
-            }
-
-            val anyFailed = result.any { it is UPnPResult.Failure }
-
-            if(anyFailed) {
-                val res = result.first { it is UPnPResult.Failure }
-                res!!
-                Toast.makeText(
-                    PortForwardApplication.appContext,
-                    "Failure - ${(res as UPnPResult.Failure).reason}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            else
-            {
-                Toast.makeText(
-                    PortForwardApplication.appContext,
-                    "Success",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
 
     // get all enabled. note: need to clone.
     val rules = chosenOnly?.toList() ?: UpnpManager.GetAllRules()
-    UpnpManager.DeletePortMappingsEntry(rules, ::batchCallback)
+    val result = UpnpManager.DeletePortMappingsEntry(rules)
+
+    RunUIThread {
+
+        //debug
+        for (res in result)
+        {
+            res
+            when (res)
+            {
+                is UPnPResult.Success -> {
+                    print("success")
+                    print(res.requestInfo.Description)
+                }
+                is UPnPResult.Failure -> {
+                    print("failure")
+                    print(res.reason)
+                    print(res.response)
+                }
+            }
+        }
+
+        val anyFailed = result.any { it is UPnPResult.Failure }
+
+        if(anyFailed) {
+            val res = result.first { it is UPnPResult.Failure }
+            Toast.makeText(
+                PortForwardApplication.appContext,
+                "Failure - ${(res as UPnPResult.Failure).reason}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        else
+        {
+            Toast.makeText(
+                PortForwardApplication.appContext,
+                "Success",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 }
 
 fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null)

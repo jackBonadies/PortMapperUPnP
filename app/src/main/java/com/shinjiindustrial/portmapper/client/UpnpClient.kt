@@ -25,6 +25,13 @@ import java.util.logging.Level
 import kotlin.coroutines.resume
 
 class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
+
+    sealed class ClingExecutionResult {
+        data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()
+        data class Failure(val invocation: ActionInvocation<*>, val operation : UpnpResponse, val defaultMsg : String) :
+            ClingExecutionResult()
+    }
+
     init {
         upnpService.registry?.addListener(object : RegistryListener {
             // ssdp datagrams have been alive and processed
@@ -77,15 +84,32 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
         })
     }
 
-    private fun executeAction(callback: ActionCallback): Future<Any> {
-        return upnpService.controlPoint.execute(callback)
+    private suspend fun executeAction(actionInvocation: ActionInvocation<*>): ClingExecutionResult =
+        suspendCancellableCoroutine { cont ->
+            // TODO test throwing exception behavior
+            val future = upnpService.controlPoint.execute(object :
+                ActionCallback(actionInvocation) {
+                override fun success(invocation: ActionInvocation<*>?) {
+                    val result = ClingExecutionResult.Success(invocation!!)
+                    cont.resume(result)
+                }
+
+                override fun failure(
+                    invocation: ActionInvocation<*>?,
+                    operation: UpnpResponse,
+                    defaultMsg: String
+                ) {
+                    val result = ClingExecutionResult.Failure(invocation!!, operation, defaultMsg)
+                    cont.resume(result)
+                }
+            })
+            cont.invokeOnCancellation { future.cancel(true) }
     }
 
     override suspend fun createPortMappingRule(
         device: IGDDevice,
         portMappingRequest: PortMappingRequest,
-    ) : UPnPCreateMappingResult =
-        suspendCancellableCoroutine { cont ->
+    ) : UPnPCreateMappingResult {
                 val externalIp = portMappingRequest.externalIp
                 val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
                 val actionInvocation = ActionInvocation(action)
@@ -98,47 +122,36 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 actionInvocation.setInput("NewEnabled", if (portMappingRequest.enabled) "1" else "0")
                 actionInvocation.setInput("NewPortMappingDescription", portMappingRequest.description)
                 actionInvocation.setInput("NewLeaseDuration", portMappingRequest.leaseDuration)
-            val future = this.executeAction(object :
-                ActionCallback(actionInvocation) {
-                override fun success(invocation: ActionInvocation<*>?) {
-                    invocation!!
+            val result = this.executeAction(actionInvocation)
+            when(result) {
+                is ClingExecutionResult.Success -> {
                     val result = UPnPCreateMappingResult.Success(portMappingRequest.realize())
-                    cont.resume(result)
-                    //callback(result)
-                }
-
-                override fun failure(
-                    invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
-                    defaultMsg: String
-                ) {
-                    // Handle failure
-                    println(defaultMsg)
-
-                    println(operation.statusMessage)
-                    println(operation.responseDetails)
-                    println(operation.statusCode)
-                    println(operation.isFailed)
-
-                    OurLogger.log(
-                        Level.SEVERE,
-                        "Failed to create rule (${portMappingRequest.realize().shortName()})."
-                    )
-                    OurLogger.log(Level.SEVERE, "\t$defaultMsg")
-
-                    val result = UPnPCreateMappingResult.Failure(defaultMsg, operation)
-                    cont.resume(result)
-                    //callback(result)
-                }
-            })
-            cont.invokeOnCancellation { future.cancel(true) }
+                    return result
         }
+        is ClingExecutionResult.Failure -> {
+            // Handle failure
+            println(result.defaultMsg)
 
-    override fun deletePortMapping(
+            println(result.operation.statusMessage)
+            println(result.operation.responseDetails)
+            println(result.operation.statusCode)
+            println(result.operation.isFailed)
+
+            OurLogger.log(
+                Level.SEVERE,
+                "Failed to create rule (${portMappingRequest.realize().shortName()})."
+            )
+            OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
+
+            return UPnPCreateMappingResult.Failure(result.defaultMsg, result.operation)
+        }
+            }
+}
+
+    override suspend fun deletePortMapping(
         device: IGDDevice,
         portMapping: PortMapping,
-        callback: (UPnPResult) -> Unit
-    ): Future<Any> {
+    ): UPnPResult {
         val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
         val actionInvocation = ActionInvocation(action)
         actionInvocation.setInput("NewRemoteHost", portMapping.getRemoteHostNormalizedForDelete())
@@ -146,10 +159,9 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
         actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
         actionInvocation.setInput("NewProtocol", portMapping.Protocol)
 
-        val future = this.executeAction(object :
-            ActionCallback(actionInvocation) {
-            override fun success(invocation: ActionInvocation<*>?) {
-                invocation!!
+        val result = this.executeAction(actionInvocation)
+        when (result) {
+            is ClingExecutionResult.Success -> {
                 println("Successfully deleted")
 
                 OurLogger.log(
@@ -157,46 +169,34 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                     "Successfully deleted rule (${portMapping.shortName()})."
                 )
 
-                val result = UPnPResult.Success(portMapping)
-                callback(result)
-
+                return UPnPResult.Success(portMapping)
             }
-
-            override fun failure(
-                invocation: ActionInvocation<*>?,
-                operation: UpnpResponse,
-                defaultMsg: String
-            ) {
+            is ClingExecutionResult.Failure -> {
                 // Handle failure
-                println(defaultMsg)
+                println(result.defaultMsg)
 
-                println(operation.statusMessage)
-                println(operation.responseDetails)
-                println(operation.statusCode)
-                println(operation.isFailed)
+                println(result.operation.statusMessage)
+                println(result.operation.responseDetails)
+                println(result.operation.statusCode)
+                println(result.operation.isFailed)
 
                 OurLogger.log(
                     Level.SEVERE,
                     "Failed to delete rule (${portMapping.shortName()})."
                 )
-                OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+                OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
 
-                val result = UPnPResult.Failure(defaultMsg, operation)
-                callback(result)
+                return UPnPResult.Failure(result.defaultMsg, result.operation)
             }
-        })
-
-        return future
-
+        }
     }
 
-    override fun getSpecificPortMappingRule(
+    override suspend fun getSpecificPortMappingRule(
         device: IGDDevice,
         remoteHost: String,
         remotePort: String,
         protocol: String,
-        callback: (UPnPCreateMappingWrapperResult) -> Unit
-    ): Future<Any> {
+    ): UPnPCreateMappingWrapperResult {
 
         val remoteIp = device.ipAddress
         val action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
@@ -206,11 +206,9 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
         actionInvocation.setInput("NewExternalPort", remotePort)
         actionInvocation.setInput("NewProtocol", protocol)
 
-        val future = this.executeAction(object :
-            ActionCallback(actionInvocation) {
-            override fun success(invocation: ActionInvocation<*>?) {
-                invocation!!
-
+        val result = this.executeAction(actionInvocation)
+        when (result) {
+            is ClingExecutionResult.Success -> {
                 val internalPort = actionInvocation.getOutput("NewInternalPort")
                 val internalClient = actionInvocation.getOutput("NewInternalClient")
                 val enabled = actionInvocation.getOutput("NewEnabled")
@@ -237,50 +235,42 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                 )
 
                 val result = UPnPCreateMappingWrapperResult.Success(pm, pm, true)
-                callback(result)
+                return result
             }
 
-            override fun failure(
-                invocation: ActionInvocation<*>?,
-                operation: UpnpResponse,
-                defaultMsg: String
-            ) {
-                println(defaultMsg)
+            is ClingExecutionResult.Failure -> {
+                println(result.defaultMsg)
 
-                println(operation.statusMessage)
-                println(operation.responseDetails)
-                println(operation.statusCode)
-                println(operation.isFailed)
+                println(result.operation.statusMessage)
+                println(result.operation.responseDetails)
+                println(result.operation.statusCode)
+                println(result.operation.isFailed)
 
                 val rule = formatShortName(protocol, remoteIp, remotePort)
                 OurLogger.log(
                     Level.SEVERE,
                     "Failed to read back our new rule ($rule)."
                 )
-                OurLogger.log(Level.SEVERE, "\t$defaultMsg")
+                OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
 
-                val result = UPnPCreateMappingWrapperResult.Failure(defaultMsg, operation)
-                callback(result)
+                val result = UPnPCreateMappingWrapperResult.Failure(result.defaultMsg, result.operation)
+                return result
             }
-        })
-
-
-        return future
+        }
     }
 
-
-    override fun getGenericPortMappingRule(device : IGDDevice,
-                                           slotIndex : Int,
-                                           callback: (UPnPGetSpecificMappingResult) -> Unit) : Future<Any>
+    override suspend fun getGenericPortMappingRule(device : IGDDevice,
+                                           slotIndex : Int) : UPnPGetSpecificMappingResult
     {
         val ipAddress = device.ipAddress
         val action = device.actionsMap[ACTION_NAMES.GetGenericPortMappingEntry]
         println("requesting slot $slotIndex")
         val actionInvocation = ActionInvocation(action)
         actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
-        val future = this.executeAction(object : ActionCallback(actionInvocation) {
-            override fun success(invocation: ActionInvocation<*>?) {
-                invocation!!
+        val result = this.executeAction(actionInvocation)
+        when (result) {
+            is ClingExecutionResult.Success -> {
+                val invocation = result.invocation
                 OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
                 val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
@@ -304,19 +294,13 @@ class UpnpClient(private val upnpService: UpnpService) : IUpnpClient {
                     System.currentTimeMillis(),
                     slotIndex)
                 val result = UPnPGetSpecificMappingResult.Success(portMapping, portMapping)
-                callback(result)
+                return result
             }
-
-            override fun failure(
-                invocation: ActionInvocation<*>?,
-                operation: UpnpResponse,
-                defaultMsg: String
-            ) {
-                val result = UPnPGetSpecificMappingResult.Failure(defaultMsg, operation)
-                callback(result)
+            is ClingExecutionResult.Failure -> {
+                val result = UPnPGetSpecificMappingResult.Failure(result.defaultMsg, result.operation)
+                return result
             }
-        })
-        return future
+        }
     }
 
     override fun search(maxSeconds : Int)
