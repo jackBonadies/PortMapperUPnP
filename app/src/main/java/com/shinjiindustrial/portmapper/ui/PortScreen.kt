@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
@@ -477,18 +476,6 @@ fun NoMappingsCard()
     }
 }
 
-
-@Composable
-fun MyScreen(myViewModel: UPnPElementViewModel = UPnPElementViewModel()) {
-    val items by myViewModel.items.observeAsState(emptyList())
-
-    LazyColumn {
-        items(items) { item ->
-            Text(item.UnderlyingElement.toString())
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview
 @Composable
@@ -537,7 +524,7 @@ fun PreviewConversation() {
 }
 
 @Composable
-fun ConversationEntryPoint(modelView : UPnPElementViewModel)
+fun PortMappingContent(modelView : UPnPElementViewModel)
 {
     val items by modelView.items.observeAsState(emptyList())
     Conversation(items)

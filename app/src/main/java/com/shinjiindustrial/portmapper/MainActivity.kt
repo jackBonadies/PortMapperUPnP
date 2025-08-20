@@ -116,6 +116,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -156,7 +157,7 @@ import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
-import com.shinjiindustrial.portmapper.ui.ConversationEntryPoint
+import com.shinjiindustrial.portmapper.ui.PortMappingContent
 import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
 import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
@@ -548,7 +549,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
     override fun onDestroy() {
         super.onDestroy()
         UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
@@ -927,15 +927,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             } else {
-                                // TODO: ??????
-                                ConversationEntryPoint(upnpElementsViewModel)
+                                PortMappingContent(upnpElementsViewModel)
                             }
-
-
-//                                MyScreen(viewModel)
-//                                Greeting("Android")
-//                                Text("hello")
-//                                MessageCard("hello", "message content", true)
                         }
 
                         PullRefreshIndicator(
@@ -1072,6 +1065,13 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                 if (portMapping.Enabled) "Disable" else "Enable"
                             ) {
                                 portViewModel.enableDisable(portMapping, !portMapping.Enabled)
+                            }
+                        )
+                        menuItems.add(
+                            Pair<String, () -> Unit>(
+                                "Renew"
+                            ) {
+                                portViewModel.renew(portMapping)
                             }
                         )
                         menuItems.add(
@@ -1790,29 +1790,30 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
     ) {
         // this gets called on expanded, so I dont think we need to monitor additional state.
 
-        val items : MutableList<String> = mutableListOf()
+        val items : MutableList<Int> = mutableListOf()
         if(MainActivity.MultiSelectItems!!.isEmpty())
         {
-            items.add("Refresh")
+            items.add(R.string.refresh_action)
             if(UpnpManager.IGDDevices.isNotEmpty())
             {
                 val (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
                 if(anyEnabled) // also get info i.e. any enabled, any disabled
                 {
-                    items.add("Disable All")
+                    items.add(R.string.disable_all_action)
                 }
                 if (anyDisabled)
                 {
-                    items.add("Enable All")
+                    items.add(R.string.enable_all_action)
                 }
                 if(anyDisabled || anyEnabled)
                 {
-                    items.add("Delete All")
+                    items.add(R.string.delete_all_action)
                 }
+                items.add(R.string.renew_all_action)
             }
-            items.add("View Log")
-            items.add("Settings")
-            items.add("About")
+            items.add(R.string.view_log_action)
+            items.add(R.string.settings)
+            items.add(R.string.about)
         }
         else
         {
@@ -1820,62 +1821,65 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
             val anyDisabled = MainActivity.MultiSelectItems!!.any { it -> !it.Enabled }
             if(anyEnabled)
             {
-                items.add("Disable")
+                items.add(R.string.disable_action)
             }
             if(anyDisabled)
             {
-                items.add("Enable")
+                items.add(R.string.enable_action)
             }
         }
 
         MainActivity.MultiSelectItems
 
         items.forEach { label ->
-            DropdownMenuItem(text = { Text(label) }, onClick = {
+            DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = {
                 // handle item click
                 expanded = false
 
                 when (label) {
-                    "Refresh" ->
+                    R.string.refresh_action ->
                     {
                         portViewModel.fullRefresh()
                     }
-                    "Disable All" ->
+                    R.string.disable_all_action ->
                     {
                         portViewModel.enableDisableAll(false)
                     }
-                    "Enable All" ->
+                    R.string.enable_all_action ->
                     {
                         portViewModel.enableDisableAll(true)
                     }
-                    "Disable" ->
+                    R.string.disable_action ->
                     {
                         portViewModel.enableDisableAll(false, MainActivity.MultiSelectItems)
                     }
-                    "Enable" ->
+                    R.string.enable_action ->
                     {
                         portViewModel.enableDisableAll(true, MainActivity.MultiSelectItems)
                     }
-                    "Delete All" ->
+                    R.string.delete_all_action ->
                     {
                         portViewModel.deleteAll()
                     }
-                    "View Log" ->
+                    R.string.renew_all_action ->
+                    {
+                        portViewModel.renewAll()
+                    }
+                    R.string.view_log_action ->
                     {
                         val intent =
                             Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
                         PortForwardApplication.CurrentActivity?.startActivity(intent)
                     }
-                    "Settings" ->
+                    R.string.settings ->
                     {
                         val intent =
                             Intent(PortForwardApplication.CurrentActivity, SettingsActivity::class.java)
                         PortForwardApplication.CurrentActivity?.startActivity(intent)
                     }
-                    "About" ->
+                    R.string.about ->
                     {
                         showAboutDialogState.value = true
-                        println("Item 1 pressed")
                     }
                 }
             })

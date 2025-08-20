@@ -40,6 +40,55 @@ class PortViewModel @Inject constructor(
         UpnpManager.FullRefresh()
     }
 
+    fun renew( portMapping: PortMapping ) = applicationScope.launch {
+            try {
+                val res = UpnpManager.RenewRule(portMapping)
+                if (res is UPnPCreateMappingWrapperResult.Success) {
+                    _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                }
+                else
+                {
+                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+                }
+            } catch (e: Exception) {
+                _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+            }
+        }
+
+    fun renewAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
+        try {
+            val portMappings = chosen?.toList() ?: UpnpManager.GetAllRules()
+            val result = UpnpManager.RenewRules(portMappings)
+            result.forEach { res ->
+                when (res) {
+                    is UPnPCreateMappingWrapperResult.Success -> {
+                        print("success")
+                        print(res.requestInfo.Description)
+                    }
+
+                    is UPnPCreateMappingWrapperResult.Failure -> {
+                        print("failure")
+                        print(res.reason)
+                        print(res.response)
+                    }
+                }
+            }
+
+            val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
+
+            if(anyFailed) {
+                val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+            }
+            else
+            {
+                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
+            _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+        }
+    }
+
     fun enableDisable(
         portMapping: PortMapping,
         enable: Boolean) =
