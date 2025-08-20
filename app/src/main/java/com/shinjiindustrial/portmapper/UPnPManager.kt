@@ -151,55 +151,31 @@ class UpnpManager {
                     Level.SEVERE,
                     "Create Rule Failed: " + exception.message + exception.stackTraceToString()
                 )
-                MainActivity.showSnackBarViewLog("Create Rule Failed")
                 throw exception
             }
         }
 
-        fun DisableEnablePortMappingEntries(
+        suspend fun DisableEnablePortMappingEntries(
             portMappings: List<PortMapping>,
             enable: Boolean,
-            onCompleteBatchCallback: (MutableList<UPnPCreateMappingWrapperResult?>) -> Unit
-        ): FutureTask<List<PortMapping>> {
+        ): List<UPnPCreateMappingWrapperResult> {
 
-                val callable = Callable {
+            return portMappings.map { portMapping ->
 
-                    try {
+                try {
+                    val result = DisableEnablePortMapping(portMapping, enable)
+                    enableDisableDefaultCallback(result)
+                    result
+                } catch (exception: Exception) {
 
-                    val listOfResults: MutableList<UPnPCreateMappingWrapperResult?> =
-                        MutableList(portMappings.size) { null }
-
-                    for (i in 0 until portMappings.size) {
-
-                        fun callback(result: UPnPCreateMappingWrapperResult) {
-
-                            enableDisableDefaultCallback(result)
-                            listOfResults[i] = result
-                        }
-
-                        // TODO
-                        val future = DisableEnablePortMapping(portMappings[i], enable, ::callback)
-                        future.get()
-                    }
-
-                    onCompleteBatchCallback(listOfResults)
-                    portMappings
-
-                    } catch (exception: Exception) {
-
-                        val enableDisableString = if(enable) "Enable" else "Disable"
-                        OurLogger.log(
-                            Level.SEVERE,
-                            "$enableDisableString Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-                        )
-                        MainActivity.showSnackBarViewLog("$enableDisableString Port Mappings Failed")
-                        throw exception
-                    }
+                    val enableDisableString = if (enable) "Enable" else "Disable"
+                    OurLogger.log(
+                        Level.SEVERE,
+                        "$enableDisableString Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                    )
+                    throw exception
                 }
-
-                val task = FutureTask(callable)
-                Thread(task).start()
-                return task // a FutureTask is a Future
+            }
         }
 
         var FailedToInitialize: Boolean = false
@@ -353,14 +329,15 @@ class UpnpManager {
         var IGDDevices: MutableList<IGDDevice> = mutableListOf()
 
 
-        fun DisableEnablePortMappingEntry(
+        suspend fun DisableEnablePortMappingEntry(
             portMapping: PortMapping,
             enable: Boolean,
-            onDisableEnableCompleteCallback: (UPnPCreateMappingWrapperResult) -> Unit
-        ): Future<Any>? {
+        ): UPnPCreateMappingWrapperResult {
             try
             {
-                return DisableEnablePortMapping(portMapping, enable, onDisableEnableCompleteCallback)
+                val res = DisableEnablePortMapping(portMapping, enable)
+                enableDisableDefaultCallback(res)
+                return res
             }
             catch (exception: Exception) {
                 val enableDisableString = if(enable) "Enable" else "Disable"
@@ -368,17 +345,14 @@ class UpnpManager {
                     Level.SEVERE,
                     "$enableDisableString Port Mapping Failed: " + exception.message + exception.stackTraceToString()
                 )
-                MainActivity.showSnackBarViewLog("$enableDisableString Port Mapping Failed")
-                //throw exception // this will crash the app
-                return null
+                throw exception
             }
         }
 
-        fun DisableEnablePortMapping(
+        private suspend fun DisableEnablePortMapping(
             portMapping: PortMapping,
             enable: Boolean,
-            onDisableEnableCompleteCallback: (UPnPCreateMappingWrapperResult) -> Unit
-        ): Future<Any> {
+        ) : UPnPCreateMappingWrapperResult {
             // AddPortMapping
             //  This action creates a new port mapping or overwrites an existing mapping with the same internal client. If
             //  the ExternalPort and PortMappingProtocol pair is already mapped to another internal client, an error is
@@ -398,16 +372,12 @@ class UpnpManager {
                 enable,
                 portMapping.RemoteHost
             )
-//            Future.CompletedFuture(null)
-//            return CreatePortMappingRuleWrapper(
-//                portMappingRequest,
-//                false,
-//                getEnabledDisabledString(enable).lowercase(),
-//                onDisableEnableCompleteCallback
-//            )
-//            val completedFuture = CompletableFuture.completedFuture("");
-//            return completedFuture
-            return DisableEnablePortMapping(portMapping, enable,onDisableEnableCompleteCallback)//TODO revert
+            val res = CreatePortMappingRuleWrapper(
+                portMappingRequest,
+                false,
+                getEnabledDisabledString(enable).lowercase(),
+            )
+            return res
         }
 
         fun getEnabledDisabledString(enabled: Boolean): String {
@@ -427,29 +397,18 @@ class UpnpManager {
 
         // DeletePortMappingRange is only available in v2.0 (also it can only delete
         //   a contiguous range)
-        suspend fun DeletePortMappingEntry(portMapping: PortMapping) {
+        suspend fun DeletePortMappingEntry(portMapping: PortMapping) : UPnPResult {
 
-            val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
-            val result = GetUPnPClient().deletePortMapping(device, portMapping)
             try {
+                val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
+                val result = GetUPnPClient().deletePortMapping(device, portMapping)
                 defaultRuleDeletedCallback(result)
-                RunUIThread {
-                    println("delete callback")
-                    when (result) {
-                        is UPnPResult.Success -> {
-                            MainActivity.showSnackBarShortNoAction("Success!")
-                        }
-                        is UPnPResult.Failure -> {
-                            MainActivity.showSnackBarViewLog("Failed to delete entry.")
-                        }
-                    }
-                }
+                return result
             } catch (exception: Exception) {
                 OurLogger.log(
                     Level.SEVERE,
                     "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
-                MainActivity.showSnackBarViewLog("Delete Port Mappings Failed")
                 throw exception
             }
         }

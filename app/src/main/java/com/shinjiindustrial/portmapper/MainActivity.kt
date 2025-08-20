@@ -94,6 +94,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -127,6 +128,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -139,9 +141,6 @@ import com.example.myapplication.R
 import com.google.accompanist.navigation.animation.AnimatedNavHost
 import com.google.accompanist.navigation.animation.composable
 import com.google.accompanist.navigation.animation.rememberAnimatedNavController
-import com.shinjiindustrial.portmapper.client.IUpnpClient
-import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
-import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.common.ValidationError
@@ -172,16 +171,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
-import java.io.IOException
+import java.com.shinjiindustrial.portmapper.PortViewModel
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.logging.FileHandler
 import java.util.logging.Level
 import java.util.logging.LogRecord
-import java.util.logging.Logger
-import java.util.logging.SimpleFormatter
-import javax.inject.Inject
 import kotlin.random.Random
 
 var PseudoSlotCounter : Int = MAX_PORT // as starting slot
@@ -229,6 +224,7 @@ enum class Protocol(val protocol: String) {
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
 
     fun deviceFoundHandler(remoteDevice: IGDDevice) {
         runOnUiThread {
@@ -359,7 +355,6 @@ class MainActivity : ComponentActivity() {
     //var upnpElementsViewModel: ViewModel by viewModels()
     //var upnpElementsViewModel = UPnPElementViewModel()
     var searchInProgressJob: Job? = null
-
 
     var mainSearchInProgressAndNothingFoundYet: MutableState<Boolean>? = null //TODO similar thing with pullrefresh...
 
@@ -548,7 +543,7 @@ class MainActivity : ComponentActivity() {
                     portMappingUserInputToEdit = PortMappingUserInput(desc, internalIp!!, internalRange!!, externalIp!!, externalRange!!, protocol!!, leaseDuration!!, enabled!!)
                 }
 
-                RuleCreationDialog(navController = navController, portMappingUserInputToEdit)
+                RuleCreationDialog(navController = navController, ruleToEdit = portMappingUserInputToEdit)
             }
         }
     }
@@ -564,16 +559,29 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     @Composable
-    fun MainScreen(navController : NavHostController) {
+    fun MainScreen(navController : NavHostController, portViewModel : PortViewModel = hiltViewModel()) {
         // A surface container using the 'background' color from the theme
         rememberScrollState()
         val showAboutDialogState = remember { mutableStateOf(false) }
         val showMoreInfoDialogState = remember { mutableStateOf(false) }
         val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
 
-//                var showMainLoading = remember { mutableStateOf(searchStarted) }
-//
-
+        LaunchedEffect(Unit) {
+            portViewModel.events.collect { ev ->
+                if (ev is PortViewModel.UiEvent.ToastEvent)
+                {
+                    Toast.makeText(
+                        PortForwardApplication.appContext,
+                        ev.msg,
+                        ev.duration
+                    ).show()
+                }
+                else if (ev is PortViewModel.UiEvent.SnackBarViewLogEvent)
+                {
+                    showSnackBarViewLog(ev.msg) // emit these
+                }
+            }
+        }
 
         PortForwardApplication.currentSingleSelectedObject =
             remember { mutableStateOf(null) }
@@ -601,7 +609,8 @@ class MainActivity : ComponentActivity() {
             EnterContextMenu(
                 PortForwardApplication.currentSingleSelectedObject,
                 showMoreInfoDialogState,
-                navController
+                navController,
+                portViewModel
             )
         }
 
@@ -766,9 +775,7 @@ class MainActivity : ComponentActivity() {
                             else
                             {
                                 IconButton(onClick = {
-                                    GlobalScope.launch {
-                                        deleteAll(MultiSelectItems)
-                                    }
+                                    portViewModel.deleteAll(MultiSelectItems)
                                 })
                                 {
                                     Icon(Icons.Default.Delete, contentDescription = "Sort")
@@ -777,7 +784,7 @@ class MainActivity : ComponentActivity() {
 
 
                             OverflowMenu(
-                                showAboutDialogState
+                                showAboutDialogState, portViewModel
                             )
                         }
                     )
@@ -795,7 +802,7 @@ class MainActivity : ComponentActivity() {
 
                     fun refresh() = refreshScope.launch {
                         refreshing = !onlyShowMainProgressBar
-                        UpnpManager.FullRefresh()
+                        portViewModel.fullRefresh()
 
                         //TODO cancel if already done
 
@@ -906,7 +913,7 @@ class MainActivity : ComponentActivity() {
                                                 PortForwardApplication.appContext,
                                                 true
                                             )
-                                            UpnpManager.FullRefresh()
+                                            portViewModel.fullRefresh()
                                         },
                                         modifier = Modifier
                                             .padding(0.dp, 10.dp)
@@ -940,68 +947,10 @@ class MainActivity : ComponentActivity() {
 
                 }
             )
-//                Surface(
-//                    modifier = Modifier
-//                        .fillMaxSize()
-//                        .verticalScroll(scrollState),
-//                    color = MaterialTheme.colorScheme.background
-//                ) {
-//                    Column {
-//
-//                        MyScreen(viewModel)
-//                        Greeting("Android")
-//                        Text("hello")
-//                        MessageCard("hello", "message content")
-//
-//                    }
-//                }
-//                        }
+
         }
     }
 }
-
-//caused weird visual artifacts at runtime
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable
-//@Preview
-//fun Picker()
-//{
-//    SetupPreview()
-//
-//        Row()
-//        {
-//
-//            for (i in 0..4) {
-//                AndroidView(
-//                    modifier = Modifier
-//                        .weight(1.0f)
-//                        .padding(10.dp),
-////                    update = { view ->
-////                        // Apply color and typography directly
-////                        view.findViewById<TextView>(R.id.myTextView).apply {
-////                            setTextColor(color.toArgb())
-////                            setTextAppearance(textAppearance)
-////                        }
-////                    },
-//                    factory = { context ->
-//                        var np = NumberPicker(context)
-//                        //np.textColor = MaterialTheme.colorScheme.primary
-//                        np.setDisplayedValues(
-//                            listOf(
-//                                "1 hour",
-//                                "2 hour",
-//                                "3 hour"
-//                            ).toTypedArray()
-//                        )
-//                        np.apply {
-//                            setOnValueChangedListener { numberPicker, i, i2 -> }
-//                            minValue = 0
-//                            maxValue = 2
-//
-//                        }
-//            }
-//        }
-//}
 
 // TODO: expires in 5 minutes, autorenews in 5 minutes status symbols for each portmapping
 // TODO: mock profile
@@ -1035,13 +984,6 @@ fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPEl
             }
 
         }
-
-//            delay(10000L) // non-blocking delay for 5 seconds (5000 milliseconds)
-//            println(remoteDeviceOfInterest?.displayString)
-//            for (device in UpnpManager.GetUPnPService().registry.devices){
-//                println(device.displayString)
-//                println(device.type)
-//            }
     }
 }
 
@@ -1069,7 +1011,7 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController)
+fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController, portViewModel : PortViewModel)
 {
     if(singleSelectedItem.value == null)
     {
@@ -1129,45 +1071,14 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 if (portMapping.Enabled) "Disable" else "Enable"
                             ) {
-
-                                fun enableDisableCallback(result: UPnPCreateMappingWrapperResult) {
-                                    //portMapping : PortMapping,
-                                    UpnpManager.enableDisableDefaultCallback(result)
-                                    RunUIThread {
-                                        when (result)
-                                        {
-                                            is UPnPCreateMappingWrapperResult.Success -> {
-                                                Toast.makeText(
-                                                    PortForwardApplication.appContext,
-                                                    "Success",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                            is UPnPCreateMappingWrapperResult.Failure -> {
-                                                Toast.makeText(
-                                                    PortForwardApplication.appContext,
-                                                    "Failure - ${result.reason}",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            }
-                                        }
-                                    }
-                                }
-
-                                UpnpManager.DisableEnablePortMappingEntry(
-                                    portMapping,
-                                    !portMapping.Enabled,
-                                    ::enableDisableCallback
-                                )
+                                portViewModel.enableDisable(portMapping, !portMapping.Enabled)
                             }
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
                                 "Delete"
                             ) {
-                                GlobalScope.launch {
-                                    UpnpManager.DeletePortMappingEntry(portMapping)
-                                }
+                                portViewModel.delete(portMapping)
                             }
                         )
                         menuItems.add(
@@ -1863,7 +1774,7 @@ fun DeviceRow(content: @Composable RowScope.() -> Unit) {
 }
 
 @Composable
-fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
+fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : PortViewModel) {
     var expanded by remember { mutableStateOf(false) }
 
 
@@ -1927,29 +1838,27 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
                 when (label) {
                     "Refresh" ->
                     {
-                        UpnpManager.FullRefresh()
+                        portViewModel.fullRefresh()
                     }
                     "Disable All" ->
                     {
-                        enableDisableAll(false)
+                        portViewModel.enableDisableAll(false)
                     }
                     "Enable All" ->
                     {
-                        enableDisableAll(true)
+                        portViewModel.enableDisableAll(true)
                     }
                     "Disable" ->
                     {
-                        enableDisableAll(false, MainActivity.MultiSelectItems)
+                        portViewModel.enableDisableAll(false, MainActivity.MultiSelectItems)
                     }
                     "Enable" ->
                     {
-                        enableDisableAll(true, MainActivity.MultiSelectItems)
+                        portViewModel.enableDisableAll(true, MainActivity.MultiSelectItems)
                     }
                     "Delete All" ->
                     {
-                        GlobalScope.launch(Dispatchers.Main) {
-                            deleteAll()
-                        }
+                        portViewModel.deleteAll()
                     }
                     "View Log" ->
                     {
@@ -1971,112 +1880,6 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>) {
                 }
             })
         }
-    }
-}
-
-suspend fun deleteAll(chosenOnly : List<PortMapping>? = null)
-{
-
-    // get all enabled. note: need to clone.
-    val rules = chosenOnly?.toList() ?: UpnpManager.GetAllRules()
-    val result = UpnpManager.DeletePortMappingsEntry(rules)
-
-    RunUIThread {
-
-        //debug
-        for (res in result)
-        {
-            res
-            when (res)
-            {
-                is UPnPResult.Success -> {
-                    print("success")
-                    print(res.requestInfo.Description)
-                }
-                is UPnPResult.Failure -> {
-                    print("failure")
-                    print(res.reason)
-                    print(res.response)
-                }
-            }
-        }
-
-        val anyFailed = result.any { it is UPnPResult.Failure }
-
-        if(anyFailed) {
-            val res = result.first { it is UPnPResult.Failure }
-            Toast.makeText(
-                PortForwardApplication.appContext,
-                "Failure - ${(res as UPnPResult.Failure).reason}",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-        else
-        {
-            Toast.makeText(
-                PortForwardApplication.appContext,
-                "Success",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-}
-
-fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null)
-{
-    fun batchCallback(result : MutableList<UPnPCreateMappingWrapperResult?>) {
-
-        RunUIThread {
-
-            //debug
-            for (res in result)
-            {
-                when (res)
-                {
-                    is UPnPCreateMappingWrapperResult.Success -> {
-                        print("success")
-                        print(res.resultingMapping.Protocol)
-                    }
-                    is UPnPCreateMappingWrapperResult.Failure -> {
-                        print("failure")
-                        print(res.reason)
-                        print(res.response)
-                    }
-
-                    null -> TODO()
-                }
-            }
-
-            val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
-
-            if(anyFailed) {
-                val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
-                res!!
-                Toast.makeText(
-                    PortForwardApplication.appContext,
-                    "Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            else
-            {
-                Toast.makeText(
-                    PortForwardApplication.appContext,
-                    "Success",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
-
-    if(chosenRulesOnly != null)
-    {
-        val rules = chosenRulesOnly.filter { it -> it.Enabled != enable }
-        UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
-    }
-    else {
-        val rules = UpnpManager.GetEnabledDisabledRules(!enable)
-        UpnpManager.DisableEnablePortMappingEntries(rules, enable, ::batchCallback)
     }
 }
 

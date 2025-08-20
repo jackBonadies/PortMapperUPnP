@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.shinjiindustrial.portmapper.CreateRuleContents
 import com.shinjiindustrial.portmapper.MainActivity
@@ -51,12 +52,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.com.shinjiindustrial.portmapper.PortViewModel
 import java.util.logging.Level
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappingUserInput? = null)  {
+fun RuleCreationDialog(navController : NavHostController, portViewModel : PortViewModel = hiltViewModel(), ruleToEdit : PortMappingUserInput? = null)  {
+
+
+    // TODO vm.collect()
 
     val isPreview = false
 
@@ -221,55 +226,6 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
 
                             //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
-                            val modifyCase = ruleToEdit != null
-
-
-                            // TODO vm.createRule
-                            // TODO vm.events -> UiEvents that are collected then launch effect
-
-                            fun batchCallback(result: List<UPnPCreateMappingWrapperResult>) {
-
-                                RunUIThread {
-                                    //debug
-                                    for (res in result) {
-                                        when (res)
-                                        {
-                                            is UPnPCreateMappingWrapperResult.Failure -> {
-                                                println("Failure")
-                                                println(res.reason)
-                                                println(res.response)
-                                            }
-                                            is UPnPCreateMappingWrapperResult.Success -> {
-                                                println("Success")
-                                                println(res.resultingMapping.Protocol)
-                                            }
-                                        }
-                                    }
-
-                                    val numFailed = result.count { it is UPnPCreateMappingWrapperResult.Failure }
-
-                                    val anyFailed = numFailed > 0
-
-                                    if (anyFailed) {
-
-                                        val verbString = if(modifyCase) "modify" else "create"
-
-                                        // all failed
-                                        if (numFailed == result.size) {
-                                            if (result.size == 1) {
-                                                showSnackBarViewLog("Failed to $verbString rule.")
-                                            } else {
-                                                showSnackBarViewLog("Failed to create rules.") // emit these
-                                            }
-                                        } else {
-                                            showSnackBarViewLog("Failed to create some rules.")
-                                        }
-                                    } else {
-                                        showSnackBarShortNoAction("Success!")
-                                    }
-                                }
-                            }
-
                             GlobalScope.launch(Dispatchers.Main) {
 
 
@@ -285,55 +241,14 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                                 }
                                 else
                                 {
-                                    // delete old rule and add new rules...
-
-
                                     val oldRulesToDelete = ruleToEdit.splitIntoRules()
-
-                                    val device: IGDDevice = getIGDDevice(oldRulesToDelete[0].externalIp)
-                                    val result = UpnpManager.GetUPnPClient().deletePortMapping(device, oldRulesToDelete[0].realize()) //TODO: handle delete multiple (when that becomes a thing)
-
-                                    try {
-                                        defaultRuleDeletedCallback(result)
-                                        RunUIThread {
-                                            println("delete callback")
-                                            when(result)
-                                            {
-                                                is UPnPResult.Success ->
-                                                {
-                                                    // if successfully deleted original rule,
-                                                    //   add new rule.
-                                                    runBlocking {
-                                                        val result = UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput)
-                                                        batchCallback(result)
-                                                    }
-                                                }
-                                                is UPnPResult.Failure ->
-                                                {
-                                                    // the old rule must still be remaining if it failed to delete
-                                                    // so nothing has changed.
-                                                    showSnackBarViewLog("Failed to modify entry.")
-                                                }
-                                            }
-                                        }
-                                    } catch (exception: Exception) {
-                                        PortForwardApplication.OurLogger.log(
-                                            Level.SEVERE,
-                                            "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-                                        )
-                                        showSnackBarViewLog("Failed to modify entry.")
-                                        throw exception
-                                    }
-
+                                    portViewModel.editRule(oldRulesToDelete[0].realize(), portMappingRequestInput)
                                     navController.popBackStack()
                                 }
                             }
                             else
                             {
-                                val result = UpnpManager.CreatePortMappingRulesEntry(portMappingRequestInput) //spilts into rules
-                                batchCallback(result)
-                                //showDialogMutable.value = false
-
+                                portViewModel.createRules(portMappingRequestInput)
                                 navController.popBackStack()
                             }
                             }
@@ -345,15 +260,6 @@ fun RuleCreationDialog(navController : NavHostController, ruleToEdit : PortMappi
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                         )
                     }
-//                        Text("CREATE", modifier = Modifier.clickable {
-//                            // navigate
-//                        })
-//                        IconButton(onClick = {
-//
-//                        })
-//                        {
-//                            Icon(Icons.Default.Sort, contentDescription = "Sort")
-//                        }
                 }
             )
         },
