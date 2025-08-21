@@ -120,7 +120,7 @@ dependencies {
     implementation 'androidx.compose.material:material-icons-extended'
     //implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation "androidx.datastore:datastore-preferences:1.0.0"
-
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.6.0'
 
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
@@ -138,6 +138,8 @@ dependencies {
     releaseImplementation platform('com.google.firebase:firebase-bom:32.2.2')
     releaseImplementation 'com.google.firebase:firebase-crashlytics'
 
+
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
 
 

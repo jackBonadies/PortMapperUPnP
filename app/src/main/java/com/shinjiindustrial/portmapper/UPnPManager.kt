@@ -4,11 +4,9 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.invokeUpdateUIFromData
 import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
-import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.client.UpnpClient
 import com.shinjiindustrial.portmapper.common.Event
@@ -20,27 +18,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.fourthline.cling.UpnpService
 import org.fourthline.cling.UpnpServiceImpl
-import org.fourthline.cling.model.message.UpnpResponse
 import java.util.TreeSet
-import java.util.concurrent.Callable
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Future
-import java.util.concurrent.FutureTask
 import java.util.logging.Level
-import javax.inject.Inject
 import kotlin.collections.map
 
 
@@ -61,6 +52,30 @@ class UpnpManager {
         var AnyIgdDevices: MutableState<Boolean>? = null
         var FailedToInitialize: Boolean = false
         var IGDDevices: MutableList<IGDDevice> = mutableListOf()
+
+        private val _devices = MutableStateFlow(listOf<IGDDevice>())  // TreeSet<PortMapping>
+        val devices : StateFlow<List<IGDDevice>> =
+            _devices//.map { it..sortedBy { d -> d.name } }
+                //.stateIn(MainScope(), SharingStarted.Eagerly, emptyList())
+        val anyDevices : Flow<Boolean> = _devices.map { !it.isEmpty() }
+
+//        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
+        private var portMappingsSortedSource : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
+        private var portMappingLookup : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
+
+        private val _portMappings = MutableStateFlow(portMappingsSortedSource)  // TreeSet<PortMapping>
+        val portMappings : StateFlow<Set<PortMapping>> = _portMappings
+//
+//        fun update(pm: PortMapping) = _setFlow.update { old ->
+//            TreeSet(old).apply { add(pm) }
+//        }
+
+        fun add(pm: PortMapping) = _portMappings.update { old ->
+            TreeSet(old).apply { add(pm) }
+        }
+        fun remove(pm: PortMapping) = _portMappings.update { old ->
+            TreeSet(old).apply { remove(pm) }
+        }
 
         // endregion
 

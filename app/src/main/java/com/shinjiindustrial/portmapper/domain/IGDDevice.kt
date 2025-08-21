@@ -18,6 +18,7 @@ import java.util.TreeSet
 import java.util.logging.Level
 import kotlin.system.measureTimeMillis
 
+// has state including rules. add update those rules. and do a upnp action. and sort.
 class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteService?)
 {
 
@@ -95,8 +96,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             if(actionsMap.containsKey(ACTION_NAMES.GetGenericPortMappingEntry))
             {
                 OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
-                val getPortMapping = actionsMap[ACTION_NAMES.GetGenericPortMappingEntry]!!
-                getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping)
+                getAllPortMappingsUsingGenericPortMappingEntry()
             }
             else{
                 //TODO firebase integration
@@ -113,7 +113,7 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
 
     // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
     // TODO I dont like that this is here but the other classes that interact with Client are in UPnp manager
-    private suspend fun getAllPortMappingsUsingGenericPortMappingEntry(getPortMapping : Action<RemoteService>) {
+    private suspend fun getAllPortMappingsUsingGenericPortMappingEntry() {
         var slotIndex : Int = 0;
         var retryCount : Int = 0
         while(true)

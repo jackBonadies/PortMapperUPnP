@@ -61,6 +61,7 @@ import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import java.com.shinjiindustrial.portmapper.PortUiState
 
 @OptIn(
     ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
@@ -524,10 +525,9 @@ fun PreviewConversation() {
 }
 
 @Composable
-fun PortMappingContent(modelView : UPnPElementViewModel)
+fun PortMappingContent(uiState : PortUiState)
 {
-    val items by modelView.items.observeAsState(emptyList())
-    Conversation(items)
+    Conversation(uiState.items)
 }
 
 //lazy column IS recycler view basically. both recycle.
@@ -546,7 +546,15 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
         ) {
 
+        var curVal = 0
+
         itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
+
+            curVal++
+            if (curVal % 4 == 0)
+            {
+                Text(text = "test")
+            }
 
             if(message.IsSpecialEmpty)
             {

@@ -134,6 +134,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -170,6 +171,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.com.shinjiindustrial.portmapper.PortViewModel
@@ -258,39 +260,6 @@ class MainActivity : ComponentActivity() {
                     mainSearchInProgressAndNothingFoundYet!!.value = false
                 }
             }
-        }
-    }
-
-    fun updateUIFromData(o: Any? = null) {
-        Log.i("portmapperUI", "updateUIFromData non ui thread")
-        runOnUiThread {
-
-            Log.i("portmapperUI", "updateUIFromData")
-
-            val data: MutableList<UPnPViewElement> = mutableListOf()
-            synchronized(UpnpManager.lockIgdDevices)
-            {
-                for (device in UpnpManager.IGDDevices) {
-                    data.add(UPnPViewElement(device))
-
-                    if (device.portMappings.isEmpty()) {
-                        data.add(
-                            UPnPViewElement(
-                                device,
-                                true
-                            )
-                        ) // calls LiveData.setValue i.e. must be done on UI thread
-                    } else {
-
-                        for (mapping in device.portMappings)
-                        {
-                            data.add(UPnPViewElement(mapping))
-                        }
-
-                    }
-                }
-            }
-            upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
         }
     }
 
@@ -404,10 +373,7 @@ class MainActivity : ComponentActivity() {
         UpnpManager.PortInitialFoundEvent += ::portMappingFoundHandler
         UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
 
-        UpnpManager.SubscibeToUpdateData(lifecycleScope) {
-            Log.i("portmapper", "ui update data handler")
-            updateUIFromData(null)
-        }
+
 //
 //        UpnpManager.UpdateUIFromDataCollating.conflate().onEach {
 //
@@ -446,14 +412,10 @@ class MainActivity : ComponentActivity() {
         val navController = rememberAnimatedNavController()
 
         AnimatedNavHost(navController = navController, startDestination = "main_screen") {
-            composable("main_screen", exitTransition = {
-//                slideOutHorizontally(
-//                    targetOffsetX = { -300 }, animationSpec = tween(
-//                        durationMillis = 300, easing = FastOutSlowInEasing
-//                    )
-//                )
-                fadeOut(animationSpec = tween(300))
-            },
+            composable("main_screen",
+                exitTransition = {
+                    fadeOut(animationSpec = tween(300))
+                },
                 popEnterTransition = {
                     //fadeIn(animationSpec = tween(0))
                     //this is whats used when going back from "create rule"
@@ -469,13 +431,7 @@ class MainActivity : ComponentActivity() {
 
                 },
                 popExitTransition = {
-                    fadeOut(animationSpec = tween(300))
-//                    slideInVertically(
-//                        initialOffsetY = { -300 }, animationSpec = tween(
-//                            durationMillis = 300, easing = FastOutSlowInEasing
-//                        )
-//                    ) //+ fadeIn(animationSpec = tween(300))
-
+                   fadeOut(animationSpec = tween(300))
                 },
             )
             {
@@ -554,7 +510,6 @@ class MainActivity : ComponentActivity() {
         UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
         UpnpManager.PortAddedEvent -= ::portMappingAddedHandler
         UpnpManager.FinishedListingPortsEvent -= ::deviceFinishedListingPortsHandler
-        UpnpManager.UpdateUIFromData -= ::updateUIFromData
     }
 
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -854,6 +809,7 @@ class MainActivity : ComponentActivity() {
                                         textAlign = TextAlign.Center
                                     )
 
+                                    // these can go through vm -> repo -> client 
                                     val interfacesUsedInSearch =
                                         UpnpManager.GetUPnPClient().getInterfacesUsedInSearch()
                                     val anyInterfaces =
@@ -927,7 +883,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             } else {
-                                PortMappingContent(upnpElementsViewModel)
+                                val uiState by portViewModel.uiState.collectAsStateWithLifecycle()
+                                PortMappingContent(uiState)
                             }
                         }
 
@@ -1794,7 +1751,7 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
         if(MainActivity.MultiSelectItems!!.isEmpty())
         {
             items.add(R.string.refresh_action)
-            if(UpnpManager.IGDDevices.isNotEmpty())
+            if(UpnpManager.GetUPnPClient().isInitialized()) // TODO cahnge back
             {
                 val (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
                 if(anyEnabled) // also get info i.e. any enabled, any disabled
@@ -1896,6 +1853,7 @@ fun formatIpv4(ipAddr : Int) : String
     return inetAddress.hostAddress
 }
 
+// TODO delete?
 class UPnPElementViewModel: ViewModel() {
     private val _items = MutableLiveData<List<UPnPViewElement>>(emptyList())
     val items: LiveData<List<UPnPViewElement>> get() = _items

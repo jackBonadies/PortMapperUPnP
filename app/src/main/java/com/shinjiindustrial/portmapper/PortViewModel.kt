@@ -1,23 +1,38 @@
 package java.com.shinjiindustrial.portmapper
 
+import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.shinjiindustrial.portmapper.PortForwardApplication
+import com.shinjiindustrial.portmapper.UPnPElementViewModel
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.CreatePortMappingRulesEntry
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.DeletePortMappingEntry
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
+import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.logging.Level
 import javax.inject.Inject
+
+data class PortUiState(
+    val items: List<UPnPViewElement> = emptyList(),
+    val isLoading: Boolean = false,
+    val userMessage: Int? = null
+)
 
 @HiltViewModel
 class PortViewModel @Inject constructor(
@@ -35,9 +50,74 @@ class PortViewModel @Inject constructor(
 
     private val applicationScope : CoroutineScope = MainScope()
 
+    val uiState: StateFlow<PortUiState> = combine( // !! todo
+        UpnpManager.devices, UpnpManager.portMappings
+    ) { devices, portMappings ->
+
+
+        val upnpElements = mutableListOf<UPnPViewElement>()
+        if (devices.isEmpty())
+        {
+            PortUiState(isLoading = true)
+        }
+        else
+        {
+            val curDevice = devices.first()
+            // TODO clean up for multiple devices
+            portMappings.forEachIndexed { index, portMapping ->
+                upnpElements.add(UPnPViewElement(portMapping))
+            }
+        }
+
+        PortUiState(upnpElements)
+    }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = PortUiState(isLoading = true)
+        )
+
+//
+//    fun updateUIFromData(o: Any? = null) {
+//        Log.i("portmapperUI", "updateUIFromData non ui thread")
+//        runOnUiThread {
+//
+//            Log.i("portmapperUI", "updateUIFromData")
+//
+//            val data: MutableList<UPnPViewElement> = mutableListOf()
+//            synchronized(UpnpManager.lockIgdDevices)
+//            {
+//                for (device in UpnpManager.IGDDevices) {
+//                    data.add(UPnPViewElement(device))
+//
+//                    if (device.portMappings.isEmpty()) {
+//                        data.add(
+//                            UPnPViewElement(
+//                                device,
+//                                true
+//                            )
+//                        ) // calls LiveData.setValue i.e. must be done on UI thread
+//                    } else {
+//
+//                        for (mapping in device.portMappings)
+//                        {
+//                            data.add(UPnPViewElement(mapping))
+//                        }
+//
+//                    }
+//                }
+//            }
+//            upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
+//        }
+//    }
+
     fun fullRefresh()
     {
         UpnpManager.FullRefresh()
+    }
+
+    fun devices(): StateFlow<List<IGDDevice>> {
+        return UpnpManager.devices
     }
 
     fun renew( portMapping: PortMapping ) = applicationScope.launch {
