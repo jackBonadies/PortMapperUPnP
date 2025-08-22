@@ -546,15 +546,8 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
         ) {
 
-        var curVal = 0
 
         itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
-
-            curVal++
-            if (curVal % 4 == 0)
-            {
-                Text(text = "test")
-            }
 
             if(message.IsSpecialEmpty)
             {

@@ -85,7 +85,7 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
     val expandedInternal = remember { mutableStateOf(false) }
     val expandedExternal = remember { mutableStateOf(false) }
     val wanIpVersionOfGatewayIsVersion1 = remember { derivedStateOf {
-        val version = UpnpManager.GetDeviceByExternalIp(defaultGatewayIp)?.upnpTypeVersion ?: 2
+        val version = UpnpManager.getIGDDevice(defaultGatewayIp).upnpTypeVersion ?: 2
         version == 1
     } }
 

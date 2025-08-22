@@ -15,12 +15,12 @@ import android.text.Html
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.util.DisplayMetrics
-import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -135,7 +135,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -153,7 +152,6 @@ import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.ActionNames
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
@@ -169,9 +167,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.com.shinjiindustrial.portmapper.PortViewModel
@@ -228,40 +224,7 @@ enum class Protocol(val protocol: String) {
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-
-    fun deviceFoundHandler(remoteDevice: IGDDevice) {
-        runOnUiThread {
-            mainSearchInProgressAndNothingFoundYet?.value = false
-        }
-        UpnpManager.invokeUpdateUIFromData()
-    }
-
-    fun portMappingAddedHandler(portMapping: PortMapping) {
-        UpnpManager.invokeUpdateUIFromData()
-    }
-
-    fun portMappingFoundHandler(portMapping: PortMapping) {
-        UpnpManager.invokeUpdateUIFromData()
-    }
-
-    fun deviceFinishedListingPortsHandler(remoteDevice: IGDDevice) {
-        if (remoteDevice.portMappings.isEmpty()) {
-            UpnpManager.invokeUpdateUIFromData()
-        }
-    }
-
-    fun searchStarted(o: Any?) {
-        runOnUiThread {
-            mainSearchInProgressAndNothingFoundYet!!.value = true // controls when loading bar is there
-            searchInProgressJob?.cancel() // cancel old search timer
-            if (mainSearchInProgressAndNothingFoundYet!!.value) {
-                searchInProgressJob = GlobalScope.launch {
-                    delay(6000)
-                    mainSearchInProgressAndNothingFoundYet!!.value = false
-                }
-            }
-        }
-    }
+    private val portViewModel: PortViewModel by viewModels()
 
     companion object {
 
@@ -320,14 +283,6 @@ class MainActivity : ComponentActivity() {
         var MultiSelectItems : SnapshotStateList<PortMapping>? = null
     }
 
-    lateinit var upnpElementsViewModel: UPnPElementViewModel
-
-    //var upnpElementsViewModel: ViewModel by viewModels()
-    //var upnpElementsViewModel = UPnPElementViewModel()
-    var searchInProgressJob: Job? = null
-
-    var mainSearchInProgressAndNothingFoundYet: MutableState<Boolean>? = null //TODO similar thing with pullrefresh...
-
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -348,50 +303,9 @@ class MainActivity : ComponentActivity() {
                 onBackPressedDispatcher.onBackPressed()
             }
         }
-        
-        //OurNetworkInfo.GetNameTypeMappings(this)
-        //getConnectionType(this)
-        //getLocalIpAddress()
-
-        //android router set wifi enabled
-
-//        val future = CompletableFuture<String>()
-//        future.complete("Hello")
-//        var result = future.get()
-
-        //AndroidRouter().enableWiFi()
-
-        // viewModel = ViewModelProvider(this).get(MyViewModel::class.java)
-        //     var upnpElementsViewModel = UPnPElementViewModel()
 
         UpnpManager.Initialize(this, false)
-        upnpElementsViewModel = ViewModelProvider(this).get(UPnPElementViewModel::class.java)
-        //updateUIFromData() // no longer needed with ViewModelProvided ViewModel
-
-        UpnpManager.DeviceFoundEvent += ::deviceFoundHandler
-        UpnpManager.PortAddedEvent += ::portMappingAddedHandler
-        UpnpManager.PortInitialFoundEvent += ::portMappingFoundHandler
-        UpnpManager.FinishedListingPortsEvent += ::deviceFinishedListingPortsHandler
-
-
-//
-//        UpnpManager.UpdateUIFromDataCollating.conflate().onEach {
-//
-//                Log.i("portmapper","ui update data handler")
-//                updateUIFromData(null)
-//
-//            }.launchIn(lifecycleScope)
-
-        UpnpManager.SearchStarted += ::searchStarted
-
-        if (UpnpManager.FailedToInitialize) {
-            mainSearchInProgressAndNothingFoundYet = mutableStateOf(false)
-        } else {
-            mainSearchInProgressAndNothingFoundYet = mutableStateOf(!UpnpManager.HasSearched)
-            UpnpManager.Search(true) // by default STAll
-        }
-        //var refreshState = mutableStateOf(false)
-
+        portViewModel.start()
 
         setContent {
             MyApplicationTheme {
@@ -417,18 +331,10 @@ class MainActivity : ComponentActivity() {
                     fadeOut(animationSpec = tween(300))
                 },
                 popEnterTransition = {
-                    //fadeIn(animationSpec = tween(0))
                     //this is whats used when going back from "create rule"
                     slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(
                         durationMillis = 200, easing = FastOutSlowInEasing
                     )) + fadeIn(animationSpec = tween(400))
-                    //fadeIn(animationSpec = tween(300))
-//                    slideInHorizontally(
-//                        initialOffsetX = { -300 }, animationSpec = tween(
-//                            durationMillis = 300, easing = FastOutSlowInEasing
-//                        )
-//                    ) //+ fadeIn(animationSpec = tween(300))
-
                 },
                 popExitTransition = {
                    fadeOut(animationSpec = tween(300))
@@ -454,29 +360,17 @@ class MainActivity : ComponentActivity() {
                             targetOffsetY = { it / 2 }, animationSpec = tween(
                                 durationMillis = 200, easing = FastOutSlowInEasing
                             )) + fadeOut(animationSpec = tween(100))
-//                slideOutVertically(
-//                    targetOffsetY = { -300 }, animationSpec = tween(
-//                        durationMillis = 300, easing = FastOutSlowInEasing
-//                    )
-                    //) //+
-                    //fadeOut(animationSpec = tween(300))
                 },
                 exitTransition = {
                slideOutVertically(
                    targetOffsetY = { it }, animationSpec = tween(
                        durationMillis = 5000, easing = FastOutSlowInEasing
                    ))
-                //) //+
             },
                 enterTransition = {
-
                     slideInVertically(initialOffsetY = { it }, animationSpec = tween(
                             durationMillis = 200, easing = FastOutSlowInEasing
                         )) + fadeIn(animationSpec = tween(400))
-//                        initialOffsetY = { -300 }, animationSpec = tween(
-//                            durationMillis = 300, easing = FastOutSlowInEasing
-//                        )
-
                 },
                 popEnterTransition = {
                     fadeIn(animationSpec = tween(150))
@@ -505,17 +399,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        UpnpManager.DeviceFoundEvent -= ::deviceFoundHandler
-        UpnpManager.PortAddedEvent -= ::portMappingAddedHandler
-        UpnpManager.FinishedListingPortsEvent -= ::deviceFinishedListingPortsHandler
-    }
-
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     @Composable
     fun MainScreen(navController : NavHostController, portViewModel : PortViewModel = hiltViewModel()) {
         // A surface container using the 'background' color from the theme
+        val searchStartedRecentlyAndNothingFoundYet by portViewModel.searchStartedRecentlyAndNothingFoundYet.collectAsStateWithLifecycle()
+        val anyDevices by portViewModel.anyDevices.collectAsStateWithLifecycle()
         rememberScrollState()
         val showAboutDialogState = remember { mutableStateOf(false) }
         val showMoreInfoDialogState = remember { mutableStateOf(false) }
@@ -540,25 +429,6 @@ class MainActivity : ComponentActivity() {
 
         PortForwardApplication.currentSingleSelectedObject =
             remember { mutableStateOf(null) }
-
-//                if(singleSelectionPopup)
-//                {
-//                    Popup(alignment = Alignment.Center) {
-//                        DropdownMenu(
-//                            expanded = true,
-//                            onDismissRequest = {}
-//                        ) {
-//                            DropdownMenuItem(
-//                                text = { Text("Load") },
-//                                onClick = {  }
-//                            )
-//                            DropdownMenuItem(
-//                                text = { Text("Save") },
-//                                onClick = {  }
-//                            )
-//                        }
-//                    }
-        //}
 
         if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
             EnterContextMenu(
@@ -629,8 +499,6 @@ class MainActivity : ComponentActivity() {
         MainActivity.MultiSelectItems = remember { mutableStateListOf<PortMapping>() }
         rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
-        val anyIgdDevices = remember { mutableStateOf(!UpnpManager.IGDDevices.isEmpty()) }
-        UpnpManager.AnyIgdDevices = anyIgdDevices
 
         val bottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
 
@@ -669,7 +537,7 @@ class MainActivity : ComponentActivity() {
                 },
                 floatingActionButton = {
 
-                    if (anyIgdDevices.value) {
+                    if (anyDevices) {
                         FloatingActionButton(
                             // uses MaterialTheme.colorScheme.secondaryContainer
                             containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
@@ -737,7 +605,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-
                             OverflowMenu(
                                 showAboutDialogState, portViewModel
                             )
@@ -751,7 +618,7 @@ class MainActivity : ComponentActivity() {
                     val refreshState = remember { mutableStateOf(false) }
                     var refreshing by refreshState
 
-                    val andResult = remember { derivedStateOf { refreshing && mainSearchInProgressAndNothingFoundYet!!.value } }
+                    val isRefreshing = remember { derivedStateOf { refreshing && searchStartedRecentlyAndNothingFoundYet } }
 
                     val onlyShowMainProgressBar = true // looks slightly better in practice
 
@@ -766,7 +633,7 @@ class MainActivity : ComponentActivity() {
                         refreshing = false
                     }
 
-                    val state = rememberPullRefreshState(andResult.value, ::refresh)
+                    val state = rememberPullRefreshState(isRefreshing.value, ::refresh)
 
                     BoxWithConstraints(
                         Modifier
@@ -787,17 +654,13 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxHeight()
                                 .fillMaxWidth()
                         ) {
-//                                    for (i in 1..10)
-//                                    {
-//                                        Text("test")
-//                                    }
-                            if (mainSearchInProgressAndNothingFoundYet!!.value) {
+                            if (searchStartedRecentlyAndNothingFoundYet) {
                                 val offset = boxHeight * 0.28f
                                 LoadingIcon(
                                     "Searching for devices",
                                     Modifier.offset(y = offset)
                                 )
-                            } else if (!anyIgdDevices.value) {
+                            } else if (!anyDevices) {
                                 val offset = boxHeight * 0.28f
                                 Column(modifier = Modifier.offset(y = offset))
                                 {
@@ -902,41 +765,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// TODO: expires in 5 minutes, autorenews in 5 minutes status symbols for each portmapping
-// TODO: mock profile
-fun launchMockUPnPSearch(activity : MainActivity, upnpElementsViewModel : UPnPElementViewModel)
-{
-    GlobalScope.launch {
-        var iter = 0
-        while(true)
-        {
-            iter++
-
-            delay(1000L)
-            activity.runOnUiThread {
-                val index = Random.nextInt(0,upnpElementsViewModel.items.value!!.size+1)
-                upnpElementsViewModel.insertItem(
-                    UPnPViewElement(
-                        PortMapping(
-                            "Web Server $iter",
-                            "",
-                            "192.168.18.13",
-                            80,
-                            80,
-                            "UDP",
-                            true,
-                            0,
-                            "192.168.18.1",
-                            System.currentTimeMillis(),
-                            GetPsuedoSlot()
-                        )
-                    ),index)
-            }
-
-        }
-    }
-}
-
 fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 {
     // recursively look through devices
@@ -974,9 +802,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
         securePolicy = SecureFlagPolicy.SecureOff,
         usePlatformDefaultWidth = false,
         decorFitsSystemWindows = true,
-//            usePlatformDefaultWidth = false,
-//            shape = RoundedCornerShape(16.dp),
-//            backgroundColor = Color.LightGray // set your preferred color here
     )
     MyApplicationTheme {
         Dialog(
@@ -1751,7 +1576,7 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
         if(MainActivity.MultiSelectItems!!.isEmpty())
         {
             items.add(R.string.refresh_action)
-            if(UpnpManager.GetUPnPClient().isInitialized()) // TODO cahnge back
+            if(UpnpManager.GetUPnPClient().isInitialized())
             {
                 val (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
                 if(anyEnabled) // also get info i.e. any enabled, any disabled

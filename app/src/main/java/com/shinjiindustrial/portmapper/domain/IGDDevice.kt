@@ -31,6 +31,9 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     var upnpType : String //i.e. InternetGatewayDevice
     var upnpTypeVersion : Int //i.e. 2
     var actionsMap : MutableMap<String, Action<RemoteService>>
+
+
+
     var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
     var lookUpExisting : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
 //    var hasAddPortMappingAction : Boolean
@@ -76,96 +79,6 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             this.upnpType = ""
             this.upnpTypeVersion = 1
             this.actionsMap = mutableMapOf()
-        }
-    }
-
-    suspend fun EnumeratePortMappings()
-    {
-        // we enumerate port mappings later
-        portMappings = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
-        var finishedEnumeratingPortMappings = false
-
-        val timeTakenMillis = measureTimeMillis {
-
-//        if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings))
-//        {
-//            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetListOfPortMappings")
-//            var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings]!!
-//            getAllPortMappingsUsingListPortMappings(getPortMapping)
-//        }
-            if(actionsMap.containsKey(ACTION_NAMES.GetGenericPortMappingEntry))
-            {
-                OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
-                getAllPortMappingsUsingGenericPortMappingEntry()
-            }
-            else{
-                //TODO firebase integration
-                OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
-            }
-
-        }
-        OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
-
-
-        finishedEnumeratingPortMappings = true
-        UpnpManager.FinishedListingPortsEvent.invoke(this)
-    }
-
-    // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
-    // TODO I dont like that this is here but the other classes that interact with Client are in UPnp manager
-    private suspend fun getAllPortMappingsUsingGenericPortMappingEntry() {
-        var slotIndex : Int = 0;
-        var retryCount : Int = 0
-        while(true)
-        {
-            var shouldRetry : Boolean = false
-            var success : Boolean = false;
-            try {
-                //future.get() // SYNCHRONOUS (note this can, and does, throw)
-                val result = GetUPnPClient().getGenericPortMappingRule(this, slotIndex)
-                when (result) {
-                    is UPnPGetSpecificMappingResult.Success -> {
-                        val portMapping = result.resultingMapping
-                        addOrUpdate(portMapping) //!!
-                        UpnpManager.PortInitialFoundEvent.invoke(portMapping)
-                        success = true
-                        OurLogger.log(Level.INFO, portMapping.toStringFull())
-                        retryCount = 0
-
-                    }
-                    is UPnPGetSpecificMappingResult.Failure -> {
-                        OurLogger.log(Level.INFO, "GetGenericPortMapping failed for entry $slotIndex: ${result.reason}.  NOTE: This is normal.")
-                    }
-                }
-            }
-            catch(e : Exception)
-            {
-                if(retryCount == 0) // if two exceptions in a row then stop.
-                {
-                    shouldRetry = true // network issue.. retrying does work.
-                    retryCount++
-                }
-                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
-            }
-
-            if(shouldRetry)
-            {
-                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
-                continue
-            }
-
-
-            if (!success)
-            {
-                break
-            }
-
-            slotIndex++
-
-            if (slotIndex > 65535)
-            {
-                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
-            }
         }
     }
 

@@ -60,7 +60,6 @@ fun BottomSheetSortBy() {
                                 curIndex.value = index
                                 SharedPrefValues.SortByPortMapping = SortBy.from(index)
                                 UpnpManager.UpdateSorting()
-                                UpnpManager.invokeUpdateUIFromData()
                                 PortForwardApplication.instance.SaveSharedPrefs()
 
                             })
@@ -87,7 +86,6 @@ fun BottomSheetSortBy() {
                             asc.value = ascendingButton
                             SharedPrefValues.Ascending = ascendingButton
                             UpnpManager.UpdateSorting()
-                            UpnpManager.invokeUpdateUIFromData()
                             PortForwardApplication.instance.SaveSharedPrefs()
 
                         })

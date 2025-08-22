@@ -17,12 +17,16 @@ import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.logging.Level
@@ -48,7 +52,24 @@ class PortViewModel @Inject constructor(
     private val _events = MutableSharedFlow<UiEvent>()
     val events: SharedFlow<UiEvent> = _events
 
+    val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
     private val applicationScope : CoroutineScope = MainScope()
+
+    val anyDevices: StateFlow<Boolean> = UpnpManager.devices.map { devices -> devices.isNotEmpty() }.stateIn( scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
+    val searchStartedRecentlyAndNothingFoundYet: StateFlow<Boolean> = combine(UpnpManager.devices, searchStartedRecently)
+    {
+        devices, searchStartedRecently ->
+        devices.isEmpty() && searchStartedRecently
+    }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     val uiState: StateFlow<PortUiState> = combine( // !! todo
         UpnpManager.devices, UpnpManager.portMappings
@@ -58,14 +79,31 @@ class PortViewModel @Inject constructor(
         val upnpElements = mutableListOf<UPnPViewElement>()
         if (devices.isEmpty())
         {
-            PortUiState(isLoading = true)
         }
         else
         {
-            val curDevice = devices.first()
-            // TODO clean up for multiple devices
-            portMappings.forEachIndexed { index, portMapping ->
-                upnpElements.add(UPnPViewElement(portMapping))
+            var index = 0
+            val curDevice : IGDDevice? = devices.elementAt(0)
+            val portMappingsList = portMappings.toList()
+            for (curDevice in devices)
+            {
+                // do we have any port mappings
+                if (index >= portMappingsList.size || portMappingsList.elementAt(index).ActualExternalIP != curDevice.ipAddress)
+                {
+                    // emit empty and continue
+                    upnpElements.add(UPnPViewElement(curDevice, false))
+                    upnpElements.add(UPnPViewElement(curDevice, true))
+                    continue
+                }
+                upnpElements.add(UPnPViewElement(curDevice))
+                while (index < portMappingsList.size)
+                {
+                    if (portMappingsList.elementAt(index).ActualExternalIP == curDevice.ipAddress)
+                    {
+                        upnpElements.add(UPnPViewElement(portMappingsList.elementAt(index)))
+                    }
+                    index++
+                }
             }
         }
 
@@ -233,6 +271,40 @@ class PortViewModel @Inject constructor(
                 val enableDisableString = if(enable) "Enable" else "Disable"
                 _events.emit(UiEvent.SnackBarViewLogEvent("$enableDisableString Port Mappings Failed"))
             }
+    }
+
+
+
+    fun start()
+    {
+        if (UpnpManager.FailedToInitialize) {
+            searchStartedRecently.value = false
+        } else {
+            searchStartedRecently.value = !UpnpManager.HasSearched
+            UpnpManager.Search(true) // by default STAll
+        }
+    }
+
+    init {
+        UpnpManager.SearchStarted += { o -> searchStarted(o) }
+    }
+
+    override fun onCleared() {
+        UpnpManager.SearchStarted -= { o -> searchStarted(o) }
+        super.onCleared()
+    }
+
+    // move to viewmodel
+    var searchInProgressJob: Job? = null
+    fun searchStarted(o: Any?) {
+        searchStartedRecently.value = true // controls when loading bar is there
+        searchInProgressJob?.cancel() // cancel old search timer
+        if (searchStartedRecently.value) {
+            searchInProgressJob = viewModelScope.launch {
+                delay(6000)
+                searchStartedRecently.value = false
+            }
+        }
     }
 
     fun deleteAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
