@@ -43,6 +43,8 @@ interface IUpnpClient {
 
     fun getInterfacesUsedInSearch(): MutableList<NetworkInterfaceInfo>
 
+    fun instantiateAndBindUpnpService()
+
     val deviceFoundEvent: Event<IGDDevice>
 }
 

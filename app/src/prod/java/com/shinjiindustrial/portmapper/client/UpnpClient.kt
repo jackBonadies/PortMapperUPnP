@@ -1,7 +1,8 @@
 package com.shinjiindustrial.portmapper.client
 
+import android.content.Context
 import com.shinjiindustrial.portmapper.GetPsuedoSlot
-import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
@@ -11,8 +12,10 @@ import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getIGDDevice
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fourthline.cling.UpnpService
+import org.fourthline.cling.UpnpServiceImpl
 import org.fourthline.cling.controlpoint.ActionCallback
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
@@ -20,12 +23,12 @@ import org.fourthline.cling.model.meta.LocalDevice
 import org.fourthline.cling.model.meta.RemoteDevice
 import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
-import java.util.concurrent.Future
 import java.util.logging.Level
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.coroutines.resume
 
-class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUpnpClient {
+class UpnpClient @Inject constructor(@ApplicationContext private val context: Context) : IUpnpClient {
 
     sealed class ClingExecutionResult {
         data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()
@@ -33,7 +36,11 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
             ClingExecutionResult()
     }
 
-    init {
+    private lateinit var upnpService : UpnpService
+
+    override fun instantiateAndBindUpnpService()
+    {
+        upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
         upnpService.registry?.addListener(object : RegistryListener {
             // ssdp datagrams have been alive and processed
             // services are unhydrated, service descriptors not yet retrieved
@@ -85,6 +92,9 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
         })
     }
 
+    init {
+    }
+
     private suspend fun executeAction(actionInvocation: ActionInvocation<*>): ClingExecutionResult =
         suspendCancellableCoroutine { cont ->
             // TODO test throwing exception behavior
@@ -105,7 +115,7 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
                 }
             })
             cont.invokeOnCancellation { future.cancel(true) }
-    }
+        }
 
     override suspend fun createPortMappingRule(
         device: IGDDevice,
@@ -138,11 +148,11 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
             println(result.operation.statusCode)
             println(result.operation.isFailed)
 
-            OurLogger.log(
+            PortForwardApplication.Companion.OurLogger.log(
                 Level.SEVERE,
                 "Failed to create rule (${portMappingRequest.realize().shortName()})."
             )
-            OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
+            PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
 
             return UPnPCreateMappingResult.Failure(result.defaultMsg, result.operation)
         }
@@ -165,7 +175,7 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
             is ClingExecutionResult.Success -> {
                 println("Successfully deleted")
 
-                OurLogger.log(
+                PortForwardApplication.Companion.OurLogger.log(
                     Level.INFO,
                     "Successfully deleted rule (${portMapping.shortName()})."
                 )
@@ -181,11 +191,11 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
                 println(result.operation.statusCode)
                 println(result.operation.isFailed)
 
-                OurLogger.log(
+                PortForwardApplication.Companion.OurLogger.log(
                     Level.SEVERE,
                     "Failed to delete rule (${portMapping.shortName()})."
                 )
-                OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
+                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
 
                 return UPnPResult.Failure(result.defaultMsg, result.operation)
             }
@@ -230,7 +240,7 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
                     GetPsuedoSlot()
                 ) // best bet for DateTime.UtcNow
 
-                OurLogger.log(
+                PortForwardApplication.Companion.OurLogger.log(
                     Level.INFO,
                     "Successfully read back our new rule (${pm.shortName()})"
                 )
@@ -248,11 +258,11 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
                 println(result.operation.isFailed)
 
                 val rule = formatShortName(protocol, remoteIp, remotePort)
-                OurLogger.log(
+                PortForwardApplication.Companion.OurLogger.log(
                     Level.SEVERE,
                     "Failed to read back our new rule ($rule)."
                 )
-                OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
+                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
 
                 val result = UPnPCreateMappingWrapperResult.Failure(result.defaultMsg, result.operation)
                 return result
@@ -261,7 +271,7 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
     }
 
     override suspend fun getGenericPortMappingRule(device : IGDDevice,
-                                           slotIndex : Int) : UPnPGetSpecificMappingResult
+                                                   slotIndex : Int) : UPnPGetSpecificMappingResult
     {
         val ipAddress = device.ipAddress
         val action = device.actionsMap[ACTION_NAMES.GetGenericPortMappingEntry]
@@ -272,7 +282,7 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
         when (result) {
             is ClingExecutionResult.Success -> {
                 val invocation = result.invocation
-                OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
+                PortForwardApplication.Companion.OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
                 val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
                 val externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
@@ -293,7 +303,8 @@ class UpnpClient @Inject constructor(private val upnpService: UpnpService) : IUp
                     leaseDuration.toString().toInt(),
                     ipAddress,
                     System.currentTimeMillis(),
-                    slotIndex)
+                    slotIndex
+                )
                 val result = UPnPGetSpecificMappingResult.Success(portMapping, portMapping)
                 return result
             }

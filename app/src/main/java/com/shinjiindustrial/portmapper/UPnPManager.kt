@@ -8,7 +8,6 @@ import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
-import com.shinjiindustrial.portmapper.client.UpnpClient
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
@@ -24,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.UpnpServiceImpl
 import java.util.TreeSet
 import java.util.logging.Level
+import javax.inject.Inject
 import kotlin.collections.map
 import kotlin.collections.remove
 import kotlin.collections.set
@@ -33,10 +33,6 @@ import kotlin.system.measureTimeMillis
 class UpnpManager {
 
     companion object { //singleton
-
-//        private val _devices = MutableStateFlow<Map<String, IGDDevice>>(emptyMap())
-//        val devices: StateFlow<List<IGDDevice>> = _devices.map { it.values.sortedBy { d -> d.displayName } }
-//        .stateIn(appScope, SharingStarted.Eagerly, emptyList())
 
         lateinit var upnpClient : IUpnpClient
 
@@ -226,9 +222,7 @@ class UpnpManager {
                 return true
             }
 
-            // TODO need upnp provider so we can recreate the instance
-            val _upnpService = UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
-            upnpClient = UpnpClient(_upnpService)
+            GetUPnPClient().instantiateAndBindUpnpService()
             // TODO need to unsub?
             GetUPnPClient().deviceFoundEvent += { device ->
                 // this is on the cling thread
