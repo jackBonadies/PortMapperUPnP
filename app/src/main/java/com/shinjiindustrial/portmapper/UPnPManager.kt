@@ -10,7 +10,6 @@ import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
-import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -21,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
-import org.fourthline.cling.UpnpServiceImpl
 import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
@@ -328,7 +326,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
         suspend fun DeletePortMappingEntry(portMapping: PortMapping) : UPnPResult {
 
             try {
-                val device: IIGDDevice = getIGDDevice(portMapping.ActualExternalIP)
+                val device: IIGDDevice = getIGDDevice(portMapping.DeviceIP)
                 val result = upnpClient.deletePortMapping(device, portMapping)
                 removeRuleIfSuccessful(result)
                 return result
@@ -350,7 +348,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
                 try {
                     println("Requesting Delete: ${portMapping.shortName()}")
 
-                    val device: IIGDDevice = getIGDDevice(portMapping.ActualExternalIP)
+                    val device: IIGDDevice = getIGDDevice(portMapping.DeviceIP)
                     val result = upnpClient.deletePortMapping(device,portMapping)
                     removeRuleIfSuccessful(result)
                     result
@@ -613,7 +611,7 @@ data class PortMappingRequest(val description : String, val internalIp : String,
     companion object {
         fun from(portMapping: PortMapping) : PortMappingRequest
         {
-            return PortMappingRequest(portMapping.Description, portMapping.InternalIP, portMapping.InternalPort.toString(), portMapping.ActualExternalIP, portMapping.ExternalPort.toString(), portMapping.Protocol, portMapping.LeaseDuration.toString(), portMapping.Enabled, portMapping.RemoteHost)
+            return PortMappingRequest(portMapping.Description, portMapping.InternalIP, portMapping.InternalPort.toString(), portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol, portMapping.LeaseDuration.toString(), portMapping.Enabled, portMapping.RemoteHost)
         }
     }
 }

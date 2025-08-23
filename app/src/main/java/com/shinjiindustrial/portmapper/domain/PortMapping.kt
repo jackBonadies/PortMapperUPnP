@@ -10,7 +10,7 @@ class PortMapping(
     protocol: String,
     enabled: Boolean,
     leaseDuration: Int,
-    actionExternalIP : String,
+    deviceIP : String,
     timeReadLeaseDurationMs : Long,
     pseudoSlot : Int)
 {
@@ -38,7 +38,7 @@ class PortMapping(
     //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
     var RemoteHost : String = remoteHost
     // the actual ip of the IGD device
-    var ActualExternalIP : String = actionExternalIP
+    var DeviceIP : String = deviceIP
     var InternalIP : String = localIP
     var ExternalPort : Int = externalPort
     var InternalPort : Int= internalPort
@@ -62,7 +62,7 @@ class PortMapping(
 
     fun shortName() : String
     {
-        return formatShortName(Protocol,ActualExternalIP,ExternalPort.toString())
+        return formatShortName(Protocol,DeviceIP,ExternalPort.toString())
     }
 
     fun getRemainingLeaseTime(now : Long = -1) : Int
@@ -179,7 +179,7 @@ class PortMapping(
 
     fun toStringFull() : String
     {
-        return "PortMapping(RemoteHost=$RemoteHost, ActualExternalIP=$ActualExternalIP, InternalIP=$InternalIP, ExternalPort=$ExternalPort, InternalPort=$InternalPort, Protocol=$Protocol, Enabled=$Enabled, LeaseDuration=$LeaseDuration, Description=$Description, TimeReadLeaseDurationMs=$TimeReadLeaseDurationMs, Slot=$Slot)"
+        return "PortMapping(RemoteHost=$RemoteHost, ActualExternalIP=$DeviceIP, InternalIP=$InternalIP, ExternalPort=$ExternalPort, InternalPort=$InternalPort, Protocol=$Protocol, Enabled=$Enabled, LeaseDuration=$LeaseDuration, Description=$Description, TimeReadLeaseDurationMs=$TimeReadLeaseDurationMs, Slot=$Slot)"
     }
 }
 

@@ -826,7 +826,7 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     .appendQueryParameter("description", portMapping.Description)
                                     .appendQueryParameter("internalIp", portMapping.InternalIP)
                                     .appendQueryParameter("internalRange", portMapping.InternalPort.toString())
-                                    .appendQueryParameter("externalIp", portMapping.ActualExternalIP) // this is actual external IP as we only use it to delete the old rule...
+                                    .appendQueryParameter("externalIp", portMapping.DeviceIP) // this is actual external IP as we only use it to delete the old rule...
                                     .appendQueryParameter("externalRange", portMapping.ExternalPort.toString())
                                     .appendQueryParameter("protocol", portMapping.Protocol)
                                     .appendQueryParameter("leaseDuration", portMapping.LeaseDuration.toString())

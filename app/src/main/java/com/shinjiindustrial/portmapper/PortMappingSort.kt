@@ -1,7 +1,6 @@
 package com.shinjiindustrial.portmapper
 
 import com.shinjiindustrial.portmapper.domain.PortMapping
-import kotlin.text.compareTo
 
 open class PortMapperComparatorBase(ascending : Boolean) : Comparator<PortMapping> {
 
@@ -24,7 +23,7 @@ open class PortMapperComparatorBase(ascending : Boolean) : Comparator<PortMappin
         {
             return orderBySwitch * cmp
         }
-        cmp = p1.ActualExternalIP.compareTo(p2.ActualExternalIP)
+        cmp = p1.DeviceIP.compareTo(p2.DeviceIP)
         if(cmp != 0)
         {
             return orderBySwitch * cmp
@@ -124,7 +123,7 @@ open class PortMapperComparerSlot(ascending : Boolean) : PortMapperComparatorBas
 
 class ComparerWrapper(val comparator : Comparator<PortMapping>) : Comparator<PortMapping> {
     override fun compare(p1: PortMapping, p2: PortMapping): Int {
-        val cmp = p1.ActualExternalIP.compareTo(p2.ActualExternalIP)
+        val cmp = p1.DeviceIP.compareTo(p2.DeviceIP)
         if(cmp != 0)
         {
             return cmp

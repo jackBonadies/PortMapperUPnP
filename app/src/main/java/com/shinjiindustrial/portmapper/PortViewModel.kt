@@ -94,7 +94,7 @@ class PortViewModel @Inject constructor(
             {
                 // do we have any port mappings
                 upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
-                if (index >= portMappingsList.size || portMappingsList.elementAt(index).ActualExternalIP != curDevice.getIpAddress())
+                if (index >= portMappingsList.size || portMappingsList.elementAt(index).DeviceIP != curDevice.getIpAddress())
                 {
                     // emit empty and continue
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
@@ -102,7 +102,7 @@ class PortViewModel @Inject constructor(
                 }
                 while (index < portMappingsList.size)
                 {
-                    if (portMappingsList.elementAt(index).ActualExternalIP == curDevice.getIpAddress())
+                    if (portMappingsList.elementAt(index).DeviceIP == curDevice.getIpAddress())
                     {
                         upnpElements.add(UpnpViewRow.PortViewRow(portMappingsList.elementAt(index)))
                     }

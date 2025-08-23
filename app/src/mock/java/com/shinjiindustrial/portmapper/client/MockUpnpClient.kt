@@ -2,21 +2,16 @@ package com.shinjiindustrial.portmapper.client
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
-import com.shinjiindustrial.portmapper.common.NetworkType
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.fourthline.cling.binding.xml.Descriptor
 import org.fourthline.cling.model.action.ActionException
 import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.RemoteService
-import org.fourthline.cling.model.meta.Service
-import java.net.NetworkInterface
 
 class MockIGDDevice(private val displayName : String, private val ipAddress : String, private val upnpTypeVersion : Int = 2) : IIGDDevice
 {
@@ -66,7 +61,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
     private fun getKey(portMapping : PortMapping) : Key
     {
-        return Key(portMapping.ActualExternalIP, portMapping.ExternalPort.toString(), portMapping.Protocol)
+        return Key(portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol)
     }
 
     data class Key(val externalIp: String, val remotePort: String, val protocol: String)
@@ -110,7 +105,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
             protocol = protocol,
             enabled = enabled,
             leaseDuration = leaseDuration,
-            actionExternalIP = actionExternalIP,
+            deviceIP = actionExternalIP,
             timeReadLeaseDurationMs = System.currentTimeMillis(),
             pseudoSlot = pseudoSlot
         )

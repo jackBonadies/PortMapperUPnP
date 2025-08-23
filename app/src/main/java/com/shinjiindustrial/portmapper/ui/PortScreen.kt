@@ -38,7 +38,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,7 +75,7 @@ import java.com.shinjiindustrial.portmapper.PortUiState
 @Composable
 fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
 {
-    println("external ip test ${portMapping.ActualExternalIP}")
+    println("external ip test ${portMapping.DeviceIP}")
 
     MyApplicationTheme {
 

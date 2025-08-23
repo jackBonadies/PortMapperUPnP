@@ -38,7 +38,7 @@ fun MoreInfoDialog(portMapping : PortMapping, showDialog : MutableState<Boolean>
                 val pairs = mutableListOf<Pair<String, String>>()
                 pairs.add(Pair("Internal IP", portMapping.InternalIP))
                 pairs.add(Pair("Internal Port", portMapping.InternalPort.toString()))
-                pairs.add(Pair("External IP", portMapping.ActualExternalIP))
+                pairs.add(Pair("External IP", portMapping.DeviceIP))
                 pairs.add(Pair("External Port", portMapping.ExternalPort.toString()))
                 pairs.add(Pair("Protocol", portMapping.Protocol))
                 pairs.add(Pair("Enabled", if (portMapping.Enabled) "True" else "False"))
