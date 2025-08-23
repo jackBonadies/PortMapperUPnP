@@ -6,8 +6,6 @@ object SharedPrefKeys
 {
     val dayNightPref = "dayNightPref"
     val materialYouPref = "materialYouPref"
-    val sortOrderPref = "sortOrderPref"
-    val descAscPref = "descAscPref"
 }
 
 object SharedPrefValues

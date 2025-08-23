@@ -35,8 +35,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,7 +52,6 @@ import com.shinjiindustrial.portmapper.IsMultiSelectMode
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.ToggleSelection
-import com.shinjiindustrial.portmapper.UPnPElementViewModel
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping

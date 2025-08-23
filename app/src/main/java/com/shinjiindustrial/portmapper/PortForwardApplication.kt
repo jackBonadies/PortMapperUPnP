@@ -57,11 +57,8 @@ class PortForwardApplication : Application() {
             SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
             val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
             SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
-            val sortOrderKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-            // much better default than slot. with slot updating a rule (i.e. enable or disable) sends it down to bottom
-            SharedPrefValues.SortByPortMapping = SortBy.from(preferences[sortOrderKey] ?: SortBy.ExternalPort.sortByValue)
-            val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-            SharedPrefValues.Ascending = preferences[descAsc] ?: true
+            //val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
+            //SharedPrefValues.Ascending = preferences[descAsc] ?: true
         }
     }
 
@@ -72,10 +69,10 @@ class PortForwardApplication : Application() {
                 preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
                 val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
                 preferences[materialYouKey] = SharedPrefValues.MaterialYouTheme
-                val sortKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-                preferences[sortKey] = SharedPrefValues.SortByPortMapping.sortByValue
-                val descAscKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-                preferences[descAscKey] = SharedPrefValues.Ascending
+//                val sortKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
+//                preferences[sortKey] = SharedPrefValues.SortByPortMapping.sortByValue
+//                val descAscKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
+//                preferences[descAscKey] = SharedPrefValues.Ascending
             }
         }
     }

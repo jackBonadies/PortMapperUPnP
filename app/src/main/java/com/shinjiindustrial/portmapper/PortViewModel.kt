@@ -1,17 +1,17 @@
 package java.com.shinjiindustrial.portmapper
 
-import android.util.Log
+import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.UPnPElementViewModel
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.CreatePortMappingRulesEntry
 import com.shinjiindustrial.portmapper.UpnpManager.Companion.DeletePortMappingEntry
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
@@ -115,39 +115,22 @@ class PortViewModel @Inject constructor(
             initialValue = PortUiState(isLoading = true)
         )
 
-//
-//    fun updateUIFromData(o: Any? = null) {
-//        Log.i("portmapperUI", "updateUIFromData non ui thread")
-//        runOnUiThread {
-//
-//            Log.i("portmapperUI", "updateUIFromData")
-//
-//            val data: MutableList<UPnPViewElement> = mutableListOf()
-//            synchronized(UpnpManager.lockIgdDevices)
-//            {
-//                for (device in UpnpManager.IGDDevices) {
-//                    data.add(UPnPViewElement(device))
-//
-//                    if (device.portMappings.isEmpty()) {
-//                        data.add(
-//                            UPnPViewElement(
-//                                device,
-//                                true
-//                            )
-//                        ) // calls LiveData.setValue i.e. must be done on UI thread
-//                    } else {
-//
-//                        for (mapping in device.portMappings)
-//                        {
-//                            data.add(UPnPViewElement(mapping))
-//                        }
-//
-//                    }
-//                }
-//            }
-//            upnpElementsViewModel.setData(data) // calls LiveData.setValue i.e. must be done on UI thread
-//        }
-//    }
+    fun initialize(context : Context, force : Boolean)
+    {
+        UpnpManager.Initialize(context, force)
+    }
+
+    fun getExistingRuleInfos(): Pair<Boolean, Boolean> {
+        return UpnpManager.GetExistingRuleInfos()
+    }
+
+    fun getInterfacesUsedInSearch(): MutableList<NetworkInterfaceInfo> {
+        return UpnpManager.GetUPnPClient().getInterfacesUsedInSearch()
+    }
+
+    fun isInitialized(): Boolean {
+        return UpnpManager.GetUPnPClient().isInitialized()
+    }
 
     fun fullRefresh()
     {

@@ -2,9 +2,6 @@ package com.shinjiindustrial.portmapper
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.MutableState
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
@@ -18,27 +15,18 @@ import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImp
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fourthline.cling.UpnpServiceImpl
-import java.util.Collections
 import java.util.TreeSet
 import java.util.logging.Level
 import kotlin.collections.map
+import kotlin.collections.remove
+import kotlin.collections.set
 import kotlin.system.measureTimeMillis
 
 
@@ -100,16 +88,42 @@ class UpnpManager {
             _devices.update { listOf<IGDDevice>() }
         }
 
-        fun add(pm: PortMapping)
+        fun addOrUpdateMapping(pm: PortMapping)
         {
+            var existingRule : PortMapping? = null
+            val key = pm.getKey()
             _portMappings.update { old ->
+                if (portMappingLookup.containsKey(key)) {
+                    existingRule = this.portMappingLookup[key]
+                    old.remove(existingRule)
+                }
                 portMappingLookup[pm.getKey()] = pm
                 TreeSet(old).apply { add(pm) }
             }
+
+            if (existingRule != null && MainActivity.MultiSelectItems?.remove(existingRule) ?: false) {
+                MainActivity.MultiSelectItems!!.add(pm)
+            }
         }
 
-        fun remove(pm: PortMapping) = _portMappings.update { old ->
-            TreeSet(old).apply { remove(pm) }
+        fun removeMapping(pm: PortMapping)
+        {
+            _portMappings.update { old ->
+                portMappingLookup.remove(pm.getKey())
+                TreeSet(old).apply { remove(pm) }
+            }
+            MainActivity.MultiSelectItems?.remove(pm)
+        }
+
+        //
+        fun UpdateSorting() {
+            _portMappings.update { old ->
+                val newMappings = TreeSet<PortMapping>(
+                    SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)
+                )
+                newMappings.addAll(old)
+                newMappings
+            }
         }
 
         // endregion
@@ -164,22 +178,6 @@ class UpnpManager {
 
         // endregion
 
-        // TODO
-        fun UpdateSorting() {
-//            synchronized(lockIgdDevices)
-//            {
-//                for (device in IGDDevices) {
-//                    val newMappings = TreeSet<PortMapping>(
-//                        SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)
-//                    )
-//                    newMappings.addAll(device.portMappings)
-//                    for (pm in newMappings) {
-//                        device.lookUpExisting[pm.getKey()] = pm
-//                    }
-//                    device.portMappings = newMappings
-//                }
-//            }
-        }
 
         // region uievents
 
@@ -271,7 +269,7 @@ class UpnpManager {
                     false,
                     getEnabledDisabledString(enable).lowercase(),
                 )
-                enableDisableDefaultCallback(res)
+                updateMappingIfSuccessful(res)
                 return res
             }
             catch (exception: Exception) {
@@ -296,7 +294,7 @@ class UpnpManager {
                         false,
                         "renewed",
                     )
-                    enableDisableDefaultCallback(res)
+                    updateMappingIfSuccessful(res)
                     res
                 } catch (exception: Exception) {
                     OurLogger.log(
@@ -318,7 +316,7 @@ class UpnpManager {
                     false,
                     "renewed",
                 )
-                enableDisableDefaultCallback(res)
+                updateMappingIfSuccessful(res)
                 return res
             } catch (exception: Exception) {
                 OurLogger.log(
@@ -337,7 +335,7 @@ class UpnpManager {
             try {
                 val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
                 val result = GetUPnPClient().deletePortMapping(device, portMapping)
-                defaultRuleDeletedCallback(result)
+                removeRuleIfSuccessful(result)
                 return result
             } catch (exception: Exception) {
                 OurLogger.log(
@@ -359,7 +357,7 @@ class UpnpManager {
 
                     val device: IGDDevice = getIGDDevice(portMapping.ActualExternalIP)
                     val result = GetUPnPClient().deletePortMapping(device,portMapping)
-                    defaultRuleDeletedCallback(result)
+                    removeRuleIfSuccessful(result)
                     result
 
                 } catch (exception: Exception) {
@@ -386,7 +384,7 @@ class UpnpManager {
                         portMappingRequestRule,
                         false,
                         "created")
-                    defaultRuleAddedCallback(result)
+                    addRuleIfSuccessful(result)
                     result
                 }
             }
@@ -414,7 +412,7 @@ class UpnpManager {
                         false,
                         getEnabledDisabledString(enable).lowercase(),
                     )
-                    enableDisableDefaultCallback(res)
+                    updateMappingIfSuccessful(res)
                     res
                 } catch (exception: Exception) {
 
@@ -515,7 +513,7 @@ class UpnpManager {
                     when (result) {
                         is UPnPGetSpecificMappingResult.Success -> {
                             val portMapping = result.resultingMapping
-                            add(portMapping) //!!
+                            addOrUpdateMapping(portMapping) //!!
                             success = true
                             OurLogger.log(Level.INFO, portMapping.toStringFull())
                             retryCount = 0
@@ -574,34 +572,26 @@ class UpnpManager {
             clearDevices()
         }
 
-        // !!
-        fun enableDisableDefaultCallback(result: UPnPCreateMappingWrapperResult) {
+        private fun updateMappingIfSuccessful(result: UPnPCreateMappingWrapperResult) {
             println("adding rule callback")
             if (result is UPnPCreateMappingWrapperResult.Success) {
-                val device =
-                    getIGDDevice(result.resultingMapping.ActualExternalIP)
-                device.addOrUpdate(result.resultingMapping)
+                addOrUpdateMapping(result.resultingMapping)
             }
         }
 
-        fun defaultRuleAddedCallback(result : UPnPCreateMappingWrapperResult) {
+        private fun addRuleIfSuccessful(result : UPnPCreateMappingWrapperResult) {
             println("default adding rule callback")
             if (result is UPnPCreateMappingWrapperResult.Success)
             {
-                val device =
-                    UpnpManager.getIGDDevice(result.resultingMapping.ActualExternalIP)
-                val firstRule = device.portMappings.isEmpty()
-                device.addOrUpdate(result.resultingMapping)
+                addOrUpdateMapping(result.resultingMapping)
             }
         }
 
-        fun defaultRuleDeletedCallback(result : UPnPResult) {
+        private fun removeRuleIfSuccessful(result : UPnPResult) {
             println("default adding rule callback")
             if (result is UPnPResult.Success)
             {
-                val device =
-                    UpnpManager.getIGDDevice(result.requestInfo.ActualExternalIP)
-                device.removeMapping(result.requestInfo)
+                removeMapping(result.requestInfo)
             }
         }
 

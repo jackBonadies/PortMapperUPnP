@@ -304,7 +304,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        UpnpManager.Initialize(this, false)
+        portViewModel.initialize(this, false)
         portViewModel.start()
 
         setContent {
@@ -674,9 +674,9 @@ class MainActivity : ComponentActivity() {
 
                                     // these can go through vm -> repo -> client 
                                     val interfacesUsedInSearch =
-                                        UpnpManager.GetUPnPClient().getInterfacesUsedInSearch()
+                                        portViewModel.getInterfacesUsedInSearch()
                                     val anyInterfaces =
-                                        UpnpManager.GetUPnPClient().isInitialized()
+                                        portViewModel.isInitialized()
                                     if (!anyInterfaces) {
                                         Text(
                                             "No valid interfaces",
@@ -728,7 +728,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     Button(
                                         onClick = {
-                                            UpnpManager.Initialize(
+                                            portViewModel.initialize(
                                                 PortForwardApplication.appContext,
                                                 true
                                             )
@@ -1576,9 +1576,9 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
         if(MainActivity.MultiSelectItems!!.isEmpty())
         {
             items.add(R.string.refresh_action)
-            if(UpnpManager.GetUPnPClient().isInitialized())
+            if(portViewModel.isInitialized())
             {
-                val (anyEnabled, anyDisabled) = UpnpManager.GetExistingRuleInfos()
+                val (anyEnabled, anyDisabled) = portViewModel.getExistingRuleInfos()
                 if(anyEnabled) // also get info i.e. any enabled, any disabled
                 {
                     items.add(R.string.disable_all_action)
@@ -1676,25 +1676,6 @@ fun formatIpv4(ipAddr : Int) : String
     byteBuffer.putInt(ipAddr)
     val inetAddress = InetAddress.getByAddress(null, byteBuffer.array())
     return inetAddress.hostAddress
-}
-
-// TODO delete?
-class UPnPElementViewModel: ViewModel() {
-    private val _items = MutableLiveData<List<UPnPViewElement>>(emptyList())
-    val items: LiveData<List<UPnPViewElement>> get() = _items
-
-    fun setData(data : List<UPnPViewElement>)
-    {
-        _items.value = data
-    }
-
-    fun addItem(item: UPnPViewElement) {
-        _items.value = _items.value!! + listOf(item)
-    }
-
-    fun insertItem(item: UPnPViewElement, index : Int) {
-        _items.value = _items.value!!.subList(0,index) + listOf(item) + _items.value!!.subList(index, _items.value!!.size)
-    }
 }
 
 data class Message(val name : String, val msg : String)

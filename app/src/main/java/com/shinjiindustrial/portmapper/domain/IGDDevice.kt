@@ -32,18 +32,6 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
     var upnpTypeVersion : Int //i.e. 2
     var actionsMap : MutableMap<String, Action<RemoteService>>
 
-
-
-    var portMappings : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
-    var lookUpExisting : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
-//    var hasAddPortMappingAction : Boolean
-//    var hasDeletePortMappingAction : Boolean
-
-//    fun getMappingIndex(externalPort : Int, protocol : String) : Int
-//    {
-//        return portMappings.indexOfFirst { it.ExternalPort == externalPort && it.Protocol == protocol }
-//    }
-
     init {
         this.rootDevice = _rootDevice
         this.wanIPService = _wanIPService
@@ -79,35 +67,6 @@ class IGDDevice constructor(_rootDevice : RemoteDevice?, _wanIPService : RemoteS
             this.upnpType = ""
             this.upnpTypeVersion = 1
             this.actionsMap = mutableMapOf()
-        }
-    }
-
-    fun addOrUpdate(mapping : PortMapping)
-    {
-        synchronized(lockIgdDevices)
-        {
-            val key = mapping.getKey()
-            if (this.lookUpExisting.containsKey(key)) {
-                val existing = this.lookUpExisting[key]
-                this.portMappings.remove(existing) //TODO
-
-                if (existing != null && MainActivity.MultiSelectItems?.remove(existing) ?: false) {
-                    MainActivity.MultiSelectItems!!.add(mapping)
-                }
-            }
-            this.lookUpExisting[key] = mapping
-            this.portMappings.add(mapping)
-        }
-
-    }
-
-    fun removeMapping(mapping : PortMapping)
-    {
-        synchronized(lockIgdDevices)
-        {
-            this.lookUpExisting.remove(mapping.getKey())
-            this.portMappings.remove(mapping)
-            MainActivity.MultiSelectItems?.remove(mapping)
         }
     }
 }

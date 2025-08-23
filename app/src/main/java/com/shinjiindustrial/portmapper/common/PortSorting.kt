@@ -1,5 +1,6 @@
 package com.shinjiindustrial.portmapper.common
 
+import com.shinjiindustrial.portmapper.ComparerWrapper
 import com.shinjiindustrial.portmapper.PortMapperComparatorBase
 import com.shinjiindustrial.portmapper.PortMapperComparatorDescription
 import com.shinjiindustrial.portmapper.PortMapperComparatorDevice
@@ -7,6 +8,7 @@ import com.shinjiindustrial.portmapper.PortMapperComparatorExpiration
 import com.shinjiindustrial.portmapper.PortMapperComparatorExternalPort
 import com.shinjiindustrial.portmapper.PortMapperComparatorInternalPort
 import com.shinjiindustrial.portmapper.PortMapperComparerSlot
+import com.shinjiindustrial.portmapper.domain.PortMapping
 
 // TODO organize re other portmappingsort file
 
@@ -44,15 +46,16 @@ enum class SortBy(val sortByValue : Int) {
         }
     }
 
-    fun getComparer(ascending : Boolean): PortMapperComparatorBase {
-        return when(this)
-        {
-            Slot -> PortMapperComparerSlot(ascending)
-            Description -> PortMapperComparatorDescription(ascending)
-            InternalPort -> PortMapperComparatorInternalPort(ascending)
-            ExternalPort -> PortMapperComparatorExternalPort(ascending)
-            Device -> PortMapperComparatorDevice(ascending)
-            Expiration -> PortMapperComparatorExpiration(ascending)
-        }
+    fun getComparer(ascending : Boolean):  Comparator<PortMapping> {
+        return ComparerWrapper(
+            when (this) {
+                Slot -> PortMapperComparerSlot(ascending)
+                Description -> PortMapperComparatorDescription(ascending)
+                InternalPort -> PortMapperComparatorInternalPort(ascending)
+                ExternalPort -> PortMapperComparatorExternalPort(ascending)
+                Device -> PortMapperComparatorDevice(ascending)
+                Expiration -> PortMapperComparatorExpiration(ascending)
+            }
+        )
     }
 }
