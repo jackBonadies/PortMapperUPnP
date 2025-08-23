@@ -53,10 +53,9 @@ import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
-import com.shinjiindustrial.portmapper.domain.UPnPViewElement
+import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import java.com.shinjiindustrial.portmapper.PortUiState
@@ -203,6 +202,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
 
                     Text(text, color = AdditionalColors.TextColor)
+                    Text("expires in " + portMapping.getRemainingLeaseTime(), color = AdditionalColors.TextColor)
                 }
 
                 Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
@@ -512,9 +512,9 @@ fun ScaffoldDemo() {
 fun PreviewConversation() {
     SetupPreview()
     MyApplicationTheme {
-        val msgs = mutableListOf<UPnPViewElement>()
+        val msgs = mutableListOf<UpnpViewRow>()
         val pm = _getDefaultPortMapping()
-        val upnpViewEl = UPnPViewElement(pm)
+        val upnpViewEl = UpnpViewRow.PortViewRow(pm)
         for (i in 0..20)
         {
             msgs.add(upnpViewEl)
@@ -532,7 +532,7 @@ fun PortMappingContent(uiState : PortUiState)
 //lazy column IS recycler view basically. both recycle.
 @OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
 @Composable
-fun Conversation(messages: List<UPnPViewElement>) {
+fun Conversation(messages: List<UpnpViewRow>) {
 
     LazyColumn(
         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
@@ -545,20 +545,19 @@ fun Conversation(messages: List<UPnPViewElement>) {
 
         ) {
 
+        // TODO key?
+        itemsIndexed(messages, key = { index, message -> message.key }) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
 
-        itemsIndexed(messages) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
-
-            if(message.IsSpecialEmpty)
-            {
-                NoMappingsCard(message.GetUnderlyingIGDDevice())
-            }
-            else if(message.IsIGDDevice())
-            {
-                DeviceHeader(message.GetUnderlyingIGDDevice())
-            }
-            else
-            {
-                PortMappingCard(message.GetUnderlyingPortMapping(), Modifier.animateItemPlacement())
+            when(message) {
+                is UpnpViewRow.DeviceHeaderViewRow -> {
+                    DeviceHeader(message.device)
+                }
+                is UpnpViewRow.DeviceEmptyViewRow -> {
+                    NoMappingsCard(message.device)
+                }
+                is UpnpViewRow.PortViewRow -> {
+                    PortMappingCard(message.portMapping, Modifier.animateItemPlacement())
+                }
             }
         }
 

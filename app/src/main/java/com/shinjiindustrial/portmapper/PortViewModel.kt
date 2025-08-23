@@ -1,6 +1,7 @@
 package java.com.shinjiindustrial.portmapper
 
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,31 +9,35 @@ import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
-import com.shinjiindustrial.portmapper.domain.UPnPViewElement
+import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.logging.Level
 import javax.inject.Inject
 
 data class PortUiState(
-    val items: List<UPnPViewElement> = emptyList(),
+    val items: List<UpnpViewRow> = emptyList(),
     val isLoading: Boolean = false,
     val userMessage: Int? = null
 )
@@ -74,8 +79,9 @@ class PortViewModel @Inject constructor(
         upnpRepository.devices, upnpRepository.portMappings
     ) { devices, portMappings ->
 
+        Log.i("Port", "UI STATE FLOW is running")
 
-        val upnpElements = mutableListOf<UPnPViewElement>()
+        val upnpElements = mutableListOf<UpnpViewRow>()
         if (devices.isEmpty())
         {
         }
@@ -87,19 +93,18 @@ class PortViewModel @Inject constructor(
             for (curDevice in devices)
             {
                 // do we have any port mappings
+                upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
                 if (index >= portMappingsList.size || portMappingsList.elementAt(index).ActualExternalIP != curDevice.getIpAddress())
                 {
                     // emit empty and continue
-                    upnpElements.add(UPnPViewElement(curDevice, false))
-                    upnpElements.add(UPnPViewElement(curDevice, true))
+                    upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
                     continue
                 }
-                upnpElements.add(UPnPViewElement(curDevice))
                 while (index < portMappingsList.size)
                 {
                     if (portMappingsList.elementAt(index).ActualExternalIP == curDevice.getIpAddress())
                     {
-                        upnpElements.add(UPnPViewElement(portMappingsList.elementAt(index)))
+                        upnpElements.add(UpnpViewRow.PortViewRow(portMappingsList.elementAt(index)))
                     }
                     index++
                 }
@@ -278,6 +283,27 @@ class PortViewModel @Inject constructor(
             upnpRepository.Search(true) // by default STAll
         }
     }
+
+    fun tickerFlow(
+        periodMillis: Long,
+        initialDelayMillis: Long = 0L
+    ): Flow<Unit> = flow {
+        if (initialDelayMillis > 0) delay(initialDelayMillis)
+        while (currentCoroutineContext().isActive) {
+            emit(Unit)
+            delay(periodMillis)
+        }
+    }
+
+    // Example usage (in a ViewModel):
+    val data: StateFlow<Unit> =
+        tickerFlow(periodMillis = 60_000L)       // ticks every 60s
+            .onStart { emit(Unit) }               // run immediately on subscribe
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = Unit
+            )
 
     init {
         upnpRepository.SearchStarted += { o -> searchStarted(o) }
