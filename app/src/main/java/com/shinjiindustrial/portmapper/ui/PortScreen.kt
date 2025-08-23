@@ -1,7 +1,9 @@
 package com.shinjiindustrial.portmapper.ui
 
 import android.content.res.Configuration
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -35,6 +37,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,8 +63,10 @@ import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
+import com.shinjiindustrial.portmapper.domain.Urgency
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.delay
 import java.com.shinjiindustrial.portmapper.PortUiState
 
 @OptIn(
@@ -65,7 +74,7 @@ import java.com.shinjiindustrial.portmapper.PortUiState
     ExperimentalFoundationApi::class
 )
 @Composable
-fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Modifier.Companion)
+fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
 {
     println("external ip test ${portMapping.ActualExternalIP}")
 
@@ -189,7 +198,7 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
                         fontWeight = FontWeight.Companion.SemiBold,
                         color = AdditionalColors.TextColor
                     )
-                    Text("${portMapping.InternalIP}", color = AdditionalColors.TextColor)
+                    Text(portMapping.InternalIP, color = AdditionalColors.TextColor)
 
                     val text = buildAnnotatedString {
                         withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
@@ -202,7 +211,9 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
 
                     Text(text, color = AdditionalColors.TextColor)
-                    Text("expires in " + portMapping.getRemainingLeaseTime(), color = AdditionalColors.TextColor)
+                    val urgency = portMapping.getUrgency(false, now)
+                    val color by urgencyColor(urgency, AdditionalColors.TextColor, AdditionalColors.LogWarningText, AdditionalColors.LogErrorText)
+                    Text(portMapping.getRemainingLeaseTimeRoughString(false, now), color = color)
                 }
 
                 Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
@@ -220,6 +231,21 @@ fun PortMappingCard(portMapping: PortMapping, additionalModifier : Modifier = Mo
 
     }
 }
+
+@Composable
+fun urgencyColor(
+    urgency: Urgency,
+    normal: Color,
+    warn: Color,
+    error: Color,
+    expired: Color = Color.Gray
+) = animateColorAsState(
+    when (urgency) {
+        Urgency.Normal  -> normal
+        Urgency.Warn    -> warn
+        Urgency.Error   -> error
+    }
+)
 
 @Preview(showBackground = true)
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -529,10 +555,25 @@ fun PortMappingContent(uiState : PortUiState)
     Conversation(uiState.items)
 }
 
+@Composable
+fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
+    Log.i("rememberTicker", "called")
+    val now = remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(periodMillis)
+            now.value = System.currentTimeMillis()
+        }
+    }
+    return now
+}
+
 //lazy column IS recycler view basically. both recycle.
 @OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun Conversation(messages: List<UpnpViewRow>) {
+
+    val now by rememberTicker(20_000)
 
     LazyColumn(
         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
@@ -556,7 +597,7 @@ fun Conversation(messages: List<UpnpViewRow>) {
                     NoMappingsCard(message.device)
                 }
                 is UpnpViewRow.PortViewRow -> {
-                    PortMappingCard(message.portMapping, Modifier.animateItemPlacement())
+                    PortMappingCard(message.portMapping, now, Modifier.animateItemPlacement())
                 }
             }
         }

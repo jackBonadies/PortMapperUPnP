@@ -65,22 +65,65 @@ class PortMapping(
         return formatShortName(Protocol,ActualExternalIP,ExternalPort.toString())
     }
 
-    fun getRemainingLeaseTime() : Int
+    fun getRemainingLeaseTime(now : Long = -1) : Int
     {
-        val secondsPassed = (System.currentTimeMillis() - TimeReadLeaseDurationMs)/1000L
+        val secondsPassed = ((if(now == -1L) System.currentTimeMillis() else now) - TimeReadLeaseDurationMs)/1000L
         val timeToExpiration = (LeaseDuration.toLong() - secondsPassed)
         return timeToExpiration.toInt()
     }
 
-    fun getRemainingLeaseTimeString() : String
+    fun getRemainingLeaseTimeRoughString(autoRenew : Boolean, now: Long = -1) : String
+    {
+        if (this.LeaseDuration == 0)
+        {
+            return "Expires Never"
+        }
+
+        val totalSecs = getRemainingLeaseTime(now)
+        val dhms = getDHMS(totalSecs)
+
+        val hasDays = dhms.days >= 1
+        val hasHours = dhms.hours >= 1
+        val hasMinutes = dhms.mins >= 1
+        val hasSeconds = dhms.seconds >= 1
+
+        val renewsExpiresString = if(autoRenew) "Expires in" else "Renews in"
+
+        if (hasDays)
+        {
+            return "$renewsExpiresString ${dhms.days} day${_plural(dhms.days)}"
+        }
+        else if(hasHours)
+        {
+            return "$renewsExpiresString ${dhms.hours} hour${_plural(dhms.hours)}"
+        }
+        else if(hasMinutes)
+        {
+            return "$renewsExpiresString ${dhms.mins} minute${_plural(dhms.mins)}"
+        }
+        else if(hasSeconds)
+        {
+            if (autoRenew) {
+                return "Renewing now"
+            }
+            else {
+                return "$renewsExpiresString <1 minute"
+            }
+        }
+        else
+        {
+            return "Expired"
+        }
+    }
+
+    fun getRemainingLeaseTimeString(now: Long = -1) : String
     {
         if (this.LeaseDuration == 0)
         {
             return "Never"
         }
         // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
-        val totalSecs = getRemainingLeaseTime()
-
+        val totalSecs = getRemainingLeaseTime(now)
         val dhms = getDHMS(totalSecs)
 
         val hasDays = dhms.days >= 1
@@ -110,6 +153,25 @@ class PortMapping(
         }
     }
 
+    fun getUrgency(autoRenew : Boolean, now : Long = -1) : Urgency
+    {
+        if (autoRenew)
+        {
+            return Urgency.Normal
+        }
+        val totalSecs = getRemainingLeaseTime(now)
+        val dhms = getDHMS(totalSecs)
+        if (dhms.mins <= 1)
+        {
+            return Urgency.Error
+        }
+        else if (dhms.mins <= 5)
+        {
+            return Urgency.Warn
+        }
+        return Urgency.Normal
+    }
+
     fun _plural(value : Int) : String
     {
         return if (value > 1) "s" else ""
@@ -119,6 +181,12 @@ class PortMapping(
     {
         return "PortMapping(RemoteHost=$RemoteHost, ActualExternalIP=$ActualExternalIP, InternalIP=$InternalIP, ExternalPort=$ExternalPort, InternalPort=$InternalPort, Protocol=$Protocol, Enabled=$Enabled, LeaseDuration=$LeaseDuration, Description=$Description, TimeReadLeaseDurationMs=$TimeReadLeaseDurationMs, Slot=$Slot)"
     }
+}
+
+enum class Urgency {
+    Normal,
+    Warn,
+    Error,
 }
 
 data class DayHourMinSec(val days : Int, val hours : Int, val mins : Int, val seconds : Int)

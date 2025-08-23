@@ -1,9 +1,16 @@
 package com.shinjiindustrial.portmapper.domain
 
-sealed class ViewKey {
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
+sealed class ViewKey : Parcelable {
     // TODO include slot? what does it mean for 2 ports to be the same since we can edit them?
+    @Parcelize
     data class PortViewKey(val externalPort: Int, val protocol: String, val deviceIp : String) : ViewKey()
+    @Parcelize
     data class DeviceHeaderKey(val deviceIp : String) : ViewKey()
+    @Parcelize
     data class DeviceEmptyKey(val deviceIp : String) : ViewKey()
 }
 
