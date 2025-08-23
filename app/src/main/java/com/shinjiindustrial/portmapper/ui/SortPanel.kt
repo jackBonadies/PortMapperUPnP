@@ -20,11 +20,11 @@ import com.shinjiindustrial.portmapper.SharedPrefValues
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import java.com.shinjiindustrial.portmapper.PortViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Preview
-fun BottomSheetSortBy() {
+fun BottomSheetSortBy(portViewModel: PortViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -59,7 +59,7 @@ fun BottomSheetSortBy() {
 
                                 curIndex.value = index
                                 SharedPrefValues.SortByPortMapping = SortBy.from(index)
-                                UpnpManager.UpdateSorting()
+                                portViewModel.updateSorting()
                                 PortForwardApplication.instance.SaveSharedPrefs()
 
                             })
@@ -85,7 +85,7 @@ fun BottomSheetSortBy() {
 
                             asc.value = ascendingButton
                             SharedPrefValues.Ascending = ascendingButton
-                            UpnpManager.UpdateSorting()
+                            portViewModel.updateSorting()
                             PortForwardApplication.instance.SaveSharedPrefs()
 
                         })

@@ -6,11 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.UpnpManager
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.CreatePortMappingRulesEntry
-import com.shinjiindustrial.portmapper.UpnpManager.Companion.DeletePortMappingEntry
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
@@ -40,7 +39,7 @@ data class PortUiState(
 
 @HiltViewModel
 class PortViewModel @Inject constructor(
-    //private val repo: UpnpRespository
+    private val upnpRepository: UpnpManager
 ) : ViewModel() {
 
     sealed interface UiEvent {
@@ -56,12 +55,12 @@ class PortViewModel @Inject constructor(
 
     private val applicationScope : CoroutineScope = MainScope()
 
-    val anyDevices: StateFlow<Boolean> = UpnpManager.devices.map { devices -> devices.isNotEmpty() }.stateIn( scope = viewModelScope,
+    val anyDevices: StateFlow<Boolean> = upnpRepository.devices.map { devices -> devices.isNotEmpty() }.stateIn( scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = false
     )
 
-    val searchStartedRecentlyAndNothingFoundYet: StateFlow<Boolean> = combine(UpnpManager.devices, searchStartedRecently)
+    val searchStartedRecentlyAndNothingFoundYet: StateFlow<Boolean> = combine(upnpRepository.devices, searchStartedRecently)
     {
         devices, searchStartedRecently ->
         devices.isEmpty() && searchStartedRecently
@@ -72,7 +71,7 @@ class PortViewModel @Inject constructor(
         )
 
     val uiState: StateFlow<PortUiState> = combine( // !! todo
-        UpnpManager.devices, UpnpManager.portMappings
+        upnpRepository.devices, upnpRepository.portMappings
     ) { devices, portMappings ->
 
 
@@ -83,12 +82,12 @@ class PortViewModel @Inject constructor(
         else
         {
             var index = 0
-            val curDevice : IGDDevice? = devices.elementAt(0)
+            val curDevice : IIGDDevice? = devices.elementAt(0)
             val portMappingsList = portMappings.toList()
             for (curDevice in devices)
             {
                 // do we have any port mappings
-                if (index >= portMappingsList.size || portMappingsList.elementAt(index).ActualExternalIP != curDevice.ipAddress)
+                if (index >= portMappingsList.size || portMappingsList.elementAt(index).ActualExternalIP != curDevice.getIpAddress())
                 {
                     // emit empty and continue
                     upnpElements.add(UPnPViewElement(curDevice, false))
@@ -98,7 +97,7 @@ class PortViewModel @Inject constructor(
                 upnpElements.add(UPnPViewElement(curDevice))
                 while (index < portMappingsList.size)
                 {
-                    if (portMappingsList.elementAt(index).ActualExternalIP == curDevice.ipAddress)
+                    if (portMappingsList.elementAt(index).ActualExternalIP == curDevice.getIpAddress())
                     {
                         upnpElements.add(UPnPViewElement(portMappingsList.elementAt(index)))
                     }
@@ -117,33 +116,45 @@ class PortViewModel @Inject constructor(
 
     fun initialize(context : Context, force : Boolean)
     {
-        UpnpManager.Initialize(context, force)
+        upnpRepository.Initialize(context, force)
     }
 
     fun getExistingRuleInfos(): Pair<Boolean, Boolean> {
-        return UpnpManager.GetExistingRuleInfos()
+        return upnpRepository.GetExistingRuleInfos()
     }
 
     fun getInterfacesUsedInSearch(): MutableList<NetworkInterfaceInfo> {
-        return UpnpManager.GetUPnPClient().getInterfacesUsedInSearch()
+        return upnpRepository.GetUPnPClient().getInterfacesUsedInSearch()
     }
 
     fun isInitialized(): Boolean {
-        return UpnpManager.GetUPnPClient().isInitialized()
+        return upnpRepository.GetUPnPClient().isInitialized()
+    }
+
+    fun updateSorting() {
+        upnpRepository.UpdateSorting()
+    }
+
+    fun getIGDDevice(ipAddress: String): IIGDDevice {
+        return upnpRepository.getIGDDevice(ipAddress)
+    }
+
+    fun GetGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
+        return upnpRepository.GetGatewayIpsWithDefault(deviceGateway)
     }
 
     fun fullRefresh()
     {
-        UpnpManager.FullRefresh()
+        upnpRepository.FullRefresh()
     }
 
-    fun devices(): StateFlow<List<IGDDevice>> {
-        return UpnpManager.devices
+    fun devices(): StateFlow<List<IIGDDevice>> {
+        return upnpRepository.devices
     }
 
     fun renew( portMapping: PortMapping ) = applicationScope.launch {
             try {
-                val res = UpnpManager.RenewRule(portMapping)
+                val res = upnpRepository.RenewRule(portMapping)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
@@ -158,8 +169,8 @@ class PortViewModel @Inject constructor(
 
     fun renewAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
         try {
-            val portMappings = chosen?.toList() ?: UpnpManager.GetAllRules()
-            val result = UpnpManager.RenewRules(portMappings)
+            val portMappings = chosen?.toList() ?: upnpRepository.GetAllRules()
+            val result = upnpRepository.RenewRules(portMappings)
             result.forEach { res ->
                 when (res) {
                     is UPnPCreateMappingWrapperResult.Success -> {
@@ -195,7 +206,7 @@ class PortViewModel @Inject constructor(
         enable: Boolean) =
         applicationScope.launch {
             try {
-                val res = UpnpManager.DisableEnablePortMappingEntry(portMapping, enable)
+                val res = upnpRepository.DisableEnablePortMappingEntry(portMapping, enable)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
@@ -216,11 +227,11 @@ class PortViewModel @Inject constructor(
                 val result = when {
                     chosenRulesOnly != null -> {
                         val rules = chosenRulesOnly.filter { it -> it.Enabled != enable }
-                        UpnpManager.DisableEnablePortMappingEntries(rules, enable)
+                        upnpRepository.DisableEnablePortMappingEntries(rules, enable)
                     }
                     else -> {
-                        val rules = UpnpManager.GetEnabledDisabledRules(!enable)
-                        UpnpManager.DisableEnablePortMappingEntries(rules, enable)
+                        val rules = upnpRepository.GetEnabledDisabledRules(!enable)
+                        upnpRepository.DisableEnablePortMappingEntries(rules, enable)
                     }
                 }
 
@@ -260,20 +271,20 @@ class PortViewModel @Inject constructor(
 
     fun start()
     {
-        if (UpnpManager.FailedToInitialize) {
+        if (upnpRepository.FailedToInitialize) {
             searchStartedRecently.value = false
         } else {
-            searchStartedRecently.value = !UpnpManager.HasSearched
-            UpnpManager.Search(true) // by default STAll
+            searchStartedRecently.value = !upnpRepository.HasSearched
+            upnpRepository.Search(true) // by default STAll
         }
     }
 
     init {
-        UpnpManager.SearchStarted += { o -> searchStarted(o) }
+        upnpRepository.SearchStarted += { o -> searchStarted(o) }
     }
 
     override fun onCleared() {
-        UpnpManager.SearchStarted -= { o -> searchStarted(o) }
+        upnpRepository.SearchStarted -= { o -> searchStarted(o) }
         super.onCleared()
     }
 
@@ -293,8 +304,8 @@ class PortViewModel @Inject constructor(
     fun deleteAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
         try {
             // get all enabled. note: need to clone.
-            val rules = chosen?.toList() ?: UpnpManager.GetAllRules()
-            val result = UpnpManager.DeletePortMappingsEntry(rules)
+            val rules = chosen?.toList() ?: upnpRepository.GetAllRules()
+            val result = upnpRepository.DeletePortMappingsEntry(rules)
             result.forEach { res ->
                 when (res) {
                     is UPnPResult.Success -> {
@@ -327,7 +338,7 @@ class PortViewModel @Inject constructor(
 
     fun delete(portMapping: PortMapping) = applicationScope.launch {
         try {
-            val res = UpnpManager.DeletePortMappingEntry(portMapping)
+            val res = upnpRepository.DeletePortMappingEntry(portMapping)
             if (res is UPnPResult.Success) {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
@@ -340,7 +351,7 @@ class PortViewModel @Inject constructor(
 
     fun editRule(oldRule : PortMapping, portMappingRequestInput : PortMappingUserInput) = applicationScope.launch {
         try {
-            val res = DeletePortMappingEntry(oldRule)
+            val res = upnpRepository.DeletePortMappingEntry(oldRule)
             if (res is UPnPResult.Failure) {
                 _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
                 return@launch
@@ -359,7 +370,7 @@ class PortViewModel @Inject constructor(
 
     fun createRules(portMappingUserInput: PortMappingUserInput, modifyCase : Boolean = false) = applicationScope.launch {
         try {
-            val result = CreatePortMappingRulesEntry(portMappingUserInput)
+            val result = upnpRepository.CreatePortMappingRulesEntry(portMappingUserInput)
             result.forEach { res ->
                 when (res) {
                     is UPnPCreateMappingWrapperResult.Success -> {

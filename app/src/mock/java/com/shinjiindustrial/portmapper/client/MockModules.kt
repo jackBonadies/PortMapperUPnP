@@ -1,15 +1,19 @@
 package com.shinjiindustrial.portmapper.client
 
+import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class UpnpClientModule {
-    @Binds
+class UpnpClientModule {
+    @Provides
     @Singleton
-    abstract fun bindUpnpClient(impl: MockUpnpClient): IUpnpClient
+    fun provideMockUpnpClient(): IUpnpClient {
+        return MockUpnpClient(MockUpnpClientConfig(Speed.Medium))
+    }
 }

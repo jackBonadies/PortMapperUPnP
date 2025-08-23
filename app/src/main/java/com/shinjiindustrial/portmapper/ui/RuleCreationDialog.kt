@@ -49,7 +49,7 @@ import java.util.logging.Level
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RuleCreationDialog(navController : NavHostController, portViewModel : PortViewModel = hiltViewModel(), ruleToEdit : PortMappingUserInput? = null)  {
+fun RuleCreationDialog(navController : NavHostController, portViewModel : PortViewModel, ruleToEdit : PortMappingUserInput? = null)  {
 
 
     // TODO vm.collect()
@@ -80,12 +80,12 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
     }
     val internalIp = remember { mutableStateOf(ruleToEdit?.internalIp ?: ourIp!!) }
     val internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
-    val (gatewayIps, defaultGatewayIp) = remember { UpnpManager.GetGatewayIpsWithDefault(ourGatewayIp!!) }
+    val (gatewayIps, defaultGatewayIp) = remember { portViewModel.GetGatewayIpsWithDefault(ourGatewayIp!!) }
     val externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
     val expandedInternal = remember { mutableStateOf(false) }
     val expandedExternal = remember { mutableStateOf(false) }
     val wanIpVersionOfGatewayIsVersion1 = remember { derivedStateOf {
-        val version = UpnpManager.getIGDDevice(defaultGatewayIp).upnpTypeVersion ?: 2
+        val version = portViewModel.getIGDDevice(defaultGatewayIp).getUpnpVersion()
         version == 1
     } }
 

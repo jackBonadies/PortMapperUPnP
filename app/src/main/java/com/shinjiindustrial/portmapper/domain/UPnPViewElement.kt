@@ -15,12 +15,12 @@ class UPnPViewElement constructor(
 
     fun IsIGDDevice() : Boolean
     {
-        return UnderlyingElement is IGDDevice
+        return UnderlyingElement is IIGDDevice
     }
 
-    fun GetUnderlyingIGDDevice() : IGDDevice
+    fun GetUnderlyingIGDDevice() : IIGDDevice
     {
-        return UnderlyingElement as IGDDevice
+        return UnderlyingElement as IIGDDevice
     }
 
     fun IsPortMapping() : Boolean

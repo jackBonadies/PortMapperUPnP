@@ -3,6 +3,7 @@ package com.shinjiindustrial.portmapper.client
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import org.fourthline.cling.model.message.UpnpResponse
@@ -15,23 +16,23 @@ import java.util.concurrent.Future
 interface IUpnpClient {
 
     suspend fun createPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMappingRequest: PortMappingRequest,
     ) : UPnPCreateMappingResult
 
     suspend fun deletePortMapping(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMapping: PortMapping,
     ): UPnPResult
 
     suspend fun getSpecificPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         remoteHost: String,
         remotePort: String,
         protocol: String,
     ) : UPnPCreateMappingWrapperResult
 
-    suspend fun getGenericPortMappingRule(device : IGDDevice,
+    suspend fun getGenericPortMappingRule(device : IIGDDevice,
         slotIndex : Int,
     ) : UPnPGetSpecificMappingResult
 
@@ -45,7 +46,7 @@ interface IUpnpClient {
 
     fun instantiateAndBindUpnpService()
 
-    val deviceFoundEvent: Event<IGDDevice>
+    val deviceFoundEvent: Event<IIGDDevice>
 }
 
 sealed class UPnPCreateMappingWrapperResult

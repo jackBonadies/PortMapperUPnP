@@ -8,6 +8,7 @@ import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.formatShortName
@@ -118,12 +119,11 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         }
 
     override suspend fun createPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMappingRequest: PortMappingRequest,
     ) : UPnPCreateMappingResult {
                 val externalIp = portMappingRequest.externalIp
-                val action = device.actionsMap[ACTION_NAMES.AddPortMapping]
-                val actionInvocation = ActionInvocation(action)
+                val actionInvocation = device.getActionInvocation(ACTION_NAMES.AddPortMapping)
                 actionInvocation.setInput("NewRemoteHost", portMappingRequest.remoteHost)
                 // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
                 actionInvocation.setInput("NewExternalPort", portMappingRequest.externalPort)
@@ -160,11 +160,10 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 }
 
     override suspend fun deletePortMapping(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMapping: PortMapping,
     ): UPnPResult {
-        val action = device.actionsMap[ACTION_NAMES.DeletePortMapping]
-        val actionInvocation = ActionInvocation(action)
+        val actionInvocation = device.getActionInvocation(ACTION_NAMES.DeletePortMapping)
         actionInvocation.setInput("NewRemoteHost", portMapping.getRemoteHostNormalizedForDelete())
         // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
         actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
@@ -203,15 +202,14 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
     }
 
     override suspend fun getSpecificPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         remoteHost: String,
         remotePort: String,
         protocol: String,
     ): UPnPCreateMappingWrapperResult {
 
-        val remoteIp = device.ipAddress
-        val action = device.actionsMap[ACTION_NAMES.GetSpecificPortMappingEntry]
-        val actionInvocation = ActionInvocation(action)
+        val remoteIp = device.getIpAddress()
+        val actionInvocation = device.getActionInvocation(ACTION_NAMES.GetSpecificPortMappingEntry)
         // this is actually remote host
         actionInvocation.setInput("NewRemoteHost", remoteHost)
         actionInvocation.setInput("NewExternalPort", remotePort)
@@ -270,13 +268,12 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         }
     }
 
-    override suspend fun getGenericPortMappingRule(device : IGDDevice,
+    override suspend fun getGenericPortMappingRule(device : IIGDDevice,
                                                    slotIndex : Int) : UPnPGetSpecificMappingResult
     {
-        val ipAddress = device.ipAddress
-        val action = device.actionsMap[ACTION_NAMES.GetGenericPortMappingEntry]
+        val ipAddress = device.getIpAddress()
+        val actionInvocation = device.getActionInvocation(ACTION_NAMES.GetGenericPortMappingEntry)
         println("requesting slot $slotIndex")
-        val actionInvocation = ActionInvocation(action)
         actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
         val result = this.executeAction(actionInvocation)
         when (result) {
@@ -336,7 +333,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         return (upnpService.configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
     }
 
-    override val deviceFoundEvent = Event<IGDDevice>()
+    override val deviceFoundEvent = Event<IIGDDevice>()
 //    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
 //        replay = 0, extraBufferCapacity = 1
 //    )

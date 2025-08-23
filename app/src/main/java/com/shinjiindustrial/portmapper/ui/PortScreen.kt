@@ -54,6 +54,7 @@ import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.UPnPViewElement
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
@@ -330,12 +331,13 @@ fun PortMappingCardAlt(portMapping: PortMapping)
 @Composable
 fun PreviewDeviceHeader()
 {
-    DeviceHeader(IGDDevice(null, null))
+    //TODO
+    //DeviceHeader(IGDDevice(null, null))
 }
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun DeviceHeader(device : IGDDevice)
+fun DeviceHeader(device : IIGDDevice)
 {
     Spacer(modifier = Modifier.Companion.padding(2.dp))
     Column(
@@ -350,13 +352,13 @@ fun DeviceHeader(device : IGDDevice)
     {
 //                    Divider(color = Color.Gray, thickness = 1.dp)
         Text(
-            device.displayName,
+            device.getDisplayName(),
             fontWeight = FontWeight.Companion.SemiBold,
             fontSize = TextUnit(24f, TextUnitType.Companion.Sp),
             color = AdditionalColors.TextColor
 
         )
-        Text(device.ipAddress, color = AdditionalColors.TextColor)
+        Text(device.getIpAddress(), color = AdditionalColors.TextColor)
     }
     Spacer(modifier = Modifier.Companion.padding(2.dp))
 }
@@ -387,7 +389,7 @@ fun LoadingIcon(label : String, modifier : Modifier)
 }
 
 @Composable
-fun NoMappingsCard(remoteDevice : IGDDevice) {
+fun NoMappingsCard(remoteDevice : IIGDDevice) {
     NoMappingsCard()
 }
 

@@ -1,9 +1,17 @@
 package com.shinjiindustrial.portmapper.common
 
+import android.util.Log
 import androidx.compose.runtime.LaunchedEffect
+import com.shinjiindustrial.portmapper.UpnpManager
+import com.shinjiindustrial.portmapper.client.MockUpnpClient
+import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
+import com.shinjiindustrial.portmapper.client.Speed
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import io.mockk.every
+import io.mockk.mockkStatic
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -128,4 +136,52 @@ class ValidatorsTest {
         job.cancel()
         delay(15000)
     }
+
+    @Test
+    fun `client test`() = runBlocking  {
+        val client = MockUpnpClient(MockUpnpClientConfig(Speed.Medium))
+
+        launch {
+            client.search(10)
+            client.deviceFoundEvent += {
+                println("device found " + it)
+                GlobalScope.launch {
+                    val index = 0
+                    while(true)
+                    {
+                        try{
+                            val result = client.getGenericPortMappingRule(it, index)
+                            println("port found " + result.toString())
+                        }
+                        catch (e: Exception)
+                        {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
+        delay(50000)
+
+    }
+
+    @Test
+    fun `repo test`() = runBlocking  {
+
+        mockkStatic(Log::class)
+        every { Log.i(any(), any()) } returns 0
+        //every { Log.w(any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+
+        val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest))
+        val repo = UpnpManager(client)
+        GlobalScope.launch {
+            repo.Search(false)
+        }
+        delay(60000)
+        val allRules = repo.GetAllRules()
+
+    }
+
 }

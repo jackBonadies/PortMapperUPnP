@@ -19,10 +19,7 @@ class UPnPManagerTests {
     @Test
     fun addingAndReplaceRules()
     {
-        val igdDevice = IGDDevice(null, null)
-
         // if compare returns equals then they are considered the same and will be replaced in the TreeSet
-
 
         val portMappingsToAdd : MutableList<PortMapping> = mutableListOf()
         for (i in 0..65000) {
@@ -56,8 +53,6 @@ class UPnPManagerTests {
     @Test
     fun groupRules()
     {
-        val igdDevice = IGDDevice(null, null)
-
         // if compare returns equals then they are considered the same and will be replaced in the TreeSet
         val groupByProtocol = false
         var groupByRange = true

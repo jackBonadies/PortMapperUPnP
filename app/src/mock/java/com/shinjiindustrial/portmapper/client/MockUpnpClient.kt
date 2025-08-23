@@ -4,14 +4,44 @@ import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.domain.IGDDevice
+import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.fourthline.cling.binding.xml.Descriptor
+import org.fourthline.cling.model.action.ActionException
+import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
+import org.fourthline.cling.model.meta.RemoteService
+import org.fourthline.cling.model.meta.Service
 import java.net.NetworkInterface
 
+class MockIGDDevice(private val displayName : String, private val ipAddress : String, private val upnpTypeVersion : Int = 2) : IIGDDevice
+{
+    override fun getDisplayName(): String {
+        return displayName
+    }
+
+    override fun getIpAddress(): String {
+        return ipAddress
+    }
+
+    override fun supportsAction(actionName: String): Boolean {
+        return true
+    }
+
+    override fun getActionInvocation(actionName: String): ActionInvocation<*> {
+        // not actually used
+        return ActionInvocation<RemoteService>(ActionException(0, ""))
+    }
+
+    override fun getUpnpVersion() : Int {
+        return upnpTypeVersion
+    }
+
+}
 
 enum class Speed(val latency : Long) {
     Fastest(1),
@@ -41,7 +71,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
     data class Key(val externalIp: String, val remotePort: String, val protocol: String)
 
-    private val store = mutableMapOf<IGDDevice, LinkedHashMap<Key, PortMapping>>()
+    private val store = mutableMapOf<IIGDDevice, LinkedHashMap<Key, PortMapping>>()
     private val interfacesUsed = false
     private var initialized = false
 
@@ -86,36 +116,28 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         )
 
     init {
-        var igdDevice = IGDDevice(null, null)
-        igdDevice.ipAddress = "192.168.1.255"
-        igdDevice.upnpTypeVersion = 1
+        var igdDevice = MockIGDDevice("IGD Other", "192.168.1.255")
         store.put(igdDevice, linkedMapOf())
 
-
-        igdDevice = IGDDevice(null, null)
-        igdDevice.ipAddress = "192.168.1.1"
-        igdDevice.upnpTypeVersion = 2
-
+        igdDevice = MockIGDDevice("IGD Main", "192.168.1.1")
         var mappings: List<PortMapping> =
             (1..200).map { i ->
                 makePortMapping(
                     description = getDescription(i),
                     localIP = "192.168.1.${i%2}",
-                    externalPort = 5000 + i,
+                    externalPort = if (i < 100)  { 5000 + i } else { 3000 + i },
                     internalPort = 6000 + i,
                     protocol = if (i % 2 == 0) "TCP" else "UDP",
                     enabled = true,
                     leaseDuration = 3600,
-                    actionExternalIP = "123",
+                    actionExternalIP = igdDevice.getIpAddress(),
                     pseudoSlot = i
                 )
             }
 
         store.put(igdDevice, linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
 
-        igdDevice = IGDDevice(null, null)
-        igdDevice.ipAddress = "192.168.1.244"
-        igdDevice.upnpTypeVersion = 2
+        igdDevice = MockIGDDevice("IGD Other2", "192.168.1.244")
         mappings =
             (1..2).map { i ->
                 makePortMapping(
@@ -126,7 +148,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
                     protocol = if (i % 2 == 0) "TCP" else "UDP",
                     enabled = true,
                     leaseDuration = 3600,
-                    actionExternalIP = "123",
+                    actionExternalIP = igdDevice.getIpAddress(),
                     pseudoSlot = i
                 )
             }
@@ -134,7 +156,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     }
 
     override suspend fun createPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMappingRequest: PortMappingRequest,
     ) : UPnPCreateMappingResult {
         tick()
@@ -152,7 +174,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     }
 
     override suspend fun deletePortMapping(
-        device: IGDDevice,
+        device: IIGDDevice,
         portMapping: PortMapping,
     ): UPnPResult {
         tick()
@@ -170,7 +192,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     }
 
     override suspend fun getSpecificPortMappingRule(
-        device: IGDDevice,
+        device: IIGDDevice,
         remoteHost: String,
         remotePort: String,
         protocol: String,
@@ -181,7 +203,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         return UPnPCreateMappingWrapperResult.Success(pm, pm, true)
     }
 
-    override suspend fun getGenericPortMappingRule(device : IGDDevice,
+    override suspend fun getGenericPortMappingRule(device : IIGDDevice,
                                                    slotIndex : Int) : UPnPGetSpecificMappingResult
     {
         tick()
@@ -211,11 +233,14 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
     override fun getInterfacesUsedInSearch() : MutableList<NetworkInterfaceInfo>
     {
-        var ni = NetworkInterfaceInfo(NetworkInterface.getByName("wifi"), NetworkType.WIFI)
-        return mutableListOf(ni)
+        return mutableListOf<NetworkInterfaceInfo>()
     }
 
-    override val deviceFoundEvent = Event<IGDDevice>()
+    override fun instantiateAndBindUpnpService() {
+
+    }
+
+    override val deviceFoundEvent = Event<IIGDDevice>()
 //    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
 //        replay = 0, extraBufferCapacity = 1
 //    )

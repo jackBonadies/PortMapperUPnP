@@ -394,14 +394,14 @@ class MainActivity : ComponentActivity() {
                     portMappingUserInputToEdit = PortMappingUserInput(desc, internalIp!!, internalRange!!, externalIp!!, externalRange!!, protocol!!, leaseDuration!!, enabled!!)
                 }
 
-                RuleCreationDialog(navController = navController, ruleToEdit = portMappingUserInputToEdit)
+                RuleCreationDialog(navController = navController, portViewModel, ruleToEdit = portMappingUserInputToEdit)
             }
         }
     }
 
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     @Composable
-    fun MainScreen(navController : NavHostController, portViewModel : PortViewModel = hiltViewModel()) {
+    fun MainScreen(navController : NavHostController) {
         // A surface container using the 'background' color from the theme
         val searchStartedRecentlyAndNothingFoundYet by portViewModel.searchStartedRecentlyAndNothingFoundYet.collectAsStateWithLifecycle()
         val anyDevices by portViewModel.anyDevices.collectAsStateWithLifecycle()
@@ -514,7 +514,7 @@ class MainActivity : ComponentActivity() {
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    BottomSheetSortBy()
+                    BottomSheetSortBy(portViewModel)
                 }
             }
         ) {
@@ -1590,8 +1590,8 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
                 if(anyDisabled || anyEnabled)
                 {
                     items.add(R.string.delete_all_action)
+                    items.add(R.string.renew_all_action)
                 }
-                items.add(R.string.renew_all_action)
             }
             items.add(R.string.view_log_action)
             items.add(R.string.settings)
