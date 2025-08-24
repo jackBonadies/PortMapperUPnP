@@ -834,9 +834,9 @@ fun EnterContextMenu(singleSelectedItem : MutableState<PortMappingWithPref?>, sh
                                     .appendQueryParameter("externalIp", portMapping.DeviceIP) // this is actual external IP as we only use it to delete the old rule...
                                     .appendQueryParameter("externalRange", portMapping.ExternalPort.toString())
                                     .appendQueryParameter("protocol", portMapping.Protocol)
-                                    .appendQueryParameter("leaseDuration", portMapping.LeaseDuration.toString())
+                                    .appendQueryParameter("leaseDuration", portMappingWithPref.getDesiredLeaseDurationOrDefault().toString())
                                     .appendQueryParameter("enabled", portMapping.Enabled.toString())
-                                    .appendQueryParameter("autorenew", portMappingWithPref.portMappingPref?.autoRenew?.toString() ?: "false")
+                                    .appendQueryParameter("autorenew", portMappingWithPref.getAutoRenewOrDefault().toString())
                                     val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
                             }

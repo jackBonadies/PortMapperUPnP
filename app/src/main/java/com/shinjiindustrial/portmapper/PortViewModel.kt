@@ -158,7 +158,7 @@ class PortViewModel @Inject constructor(
         return upnpRepository.devices
     }
 
-    fun renew( portMapping: PortMappingWithPref ) = applicationScope.launch {
+    fun renew(portMapping: PortMappingWithPref) = applicationScope.launch {
             try {
                 val res = upnpRepository.renewRule(portMapping)
                 if (res is UPnPCreateMappingWrapperResult.Success) {

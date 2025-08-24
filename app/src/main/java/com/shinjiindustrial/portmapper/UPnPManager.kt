@@ -689,13 +689,17 @@ data class PortMappingRequest(val description : String, val internalIp : String,
     }
 
     companion object {
+        fun from(portMapping: PortMapping, desiredLeaseDuration: Int) : PortMappingRequest
+        {
+            return PortMappingRequest(portMapping.Description, portMapping.InternalIP, portMapping.InternalPort.toString(), portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol, desiredLeaseDuration.toString(), portMapping.Enabled, portMapping.RemoteHost)
+        }
         fun from(portMapping: PortMapping) : PortMappingRequest
         {
             return PortMappingRequest(portMapping.Description, portMapping.InternalIP, portMapping.InternalPort.toString(), portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol, portMapping.LeaseDuration.toString(), portMapping.Enabled, portMapping.RemoteHost)
         }
         fun from(portMapping: PortMappingWithPref) : PortMappingRequest
         {
-            return from(portMapping.portMapping)
+            return from(portMapping.portMapping, portMapping.getDesiredLeaseDurationOrDefault())
         }
     }
 }
