@@ -13,6 +13,8 @@ import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
+import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import java.com.shinjiindustrial.portmapper.persistance.PortMappingDao
+import java.com.shinjiindustrial.portmapper.persistance.PortMappingEntity
 import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
@@ -38,7 +41,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             // this is on the cling thread
             AddDevice(device)
             runBlocking {
-                EnumeratePortMappings(device.getIpAddress())
+                enumeratePortMappings(device.getIpAddress())
             }
         }
     }
@@ -56,7 +59,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         val anyDevices : Flow<Boolean> = _devices.map { !it.isEmpty() }
 
 //        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
-        private var portMappingLookup : MutableMap<Pair<Int, String>,PortMapping> = mutableMapOf()
+        private var portMappingLookup : MutableMap<PortMappingKey,PortMapping> = mutableMapOf()
 
         // I think this should be a local var inside mutable state flow
         private var portMappingsSortedSource : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
@@ -91,7 +94,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             _devices.update { listOf<IGDDevice>() }
         }
 
-        fun addOrUpdateMapping(pm: PortMapping)
+        private fun addOrUpdateMapping(pm: PortMapping)
         {
             var existingRule : PortMapping? = null
             val key = pm.getKey()
@@ -258,7 +261,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             try
             {
                 val portMappingRequest = PortMappingRequest.from(portMapping).copy(enabled = enable)
-                val res = CreatePortMappingRuleWrapper(
+                val res = createPortMappingRuleWrapper(
                     portMappingRequest,
                     false,
                     getEnabledDisabledString(enable).lowercase(),
@@ -283,7 +286,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
                 try {
                     val portMappingRequest = PortMappingRequest.from(portMapping)
-                    val res = CreatePortMappingRuleWrapper(
+                    val res = createPortMappingRuleWrapper(
                         portMappingRequest,
                         false,
                         "renewed",
@@ -305,7 +308,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         ): UPnPCreateMappingWrapperResult {
             try {
                 val portMappingRequest = PortMappingRequest.from(portMapping)
-                val res = CreatePortMappingRuleWrapper(
+                val res = createPortMappingRuleWrapper(
                     portMappingRequest,
                     false,
                     "renewed",
@@ -365,8 +368,23 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
+    private fun createPortMappingDaoEntity(portMapping: PortMapping, pref: PortMappingPref) : PortMappingEntity
+    {
+        val igdDevice = getIGDDevice(portMapping.DeviceIP)
+        return PortMappingEntity(
+            igdDevice.getIpAddress(),
+            igdDevice.udn,
+            portMapping.ExternalPort,
+            portMapping.Protocol,
+            portMapping.Description,
+            portMapping.InternalIP,
+            portMapping.InternalPort,
+            pref.autoRenew,
+            pref.desiredLeaseDuration,
+            portMapping.Enabled) // TODO enabled
+    }
 
-        suspend fun CreatePortMappingRulesEntry(
+        suspend fun createPortMappingRulesEntry(
             portMappingUserInput: PortMappingUserInput,
         ): List<UPnPCreateMappingWrapperResult> {
 
@@ -375,13 +393,20 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
                 return portMappingRequestRules.map { portMappingRequestRule ->
 
-                    val result = CreatePortMappingRuleWrapper(
+                    val result = createPortMappingRuleWrapper(
                         portMappingRequestRule,
                         false,
                         "created")
-                    //TODO DAO - with auto renew and lease
-                    //portMappingDao.upsert()
-                    addRuleIfSuccessful(result)
+                    // this is what the user input
+                    println("default adding rule callback")
+                    if (result is UPnPCreateMappingWrapperResult.Success)
+                    {
+                        val portMapping = result.resultingMapping
+                        val pref = PortMappingPref(portMappingUserInput.autoRenew, portMappingUserInput.leaseDuration.toIntOrMaxValue())
+                        val entity = createPortMappingDaoEntity(portMapping, pref)
+                        portMappingDao.upsert(entity)
+                        addOrUpdateMapping(result.resultingMapping)
+                    }
                     result
                 }
             }
@@ -395,7 +420,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        suspend fun DisableEnablePortMappingEntries(
+        suspend fun disableEnablePortMappingEntries(
             portMappings: List<PortMapping>,
             enable: Boolean,
         ): List<UPnPCreateMappingWrapperResult> {
@@ -404,7 +429,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
                 try {
                     val portMappingRequest = PortMappingRequest.from(portMapping).copy(enabled = enable)
-                    val res = CreatePortMappingRuleWrapper(
+                    val res = createPortMappingRuleWrapper(
                         portMappingRequest,
                         false,
                         getEnabledDisabledString(enable).lowercase(),
@@ -426,7 +451,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         //TODO: if List all port mappings exists, that should be used instead of getgeneric.
 
         // this method creates a rule, then grabs it again to verify it.
-        private suspend fun CreatePortMappingRuleWrapper(
+        private suspend fun createPortMappingRuleWrapper(
             portMappingRequest: PortMappingRequest,
             skipReadingBack: Boolean,
             createContext: String,
@@ -469,7 +494,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         }
 
 
-        suspend fun EnumeratePortMappings(externalIp : String)
+        suspend fun enumeratePortMappings(externalIp : String)
         {
             // we enumerate port mappings later
             val device: IIGDDevice = getIGDDevice(externalIp)
@@ -495,8 +520,27 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
         }
 
+    private fun isRuleOurs(databaseEntity : PortMappingEntity?, device: IIGDDevice, portMapping: PortMapping) : Boolean
+    {
+        if (databaseEntity == null)
+        {
+            return false
+        }
+        else
+        {
+            if (databaseEntity.description == portMapping.Description &&
+                databaseEntity.internalIp == portMapping.InternalIP &&
+                databaseEntity.internalPort == portMapping.InternalPort)
+            {
+                return true
+            }
+            // rule has been created / changed on the router side and no longer matches
+            //   what we had before.  it now belongs to the router, do not take control of it.
+            return false
+        }
+    }
+
         // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
-        // TODO I dont like that this is here but the other classes that interact with Client are in UPnp manager
         private suspend fun getAllPortMappingsUsingGenericPortMappingEntry(device : IIGDDevice) {
             var slotIndex : Int = 0;
             var retryCount : Int = 0
@@ -510,6 +554,15 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                     when (result) {
                         is UPnPGetSpecificMappingResult.Success -> {
                             val portMapping = result.resultingMapping
+                            val entity = portMappingDao.getByPrimaryKey(device.getIpAddress(), device.udn, portMapping.Protocol, portMapping.ExternalPort)
+                            if(isRuleOurs(entity, device, portMapping))
+                            {
+                                OurLogger.log(Level.INFO, "The rule is ours: ${portMapping.shortName()}")
+                            }
+                            else
+                            {
+                                OurLogger.log(Level.INFO, "The rule is not ours: ${portMapping.shortName()}")
+                            }
                             addOrUpdateMapping(portMapping) //!!
                             success = true
                             OurLogger.log(Level.INFO, portMapping.toStringFull())
@@ -572,14 +625,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         private fun updateMappingIfSuccessful(result: UPnPCreateMappingWrapperResult) {
             println("adding rule callback")
             if (result is UPnPCreateMappingWrapperResult.Success) {
-                addOrUpdateMapping(result.resultingMapping)
-            }
-        }
-
-        private fun addRuleIfSuccessful(result : UPnPCreateMappingWrapperResult) {
-            println("default adding rule callback")
-            if (result is UPnPCreateMappingWrapperResult.Success)
-            {
                 addOrUpdateMapping(result.resultingMapping)
             }
         }

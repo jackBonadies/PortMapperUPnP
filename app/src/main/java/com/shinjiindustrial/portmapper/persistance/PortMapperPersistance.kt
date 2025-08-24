@@ -23,14 +23,14 @@ data class PortMappingEntity(
     // uniquely identifies a rule
     @ColumnInfo(name = "deviceIp") val deviceIp: String,
     @ColumnInfo(name = "deviceSignature") val deviceSignature: String,
-    @ColumnInfo(name = "externalPort") val externalPort: String,
+    @ColumnInfo(name = "externalPort") val externalPort: Int,
     @ColumnInfo(name = "protocol") val protocol: String,
 
     // using these we can tell if it was likely created by us, or done out of band
     //   and if so, then remove it bc it was overwritten out of band by the user
     @ColumnInfo(name = "description") val description: String,
     @ColumnInfo(name = "internalIp") val internalIp: String,
-    @ColumnInfo(name = "internalPort") val internalPort: String,
+    @ColumnInfo(name = "internalPort") val internalPort: Int,
 
     // these are the preferences that we cannot store on the device
     @ColumnInfo(name = "autorenew") val autoRenew: Boolean,

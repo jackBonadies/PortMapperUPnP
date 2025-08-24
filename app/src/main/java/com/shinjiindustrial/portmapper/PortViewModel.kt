@@ -232,11 +232,11 @@ class PortViewModel @Inject constructor(
                 val result = when {
                     chosenRulesOnly != null -> {
                         val rules = chosenRulesOnly.filter { it -> it.Enabled != enable }
-                        upnpRepository.DisableEnablePortMappingEntries(rules, enable)
+                        upnpRepository.disableEnablePortMappingEntries(rules, enable)
                     }
                     else -> {
                         val rules = upnpRepository.GetEnabledDisabledRules(!enable)
-                        upnpRepository.DisableEnablePortMappingEntries(rules, enable)
+                        upnpRepository.disableEnablePortMappingEntries(rules, enable)
                     }
                 }
 
@@ -396,7 +396,7 @@ class PortViewModel @Inject constructor(
 
     fun createRules(portMappingUserInput: PortMappingUserInput, modifyCase : Boolean = false) = applicationScope.launch {
         try {
-            val result = upnpRepository.CreatePortMappingRulesEntry(portMappingUserInput)
+            val result = upnpRepository.createPortMappingRulesEntry(portMappingUserInput)
             result.forEach { res ->
                 when (res) {
                     is UPnPCreateMappingWrapperResult.Success -> {

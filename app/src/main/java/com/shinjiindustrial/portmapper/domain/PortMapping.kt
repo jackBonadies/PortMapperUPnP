@@ -4,6 +4,8 @@ data class PortMappingPref(val autoRenew : Boolean, val desiredLeaseDuration: In
 
 }
 
+data class PortMappingKey(val deviceIP: String, val externalPort: Int, val protocol: String)
+
 // this is what is on the router
 // with additional field for timeRead and psuedoSlot
 class PortMapping(
@@ -60,9 +62,9 @@ class PortMapping(
     fun getRemoteHostNormalizedForDelete(): String =
         this.RemoteHost.ifBlank { "*" }
 
-    fun getKey() : Pair<Int, String>
+    fun getKey() : PortMappingKey
     {
-        return Pair<Int, String>(this.ExternalPort, this.Protocol)
+        return PortMappingKey(this.DeviceIP, this.ExternalPort, this.Protocol)
     }
 
     fun shortName() : String
