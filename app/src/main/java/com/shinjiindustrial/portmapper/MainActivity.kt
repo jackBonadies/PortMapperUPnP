@@ -151,6 +151,7 @@ import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.ActionNames
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.PortMappingContent
 import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
@@ -275,7 +276,7 @@ class MainActivity : ComponentActivity() {
         }
 
         var OurSnackbarHostState: SnackbarHostState? = null
-        var MultiSelectItems : SnapshotStateList<PortMapping>? = null
+        var MultiSelectItems : SnapshotStateList<PortMappingWithPref>? = null
     }
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -429,7 +430,7 @@ class MainActivity : ComponentActivity() {
 
         if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
             EnterContextMenu(
-                PortForwardApplication.currentSingleSelectedObject,
+                PortForwardApplication.currentSingleSelectedObject, // why is this not typed??
                 showMoreInfoDialogState,
                 navController,
                 portViewModel
@@ -438,7 +439,7 @@ class MainActivity : ComponentActivity() {
 
         if (showMoreInfoDialogState.value) {
             MoreInfoDialog(
-                portMapping = PortForwardApplication.currentSingleSelectedObject.value as PortMapping,
+                portMappingWithPref = PortForwardApplication.currentSingleSelectedObject.value as PortMappingWithPref,
                 showDialog = showMoreInfoDialogState
             )
         }
@@ -493,7 +494,7 @@ class MainActivity : ComponentActivity() {
 
 
         MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
-        MainActivity.MultiSelectItems = remember { mutableStateListOf<PortMapping>() }
+        MainActivity.MultiSelectItems = remember { mutableStateListOf<PortMappingWithPref>() }
         rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
 
@@ -786,7 +787,7 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController, portViewModel : PortViewModel)
+fun EnterContextMenu(singleSelectedItem : MutableState<PortMappingWithPref?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController, portViewModel : PortViewModel)
 {
     if(singleSelectedItem.value == null)
     {
@@ -818,7 +819,8 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
 
 
                         val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
-                        val portMapping = singleSelectedItem.value as PortMapping
+                        val portMappingWithPref = singleSelectedItem.value as PortMappingWithPref // TODO remove cast
+                        val portMapping = portMappingWithPref.portMapping
                         menuItems.add(
                             Pair<String, () -> Unit>(
                                 "Edit"
@@ -834,8 +836,8 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     .appendQueryParameter("protocol", portMapping.Protocol)
                                     .appendQueryParameter("leaseDuration", portMapping.LeaseDuration.toString())
                                     .appendQueryParameter("enabled", portMapping.Enabled.toString())
-                                    //.appendQueryParameter("autorenew", portMapping.Enabled.toString()) // TODO
-                                val uri = uriBuilder.build()
+                                    .appendQueryParameter("autorenew", portMappingWithPref.portMappingPref?.autoRenew?.toString() ?: "false")
+                                    val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
                             }
                         )
@@ -843,21 +845,21 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 if (portMapping.Enabled) "Disable" else "Enable"
                             ) {
-                                portViewModel.enableDisable(portMapping, !portMapping.Enabled)
+                                portViewModel.enableDisable(portMappingWithPref, !portMapping.Enabled)
                             }
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
                                 "Renew"
                             ) {
-                                portViewModel.renew(portMapping)
+                                portViewModel.renew(portMappingWithPref)
                             }
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
                                 "Delete"
                             ) {
-                                portViewModel.delete(portMapping)
+                                portViewModel.delete(portMappingWithPref)
                             }
                         )
                         menuItems.add(
@@ -1625,8 +1627,8 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
         }
         else
         {
-            val anyEnabled = MainActivity.MultiSelectItems!!.any { it -> it.Enabled }
-            val anyDisabled = MainActivity.MultiSelectItems!!.any { it -> !it.Enabled }
+            val anyEnabled = MainActivity.MultiSelectItems!!.any { it -> it.portMapping.Enabled }
+            val anyDisabled = MainActivity.MultiSelectItems!!.any { it -> !it.portMapping.Enabled }
             if(anyEnabled)
             {
                 items.add(R.string.disable_action)
@@ -1706,9 +1708,10 @@ fun formatIpv4(ipAddr : Int) : String
 
 data class Message(val name : String, val msg : String)
 
-fun _getDefaultPortMapping() : PortMapping
+fun _getDefaultPortMapping() : PortMappingWithPref
 {
-    return PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0)
+    return PortMappingWithPref(
+        PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0))
 }
 
 // TODO: for mock purposes
@@ -1722,7 +1725,7 @@ class IGDDeviceHolder
 
 }
 
-fun ToggleSelection(portMapping : PortMapping)
+fun ToggleSelection(portMapping : PortMappingWithPref)
 {
     val has = MainActivity.MultiSelectItems!!.contains(portMapping)
     if(has)

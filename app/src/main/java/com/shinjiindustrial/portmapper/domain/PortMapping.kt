@@ -1,5 +1,25 @@
 package com.shinjiindustrial.portmapper.domain
 
+import java.com.shinjiindustrial.portmapper.persistance.PortMappingEntity
+
+class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
+{
+    fun getKey() : PortMappingKey
+    {
+        return portMapping.getKey()
+    }
+
+    fun getAutoRenewOrDefault() : Boolean
+    {
+        return portMappingPref?.autoRenew ?: false
+    }
+
+    fun getDesiredLeaseDurationOrDefault() : Int
+    {
+        return portMappingPref?.desiredLeaseDuration ?: portMapping.LeaseDuration
+    }
+}
+
 data class PortMappingPref(val autoRenew : Boolean, val desiredLeaseDuration: Int) {
 
 }
@@ -94,7 +114,7 @@ class PortMapping(
         val hasMinutes = dhms.mins >= 1
         val hasSeconds = dhms.seconds >= 1
 
-        val renewsExpiresString = if(autoRenew) "Expires in" else "Renews in"
+        val renewsExpiresString = if(autoRenew) "Renews in" else "Expires in"
 
         if (hasDays)
         {
@@ -217,3 +237,5 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String) 
 {
     return "$protocol rule at $externalIp:$externalPort"
 }
+
+fun PortMappingEntity.getPrefs(): PortMappingPref = PortMappingPref(this.autoRenew, this.desiredLeaseDuration)

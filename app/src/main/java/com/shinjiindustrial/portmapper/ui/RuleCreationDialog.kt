@@ -41,6 +41,7 @@ import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -252,7 +253,10 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 else
                                 {
                                     val oldRulesToDelete = ruleToEdit.splitIntoRules()
-                                    portViewModel.editRule(oldRulesToDelete[0].realize(), portMappingRequestInput)
+                                    portViewModel.editRule(
+                                        PortMappingWithPref( oldRulesToDelete[0].realize(), null),
+                                            portMappingRequestInput
+                                        )
                                     navController.popBackStack()
                                 }
                             }

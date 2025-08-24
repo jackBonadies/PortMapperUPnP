@@ -9,6 +9,7 @@ import com.shinjiindustrial.portmapper.PortMapperComparatorExternalPort
 import com.shinjiindustrial.portmapper.PortMapperComparatorInternalPort
 import com.shinjiindustrial.portmapper.PortMapperComparerSlot
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 
 // TODO organize re other portmappingsort file
 
@@ -46,7 +47,7 @@ enum class SortBy(val sortByValue : Int) {
         }
     }
 
-    fun getComparer(ascending : Boolean):  Comparator<PortMapping> {
+    fun getComparer(ascending : Boolean):  Comparator<PortMappingWithPref> {
         return ComparerWrapper(
             when (this) {
                 Slot -> PortMapperComparerSlot(ascending)

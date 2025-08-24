@@ -16,6 +16,8 @@ import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.getPrefs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,12 +61,12 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         val anyDevices : Flow<Boolean> = _devices.map { !it.isEmpty() }
 
 //        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
-        private var portMappingLookup : MutableMap<PortMappingKey,PortMapping> = mutableMapOf()
+        private var portMappingLookup : MutableMap<PortMappingKey, PortMappingWithPref> = mutableMapOf()
 
         // I think this should be a local var inside mutable state flow
-        private var portMappingsSortedSource : TreeSet<PortMapping> = TreeSet<PortMapping>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
+        private var portMappingsSortedSource : TreeSet<PortMappingWithPref> = TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
         private val _portMappings = MutableStateFlow(portMappingsSortedSource)  // TreeSet<PortMapping>
-        val portMappings : StateFlow<Set<PortMapping>> = _portMappings
+        val portMappings : StateFlow<Set<PortMappingWithPref>> = _portMappings
 //
 //        fun update(pm: PortMapping) = _setFlow.update { old ->
 //            TreeSet(old).apply { add(pm) }
@@ -94,9 +96,9 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             _devices.update { listOf<IGDDevice>() }
         }
 
-        private fun addOrUpdateMapping(pm: PortMapping)
+        private fun addOrUpdateMapping(pm: PortMappingWithPref)
         {
-            var existingRule : PortMapping? = null
+            var existingRule : PortMappingWithPref? = null
             val key = pm.getKey()
             _portMappings.update { old ->
                 if (portMappingLookup.containsKey(key)) {
@@ -112,10 +114,11 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        fun removeMapping(pm: PortMapping)
+        fun removeMapping(pm: PortMappingWithPref)
         {
             _portMappings.update { old ->
                 portMappingLookup.remove(pm.getKey())
+                // todo does this work?
                 TreeSet(old).apply { remove(pm) }
             }
             MainActivity.MultiSelectItems?.remove(pm)
@@ -124,7 +127,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         //
         fun UpdateSorting() {
             _portMappings.update { old ->
-                val newMappings = TreeSet<PortMapping>(
+                val newMappings = TreeSet<PortMappingWithPref>(
                     SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)
                 )
                 newMappings.addAll(old)
@@ -141,8 +144,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         }
 
         // returns anyEnabled, anyDisabled
-        fun GetEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMapping> {
-            return portMappings.value.filter { it.Enabled == enabledRules }.toMutableList()
+        fun GetEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMappingWithPref> {
+            return portMappings.value.filter { it.portMapping.Enabled == enabledRules }.toMutableList()
         }
 
         // TODO: we need a flow for just the IGD , port mappings that are available
@@ -150,7 +153,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         // autorenew can subscribe to the 1st
         // UI can subscribe to both
 
-        fun GetAllRules(): MutableList<PortMapping> {
+        fun GetAllRules(): MutableList<PortMappingWithPref> {
             return portMappings.value.toMutableList()
         }
 
@@ -177,8 +180,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         // returns anyEnabled, anyDisabled
         fun GetExistingRuleInfos(): Pair<Boolean, Boolean> {
-            var anyEnabled: Boolean = portMappings.value.any { pm -> pm.Enabled }
-            var anyDisabled: Boolean = portMappings.value.any { pm -> !pm.Enabled }
+            val anyEnabled: Boolean = portMappings.value.any { pm -> pm.portMapping.Enabled }
+            val anyDisabled: Boolean = portMappings.value.any { pm -> !pm.portMapping.Enabled }
             return Pair(anyEnabled, anyDisabled)
         }
 
@@ -248,8 +251,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         //region actions
 
         // create new rule with enabled set, and update data
-        suspend fun DisableEnablePortMappingEntry(
-            portMapping: PortMapping,
+        suspend fun disableEnablePortMappingEntry(
+            portMapping: PortMappingWithPref,
             enable: Boolean,
         ): UPnPCreateMappingWrapperResult {
             // AddPortMapping
@@ -266,7 +269,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                     false,
                     getEnabledDisabledString(enable).lowercase(),
                 )
-                updateMappingIfSuccessful(res)
+                addOrUpdateForEnabledDisabled(res, portMapping)
+                // this is to cause an update
                 return res
             }
             catch (exception: Exception) {
@@ -279,7 +283,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        suspend fun RenewRules(portMappings : List<PortMapping>)
+        suspend fun renewRules(portMappings : List<PortMappingWithPref>)
                 : List<UPnPCreateMappingWrapperResult>
         {
             return portMappings.map { portMapping ->
@@ -291,7 +295,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                         false,
                         "renewed",
                     )
-                    updateMappingIfSuccessful(res)
+                    addOrUpdateForRenew(res, portMapping)
                     res
                 } catch (exception: Exception) {
                     OurLogger.log(
@@ -303,8 +307,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        suspend fun RenewRule(
-            portMapping: PortMapping,
+        suspend fun renewRule(
+            portMapping: PortMappingWithPref,
         ): UPnPCreateMappingWrapperResult {
             try {
                 val portMappingRequest = PortMappingRequest.from(portMapping)
@@ -313,7 +317,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                     false,
                     "renewed",
                 )
-                updateMappingIfSuccessful(res)
+                // this is so it "refreshes"
+                addOrUpdateForRenew(res, portMapping)
                 return res
             } catch (exception: Exception) {
                 OurLogger.log(
@@ -327,14 +332,15 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         // DeletePortMappingRange is only available in v2.0 (also it can only delete
         //   a contiguous range)
-        suspend fun DeletePortMappingEntry(portMapping: PortMapping) : UPnPResult {
+        suspend fun deletePortMappingEntry(portMappingWithPref: PortMappingWithPref) : UPnPResult {
 
             try {
-                println("Requesting Delete: ${portMapping.shortName()}")
-                val device: IIGDDevice = getIGDDevice(portMapping.DeviceIP)
-                portMappingDao.deleteByKey(portMapping.DeviceIP, device.udn, portMapping.Protocol, portMapping.ExternalPort)
-                val result = upnpClient.deletePortMapping(device, portMapping)
-                removeRuleIfSuccessful(result)
+                val pm = portMappingWithPref.portMapping
+                println("Requesting Delete: ${pm.shortName()}")
+                val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
+                portMappingDao.deleteByKey(pm.DeviceIP, device.udn, pm.Protocol, pm.ExternalPort)
+                val result = upnpClient.deletePortMapping(device, pm)
+                removeForDelete(result, portMappingWithPref)
                 return result
             } catch (exception: Exception) {
                 OurLogger.log(
@@ -345,17 +351,18 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        suspend fun DeletePortMappingsEntry(
-            portMappings: List<PortMapping>,
+        suspend fun deletePortMappingsEntry(
+            portMappings: List<PortMappingWithPref>,
         ): List<UPnPResult> {
-            return portMappings.map { portMapping ->
+            return portMappings.map { portMappingWithPref ->
 
                 try {
+                    val portMapping = portMappingWithPref.portMapping
                     println("Requesting Delete: ${portMapping.shortName()}")
                     val device = getIGDDevice(portMapping.DeviceIP)
                     portMappingDao.deleteByKey(portMapping.DeviceIP, device.udn, portMapping.Protocol, portMapping.ExternalPort)
                     val result = upnpClient.deletePortMapping(device,portMapping)
-                    removeRuleIfSuccessful(result)
+                    removeForDelete(result, portMappingWithPref)
                     result
 
                 } catch (exception: Exception) {
@@ -405,7 +412,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                         val pref = PortMappingPref(portMappingUserInput.autoRenew, portMappingUserInput.leaseDuration.toIntOrMaxValue())
                         val entity = createPortMappingDaoEntity(portMapping, pref)
                         portMappingDao.upsert(entity)
-                        addOrUpdateMapping(result.resultingMapping)
+                        addOrUpdateMapping(PortMappingWithPref(portMapping, pref))
                     }
                     result
                 }
@@ -421,7 +428,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         }
 
         suspend fun disableEnablePortMappingEntries(
-            portMappings: List<PortMapping>,
+            portMappings: List<PortMappingWithPref>,
             enable: Boolean,
         ): List<UPnPCreateMappingWrapperResult> {
 
@@ -434,7 +441,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                         false,
                         getEnabledDisabledString(enable).lowercase(),
                     )
-                    updateMappingIfSuccessful(res)
+                    addOrUpdateForEnabledDisabled(res, portMapping)
                     res
                 } catch (exception: Exception) {
 
@@ -448,7 +455,33 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        //TODO: if List all port mappings exists, that should be used instead of getgeneric.
+    private fun addOrUpdateForEnabledDisabled(
+        res: UPnPCreateMappingWrapperResult,
+        portMapping: PortMappingWithPref
+    ) {
+        // TODO we dont need local database for now
+        //   also these may not be ours
+        if (res is UPnPCreateMappingWrapperResult.Success) {
+            addOrUpdateMapping(
+                PortMappingWithPref(
+                    portMapping.portMapping,
+                    portMapping.portMappingPref
+                )
+            )
+        }
+    }
+
+    private fun addOrUpdateForRenew(
+        res: UPnPCreateMappingWrapperResult,
+        portMapping: PortMappingWithPref
+    ) {
+        // this is so it "refreshes"
+        if (res is UPnPCreateMappingWrapperResult.Success) {
+            addOrUpdateMapping(portMapping)
+        }
+    }
+
+    //TODO: if List all port mappings exists, that should be used instead of getgeneric.
 
         // this method creates a rule, then grabs it again to verify it.
         private suspend fun createPortMappingRuleWrapper(
@@ -555,15 +588,17 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                         is UPnPGetSpecificMappingResult.Success -> {
                             val portMapping = result.resultingMapping
                             val entity = portMappingDao.getByPrimaryKey(device.getIpAddress(), device.udn, portMapping.Protocol, portMapping.ExternalPort)
+                            var pref : PortMappingPref? = null
                             if(isRuleOurs(entity, device, portMapping))
                             {
                                 OurLogger.log(Level.INFO, "The rule is ours: ${portMapping.shortName()}")
+                                pref = entity!!.getPrefs()
                             }
                             else
                             {
                                 OurLogger.log(Level.INFO, "The rule is not ours: ${portMapping.shortName()}")
                             }
-                            addOrUpdateMapping(portMapping) //!!
+                            addOrUpdateMapping(PortMappingWithPref(portMapping, pref)) //!!
                             success = true
                             OurLogger.log(Level.INFO, portMapping.toStringFull())
                             retryCount = 0
@@ -622,18 +657,12 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             clearDevices()
         }
 
-        private fun updateMappingIfSuccessful(result: UPnPCreateMappingWrapperResult) {
-            println("adding rule callback")
-            if (result is UPnPCreateMappingWrapperResult.Success) {
-                addOrUpdateMapping(result.resultingMapping)
-            }
-        }
+        private fun removeForDelete(result : UPnPResult, portMappingWithPref: PortMappingWithPref) {
 
-        private fun removeRuleIfSuccessful(result : UPnPResult) {
             println("default adding rule callback")
             if (result is UPnPResult.Success)
             {
-                removeMapping(result.requestInfo)
+                removeMapping(portMappingWithPref)
             }
         }
 
@@ -650,6 +679,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
 }
 
+
 // this is the request we give the router.  basically a port mapping minus time read and psuedo slot
 data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String)
 {
@@ -662,6 +692,10 @@ data class PortMappingRequest(val description : String, val internalIp : String,
         fun from(portMapping: PortMapping) : PortMappingRequest
         {
             return PortMappingRequest(portMapping.Description, portMapping.InternalIP, portMapping.InternalPort.toString(), portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol, portMapping.LeaseDuration.toString(), portMapping.Enabled, portMapping.RemoteHost)
+        }
+        fun from(portMapping: PortMappingWithPref) : PortMappingRequest
+        {
+            return from(portMapping.portMapping)
         }
     }
 }

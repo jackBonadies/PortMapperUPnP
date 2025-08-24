@@ -16,8 +16,8 @@ sealed class ViewKey : Parcelable {
 
 sealed class UpnpViewRow {
     abstract val key : ViewKey
-    data class PortViewRow constructor(val portMapping: PortMapping) : UpnpViewRow() {
-        override val key = ViewKey.PortViewKey(portMapping.ExternalPort, portMapping.Protocol, portMapping.DeviceIP)
+    data class PortViewRow constructor(val portMapping: PortMappingWithPref) : UpnpViewRow() {
+        override val key = ViewKey.PortViewKey(portMapping.portMapping.ExternalPort, portMapping.portMapping.Protocol, portMapping.portMapping.DeviceIP)
     }
     data class DeviceHeaderViewRow constructor(val device: IIGDDevice) : UpnpViewRow() {
         override val key = ViewKey.DeviceHeaderKey(device.getIpAddress())

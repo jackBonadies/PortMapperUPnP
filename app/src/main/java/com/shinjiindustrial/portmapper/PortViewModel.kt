@@ -13,6 +13,7 @@ import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -94,7 +95,7 @@ class PortViewModel @Inject constructor(
             {
                 // do we have any port mappings
                 upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
-                if (index >= portMappingsList.size || portMappingsList.elementAt(index).DeviceIP != curDevice.getIpAddress())
+                if (index >= portMappingsList.size || portMappingsList.elementAt(index).portMapping.DeviceIP != curDevice.getIpAddress())
                 {
                     // emit empty and continue
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
@@ -102,7 +103,7 @@ class PortViewModel @Inject constructor(
                 }
                 while (index < portMappingsList.size)
                 {
-                    if (portMappingsList.elementAt(index).DeviceIP == curDevice.getIpAddress())
+                    if (portMappingsList.elementAt(index).portMapping.DeviceIP == curDevice.getIpAddress())
                     {
                         upnpElements.add(UpnpViewRow.PortViewRow(portMappingsList.elementAt(index)))
                     }
@@ -157,9 +158,9 @@ class PortViewModel @Inject constructor(
         return upnpRepository.devices
     }
 
-    fun renew( portMapping: PortMapping ) = applicationScope.launch {
+    fun renew( portMapping: PortMappingWithPref ) = applicationScope.launch {
             try {
-                val res = upnpRepository.RenewRule(portMapping)
+                val res = upnpRepository.renewRule(portMapping)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
@@ -172,10 +173,10 @@ class PortViewModel @Inject constructor(
             }
         }
 
-    fun renewAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
+    fun renewAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
             val portMappings = chosen?.toList() ?: upnpRepository.GetAllRules()
-            val result = upnpRepository.RenewRules(portMappings)
+            val result = upnpRepository.renewRules(portMappings)
             result.forEach { res ->
                 when (res) {
                     is UPnPCreateMappingWrapperResult.Success -> {
@@ -207,11 +208,11 @@ class PortViewModel @Inject constructor(
     }
 
     fun enableDisable(
-        portMapping: PortMapping,
+        portMapping: PortMappingWithPref,
         enable: Boolean) =
         applicationScope.launch {
             try {
-                val res = upnpRepository.DisableEnablePortMappingEntry(portMapping, enable)
+                val res = upnpRepository.disableEnablePortMappingEntry(portMapping, enable)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
@@ -225,13 +226,13 @@ class PortViewModel @Inject constructor(
             }
         }
 
-    fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMapping>? = null) =
+    fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMappingWithPref>? = null) =
         applicationScope.launch {
 
             try {
                 val result = when {
                     chosenRulesOnly != null -> {
-                        val rules = chosenRulesOnly.filter { it -> it.Enabled != enable }
+                        val rules = chosenRulesOnly.filter { it -> it.portMapping.Enabled != enable }
                         upnpRepository.disableEnablePortMappingEntries(rules, enable)
                     }
                     else -> {
@@ -327,11 +328,11 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun deleteAll(chosen: List<PortMapping>? = null) = applicationScope.launch {
+    fun deleteAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
             // get all enabled. note: need to clone.
             val rules = chosen?.toList() ?: upnpRepository.GetAllRules()
-            val result = upnpRepository.DeletePortMappingsEntry(rules)
+            val result = upnpRepository.deletePortMappingsEntry(rules)
             result.forEach { res ->
                 when (res) {
                     is UPnPResult.Success -> {
@@ -362,9 +363,9 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun delete(portMapping: PortMapping) = applicationScope.launch {
+    fun delete(portMapping: PortMappingWithPref) = applicationScope.launch {
         try {
-            val res = upnpRepository.DeletePortMappingEntry(portMapping)
+            val res = upnpRepository.deletePortMappingEntry(portMapping)
             if (res is UPnPResult.Success) {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
@@ -375,9 +376,9 @@ class PortViewModel @Inject constructor(
     }
     }
 
-    fun editRule(oldRule : PortMapping, portMappingRequestInput : PortMappingUserInput) = applicationScope.launch {
+    fun editRule(oldRule : PortMappingWithPref, portMappingRequestInput : PortMappingUserInput) = applicationScope.launch {
         try {
-            val res = upnpRepository.DeletePortMappingEntry(oldRule)
+            val res = upnpRepository.deletePortMappingEntry(oldRule)
             if (res is UPnPResult.Failure) {
                 _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
                 return@launch

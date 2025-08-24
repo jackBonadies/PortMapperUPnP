@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper
 
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 
 open class PortMapperComparatorBase(ascending : Boolean) : Comparator<PortMapping> {
 
@@ -121,13 +122,15 @@ open class PortMapperComparerSlot(ascending : Boolean) : PortMapperComparatorBas
     }
 }
 
-class ComparerWrapper(val comparator : Comparator<PortMapping>) : Comparator<PortMapping> {
-    override fun compare(p1: PortMapping, p2: PortMapping): Int {
-        val cmp = p1.DeviceIP.compareTo(p2.DeviceIP)
+class ComparerWrapper(val comparator : Comparator<PortMapping>) : Comparator<PortMappingWithPref> {
+    override fun compare(p1: PortMappingWithPref, p2: PortMappingWithPref): Int {
+        val pm1 = p1.portMapping
+        val pm2 = p2.portMapping
+        val cmp = pm1.DeviceIP.compareTo(pm2.DeviceIP)
         if(cmp != 0)
         {
             return cmp
         }
-        return comparator.compare(p1, p2)
+        return comparator.compare(pm1, pm2)
     }
 }

@@ -61,6 +61,7 @@ import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
@@ -73,8 +74,9 @@ import java.com.shinjiindustrial.portmapper.PortUiState
     ExperimentalFoundationApi::class
 )
 @Composable
-fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
+fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
 {
+    val portMapping = portMappingWithPref.portMapping
     println("external ip test ${portMapping.DeviceIP}")
 
     MyApplicationTheme {
@@ -98,17 +100,17 @@ fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier
                     onClick = {
 
                         if (IsMultiSelectMode()) {
-                            ToggleSelection(portMapping)
+                            ToggleSelection(portMappingWithPref)
                         } else {
                             // TODO cleanup
                             PortForwardApplication.Companion.showContextMenu.value = true
                             PortForwardApplication.Companion.currentSingleSelectedObject.value =
-                                portMapping
+                                portMappingWithPref
                         }
 
                     },
                     onLongClick = {
-                        ToggleSelection(portMapping)
+                        ToggleSelection(portMappingWithPref)
                     }
                 ),
 
@@ -178,12 +180,12 @@ fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier
 
 
                     CircleCheckbox(
-                        MainActivity.Companion.MultiSelectItems!!.contains(portMapping),
+                        MainActivity.Companion.MultiSelectItems!!.contains(portMappingWithPref),
                         true,
                         Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
                     ) {
 
-                        ToggleSelection(portMapping)
+                        ToggleSelection(portMappingWithPref)
 
                     }
                 }
@@ -212,7 +214,7 @@ fun PortMappingCard(portMapping: PortMapping, now: Long = -1, additionalModifier
                     Text(text, color = AdditionalColors.TextColor)
                     val urgency = portMapping.getUrgency(false, now)
                     val color by urgencyColor(urgency, AdditionalColors.TextColor, AdditionalColors.LogWarningText, AdditionalColors.LogErrorText)
-                    Text(portMapping.getRemainingLeaseTimeRoughString(false, now), color = color)
+                    Text(portMapping.getRemainingLeaseTimeRoughString(portMappingWithPref.getAutoRenewOrDefault(), now), color = color)
                 }
 
                 Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
@@ -246,28 +248,28 @@ fun urgencyColor(
     }
 )
 
-@Preview(showBackground = true)
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun PortMappingCardPreview() //TODO: rename?
-{
-    SetupPreview()
-    PortMappingCard(
-        PortMapping(
-            "Web Server",
-            "",
-            "192.168.18.13",
-            80,
-            80,
-            "UDP",
-            true,
-            0,
-            "192.168.18.1",
-            System.currentTimeMillis(),
-            0
-        )
-    )
-}
+//@Preview(showBackground = true)
+//@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
+//@Composable
+//fun PortMappingCardPreview() //TODO: rename?
+//{
+//    SetupPreview()
+//    PortMappingCard(
+//        PortMapping(
+//            "Web Server",
+//            "",
+//            "192.168.18.13",
+//            80,
+//            80,
+//            "UDP",
+//            true,
+//            0,
+//            "192.168.18.1",
+//            System.currentTimeMillis(),
+//            0
+//        )
+//    )
+//}
 
 @Preview(showBackground = true)
 @Composable

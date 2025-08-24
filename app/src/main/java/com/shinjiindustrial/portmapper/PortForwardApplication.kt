@@ -13,6 +13,7 @@ import androidx.datastore.dataStore
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.shinjiindustrial.portmapper.common.SortBy
+import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -84,7 +85,7 @@ class PortForwardApplication : Application() {
         lateinit var instance: PortForwardApplication
         var CurrentActivity: ComponentActivity? = null
         //        lateinit var showPopup : MutableState<Boolean>
-        lateinit var currentSingleSelectedObject : MutableState<Any?>
+        lateinit var currentSingleSelectedObject : MutableState<PortMappingWithPref?>
         var showContextMenu : MutableState<Boolean> = mutableStateOf(false)
         var PaddingBetweenCreateNewRuleRows = 4.dp
         var Logs : SnapshotStateList<String> = mutableStateListOf<String>()
