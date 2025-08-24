@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
+import java.com.shinjiindustrial.portmapper.persistance.PortMappingDao
 import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
@@ -30,7 +31,7 @@ import kotlin.collections.set
 import kotlin.system.measureTimeMillis
 
 @Singleton
-class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
+class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, private val portMappingDao : PortMappingDao) {
 
     init {
         upnpClient.deviceFoundEvent += { device ->
@@ -326,7 +327,9 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
         suspend fun DeletePortMappingEntry(portMapping: PortMapping) : UPnPResult {
 
             try {
+                println("Requesting Delete: ${portMapping.shortName()}")
                 val device: IIGDDevice = getIGDDevice(portMapping.DeviceIP)
+                portMappingDao.deleteByKey(portMapping.DeviceIP, device.udn, portMapping.Protocol, portMapping.ExternalPort)
                 val result = upnpClient.deletePortMapping(device, portMapping)
                 removeRuleIfSuccessful(result)
                 return result
@@ -342,13 +345,12 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
         suspend fun DeletePortMappingsEntry(
             portMappings: List<PortMapping>,
         ): List<UPnPResult> {
-
             return portMappings.map { portMapping ->
 
                 try {
                     println("Requesting Delete: ${portMapping.shortName()}")
-
-                    val device: IIGDDevice = getIGDDevice(portMapping.DeviceIP)
+                    val device = getIGDDevice(portMapping.DeviceIP)
+                    portMappingDao.deleteByKey(portMapping.DeviceIP, device.udn, portMapping.Protocol, portMapping.ExternalPort)
                     val result = upnpClient.deletePortMapping(device,portMapping)
                     removeRuleIfSuccessful(result)
                     result
@@ -377,6 +379,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
                         portMappingRequestRule,
                         false,
                         "created")
+                    //TODO DAO - with auto renew and lease
+                    //portMappingDao.upsert()
                     addRuleIfSuccessful(result)
                     result
                 }
@@ -601,6 +605,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient) {
 
 }
 
+// this is the request we give the router.  basically a port mapping minus time read and psuedo slot
 data class PortMappingRequest(val description : String, val internalIp : String, val internalPort : String, val externalIp : String, val externalPort : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val remoteHost : String)
 {
     fun realize() : PortMapping

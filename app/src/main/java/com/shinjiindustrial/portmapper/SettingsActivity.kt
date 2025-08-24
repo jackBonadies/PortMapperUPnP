@@ -36,6 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.compose.rememberNavController
+import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
@@ -265,3 +268,12 @@ fun RadioGroupPreview()
     SetupPreview()
     RadioGroupExample()
 }
+
+@Composable
+@Preview
+fun RadioGroupPreview5()
+{
+    RuleCreationDialog(rememberNavController(), hiltViewModel())
+    Text("test")
+}
+

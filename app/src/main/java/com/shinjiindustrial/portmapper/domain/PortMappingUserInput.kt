@@ -3,7 +3,8 @@ package com.shinjiindustrial.portmapper.domain
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.Protocol
 
-data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean)
+// this is the information the user gives us to create a rule. i.e. what the router needs + any preference info (autorenew)
+data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val autoRenew : Boolean)
 {
     fun requestWith(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
     {
@@ -64,8 +65,6 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
         if (errorString.isNotEmpty()) {
             throw java.lang.Exception(errorString)
         }
-
-
 
         val inSize = inEnd - inStart + 1 // inclusive
         val outSize = outEnd - outStart + 1

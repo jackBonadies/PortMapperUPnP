@@ -25,8 +25,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.shinjiindustrial.portmapper.CreateRuleContents
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
@@ -46,6 +48,21 @@ import kotlinx.coroutines.launch
 import java.com.shinjiindustrial.portmapper.PortViewModel
 import java.util.logging.Level
 
+
+@Composable
+@Preview
+fun RadioGroupPreview2()
+{
+    SetupPreview()
+    Text("test")
+}
+
+@Preview
+@Composable
+fun PreviewRuleCreationDialog() {
+    //RuleCreationDialog(rememberNavController(), hiltViewModel())
+    Text("test")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +86,7 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
     val selectedProtocolMutable = remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
     val startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).hasError) }
     val endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).hasError) }
+    val autoRenew = remember { mutableStateOf(ruleToEdit?.autoRenew ?: false) }
     val (ourIp, ourGatewayIp) = remember {
         if (isPreview) Pair<String, String>(
             "192.168.0.1",
@@ -205,7 +223,8 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 externalRangeStr,
                                 selectedProtocolMutable.value,
                                 leaseDuration.value.replace(" (max)",""),
-                                true
+                                true,
+                                autoRenew.value
                             )
 
                             val errorString = portMappingRequestInput.validateRange()
@@ -280,7 +299,8 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                     externalDeviceText,
                     expandedInternal,
                     expandedExternal,
-                    wanIpVersionOfGatewayIsVersion1
+                    wanIpVersionOfGatewayIsVersion1,
+                    autoRenew
                 )
             }
 

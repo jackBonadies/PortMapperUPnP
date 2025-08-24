@@ -11,6 +11,8 @@ interface IIGDDevice {
     fun getUpnpVersion() : Int
     fun supportsAction(actionName : String) : Boolean
     fun getActionInvocation(actionName : String) : ActionInvocation<*>
+    fun getDeviceSignature() : String
+    val udn : String
 }
 
 // has state including rules. add update those rules. and do a upnp action. and sort.
@@ -30,6 +32,7 @@ class IGDDevice constructor(private val rootDevice : RemoteDevice, private val w
     private val upnpType : String = this.rootDevice.type.type //i.e. InternetGatewayDevice
     private val upnpTypeVersion : Int = this.rootDevice.type.version //i.e. 2
     private val actionsMap : MutableMap<String, Action<RemoteService>> = mutableMapOf()
+    override val udn = rootDevice.root.identity.udn.toString()
 
     override fun getUpnpVersion() : Int {
         return upnpTypeVersion
@@ -50,6 +53,11 @@ class IGDDevice constructor(private val rootDevice : RemoteDevice, private val w
     override fun getActionInvocation(actionName: String): ActionInvocation<*> {
         val action = this.actionsMap[actionName]
         return ActionInvocation(action)
+    }
+
+    override fun getDeviceSignature(): String {
+        val action = this.actionsMap[""]
+        return ""
     }
 
     init {

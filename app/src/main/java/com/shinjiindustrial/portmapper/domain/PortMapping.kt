@@ -1,6 +1,11 @@
 package com.shinjiindustrial.portmapper.domain
 
+data class PortMappingPref(val autoRenew : Boolean, val desiredLeaseDuration: Int) {
 
+}
+
+// this is what is on the router
+// with additional field for timeRead and psuedoSlot
 class PortMapping(
     description: String,
     remoteHost: String,

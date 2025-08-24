@@ -52,6 +52,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.Checkbox
+import androidx.compose.material.CheckboxDefaults
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetLayout
 import androidx.compose.material.ModalBottomSheetValue
@@ -346,6 +348,7 @@ class MainActivity : ComponentActivity() {
                     navArgument("protocol") { nullable = true; type = NavType.StringType },
                     navArgument("leaseDuration") { nullable = true; type = NavType.StringType },
                     navArgument("enabled") { type = NavType.BoolType; defaultValue = false },
+                    navArgument("autorenew") { type = NavType.BoolType; defaultValue = false },
                 ),
                     popExitTransition = {
 
@@ -380,11 +383,12 @@ class MainActivity : ComponentActivity() {
                 val protocol = arguments?.getString("protocol")
                 val leaseDuration = arguments?.getString("leaseDuration")
                 val enabled = arguments?.getBoolean("enabled")
+                val autorenew = arguments?.getBoolean("autorenew")
 
                 var portMappingUserInputToEdit : PortMappingUserInput? = null
                 if(desc != null)
                 {
-                    portMappingUserInputToEdit = PortMappingUserInput(desc, internalIp!!, internalRange!!, externalIp!!, externalRange!!, protocol!!, leaseDuration!!, enabled!!)
+                    portMappingUserInputToEdit = PortMappingUserInput(desc, internalIp!!, internalRange!!, externalIp!!, externalRange!!, protocol!!, leaseDuration!!, enabled!!, autorenew!!)
                 }
 
                 RuleCreationDialog(navController = navController, portViewModel, ruleToEdit = portMappingUserInputToEdit)
@@ -819,7 +823,6 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                             Pair<String, () -> Unit>(
                                 "Edit"
                             ) {
-
                                 ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
                                 val uriBuilder = Uri.Builder()
                                     .path("full_screen_dialog")
@@ -831,6 +834,7 @@ fun EnterContextMenu(singleSelectedItem : MutableState<Any?>, showMoreInfoDialog
                                     .appendQueryParameter("protocol", portMapping.Protocol)
                                     .appendQueryParameter("leaseDuration", portMapping.LeaseDuration.toString())
                                     .appendQueryParameter("enabled", portMapping.Enabled.toString())
+                                    //.appendQueryParameter("autorenew", portMapping.Enabled.toString()) // TODO
                                 val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
                             }
@@ -921,7 +925,8 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                                    externalDeviceText: MutableState<String>,
                                    expandedInternal: MutableState<Boolean>,
                                    expandedExternal: MutableState<Boolean>,
-                                   wanIpIsV1: State<Boolean>
+                                   wanIpIsV1: State<Boolean>,
+                                   autoRenew: MutableState<Boolean>
 )
 {
 
@@ -1152,6 +1157,34 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
                 },//isFocused.value = it.isFocused },
         )
 
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth(createNewRuleRowWidth)
+            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
+    ) {
+        //PlainTooltipBox(
+        //androidx.compose.material3. TooltipBox(
+//            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+//            tooltip = {
+//                PlainTooltip {
+//                    Text("Add to favorites")
+//                }
+//            },
+//            state = rememberTooltipState()
+//        ) {
+        //TODO where is tooltipbox?
+            //MaterialTheme.colorScheme.outline
+            Checkbox(
+                autoRenew.value,
+                onCheckedChange = {autoRenew.value = it},
+                // uncheckedColor == border color
+                colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
+
+
+            )
+        Text("Auto Renew", color = AdditionalColors.TextColor)
     }
 }
 
