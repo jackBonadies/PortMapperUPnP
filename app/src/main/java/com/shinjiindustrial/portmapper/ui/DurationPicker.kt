@@ -141,7 +141,7 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
         val hoursValuesPickerState = rememberPickerState(dhms.hours)
 
         val minsValues = remember { getStringRange(0, 59, infiniteScroll) }
-        val minsValuesPickerState = rememberPickerState(dhms.mins)
+        val minsValuesPickerState = rememberPickerState(dhms.minutes)
 
         val secsValues = remember { getStringRange(0, 59, infiniteScroll) }
         val secsValuesPickerState = rememberPickerState(dhms.seconds)
@@ -184,7 +184,7 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
                 modifier = Modifier.width(120.dp),
                 textModifier = Modifier.padding(8.dp),
                 textStyle = TextStyle(fontSize = 32.sp),
-                startIndex = dhms.mins,
+                startIndex = dhms.minutes,
             )
 
             chosenValue.value = DayHourMinSec(

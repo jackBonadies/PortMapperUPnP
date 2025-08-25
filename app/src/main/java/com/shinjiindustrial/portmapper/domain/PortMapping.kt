@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper.domain
 
-import java.com.shinjiindustrial.portmapper.persistance.PortMappingEntity
+import android.os.SystemClock
+import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 
 class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
 {
@@ -94,9 +95,13 @@ class PortMapping(
 
     fun getRemainingLeaseTime(now : Long = -1) : Int
     {
-        val secondsPassed = ((if(now == -1L) System.currentTimeMillis() else now) - TimeReadLeaseDurationMs)/1000L
+        val secondsPassed = ((if(now == -1L) SystemClock.elapsedRealtime() else now) - TimeReadLeaseDurationMs)/1000L
         val timeToExpiration = (LeaseDuration.toLong() - secondsPassed)
         return timeToExpiration.toInt()
+    }
+
+    fun getExpiresTimeMillis() : Long {
+        return TimeReadLeaseDurationMs + LeaseDuration.toLong() * 1000;
     }
 
     fun getRemainingLeaseTimeRoughString(autoRenew : Boolean, now: Long = -1) : String
@@ -109,26 +114,9 @@ class PortMapping(
         val totalSecs = getRemainingLeaseTime(now)
         val dhms = getDHMS(totalSecs)
 
-        val hasDays = dhms.days >= 1
-        val hasHours = dhms.hours >= 1
-        val hasMinutes = dhms.mins >= 1
-        val hasSeconds = dhms.seconds >= 1
-
         val renewsExpiresString = if(autoRenew) "Renews in" else "Expires in"
-
-        if (hasDays)
-        {
-            return "$renewsExpiresString ${dhms.days} day${_plural(dhms.days)}"
-        }
-        else if(hasHours)
-        {
-            return "$renewsExpiresString ${dhms.hours} hour${_plural(dhms.hours)}"
-        }
-        else if(hasMinutes)
-        {
-            return "$renewsExpiresString ${dhms.mins} minute${_plural(dhms.mins)}"
-        }
-        else if(hasSeconds)
+        val renewStringTime = roundOneUnit(dhms)
+        if (totalSecs < 60)
         {
             if (autoRenew) {
                 return "Renewing now"
@@ -139,8 +127,9 @@ class PortMapping(
         }
         else
         {
-            return "Expired"
+            return "$renewsExpiresString $renewStringTime"
         }
+
     }
 
     fun getRemainingLeaseTimeString(now: Long = -1) : String
@@ -152,31 +141,12 @@ class PortMapping(
         // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
         val totalSecs = getRemainingLeaseTime(now)
         val dhms = getDHMS(totalSecs)
+        val timeLeftString = roundTwoUnits(dhms)
 
-        val hasDays = dhms.days >= 1
-        val hasHours = dhms.hours >= 1
-        val hasMinutes = dhms.mins >= 1
-        val hasSeconds = dhms.seconds >= 1
-
-        if (hasDays)
-        {
-            return "${dhms.days} day${_plural(dhms.days)}, ${dhms.hours} hour${_plural(dhms.hours)}"
-        }
-        else if(hasHours)
-        {
-            return "${dhms.hours} hour${_plural(dhms.hours)}, ${dhms.mins} minute${_plural(dhms.mins)}"
-        }
-        else if(hasMinutes)
-        {
-            return "${dhms.mins} minute${_plural(dhms.mins)}, ${dhms.seconds} second${_plural(dhms.seconds)}"
-        }
-        else if(hasSeconds)
-        {
-            return "${dhms.seconds} second${_plural(dhms.seconds)}"
-        }
-        else
-        {
-            return "Expired"
+        return if (totalSecs > 0) {
+            timeLeftString
+        } else {
+            "Expired"
         }
     }
 
@@ -188,20 +158,15 @@ class PortMapping(
         }
         val totalSecs = getRemainingLeaseTime(now)
         val dhms = getDHMS(totalSecs)
-        if (dhms.mins <= 1)
+        if (dhms.minutes <= 1)
         {
             return Urgency.Error
         }
-        else if (dhms.mins <= 5)
+        else if (dhms.minutes <= 5)
         {
             return Urgency.Warn
         }
         return Urgency.Normal
-    }
-
-    fun _plural(value : Int) : String
-    {
-        return if (value > 1) "s" else ""
     }
 
     fun toStringFull() : String
@@ -216,11 +181,11 @@ enum class Urgency {
     Error,
 }
 
-data class DayHourMinSec(val days : Int, val hours : Int, val mins : Int, val seconds : Int)
+data class DayHourMinSec(val days : Int, val hours : Int, val minutes : Int, val seconds : Int)
 {
     fun totalSeconds() : Int
     {
-        return days * 3600 * 24 + hours * 3600 + mins * 60 + seconds
+        return days * 3600 * 24 + hours * 3600 + minutes * 60 + seconds
     }
 }
 
@@ -231,6 +196,76 @@ fun getDHMS(totalSeconds : Int) : DayHourMinSec
     val mins =  (totalSeconds % (3600)) / 60
     val secs = (totalSeconds % (60))
     return DayHourMinSec(days, hours, mins, secs)
+}
+
+fun getPlural(value : Int) : String
+{
+    return if (value > 1) "s" else ""
+}
+
+fun roundOneUnit(time: DayHourMinSec): String {
+    var days = time.days
+    var hours = time.hours
+    var minutes = time.minutes
+    val seconds = time.seconds
+    return when {
+        days > 0 -> {
+            val remainderSec = hours * 3600 + minutes * 60 + seconds
+            if (remainderSec >= 12 * 3600 * hours) {
+                days += 1
+            }
+            "$days day${getPlural(days)}"
+        }
+        hours > 0 -> {
+            val remainderSec = minutes * 60 + seconds
+            if (remainderSec >= 1800) {
+                hours += 1
+            }
+            if (hours == 24) {
+                return "1 day"
+            }
+            return "$hours hour${getPlural(hours)}"
+        }
+        minutes > 0 -> {
+            if (seconds >= 30) {
+                minutes += 1
+            }
+            if (minutes == 60) {
+                return "1 hour"
+            }
+
+            return "$minutes minute${getPlural(minutes)}"
+        }
+        else -> "$seconds second${getPlural(seconds)}"
+    }
+}
+
+fun roundTwoUnits(time: DayHourMinSec): String {
+    var days = time.days
+    var hours = time.hours
+    var minutes = time.minutes
+    val seconds = time.seconds
+    return when {
+        days > 0 -> {
+            val remainderSec = minutes * 60 + seconds
+            if (remainderSec >= 30 * 60) {
+                hours += 1
+                if (hours == 24) { days += 1; hours = 0 }
+            }
+            "$days day${getPlural(days)}, $hours hour${getPlural(hours)}"
+        }
+        hours > 0 -> {
+            if (seconds >= 30) {
+                minutes += 1
+                if (minutes == 60) { hours += 1; minutes = 0 }
+            }
+            return "$hours hour${getPlural(hours)}, $minutes minute${getPlural(minutes)}"
+        }
+        minutes > 0 -> {
+            return "$minutes minute${getPlural(minutes)}, $seconds second${getPlural(seconds)}"
+        }
+        else -> "$seconds second${getPlural(seconds)}"
+    }
 }
 
 fun formatShortName(protocol: String, externalIp: String, externalPort: String) : String

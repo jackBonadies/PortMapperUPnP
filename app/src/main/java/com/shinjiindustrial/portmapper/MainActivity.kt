@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.Html
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
@@ -339,7 +340,7 @@ class MainActivity : ComponentActivity() {
             {
                 MainScreen(navController = navController)
             }
-            composable("full_screen_dialog?description={description}&internalIp={internalIp}&internalRange={internalRange}&externalIp={externalIp}&externalRange={externalRange}&protocol={protocol}&leaseDuration={leaseDuration}&enabled={enabled}",
+            composable("full_screen_dialog?description={description}&internalIp={internalIp}&internalRange={internalRange}&externalIp={externalIp}&externalRange={externalRange}&protocol={protocol}&leaseDuration={leaseDuration}&enabled={enabled}&autorenew={autorenew}",
                 arguments = listOf(
                     navArgument("description") { nullable = true; type = NavType.StringType }, // only if nullable (or default) are they optional
                     navArgument("internalIp") { nullable = true; type = NavType.StringType },
@@ -1711,7 +1712,7 @@ data class Message(val name : String, val msg : String)
 fun _getDefaultPortMapping() : PortMappingWithPref
 {
     return PortMappingWithPref(
-        PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", System.currentTimeMillis(), 0))
+        PortMapping("Web Server", "","192.168.18.13",80,80, "UDP", true, 0, "192.168.18.1", SystemClock.elapsedRealtime(), 0))
 }
 
 // TODO: for mock purposes

@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.client.IUpnpClient
@@ -18,14 +19,15 @@ import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
+import com.shinjiindustrial.portmapper.persistence.PortMappingDao
+import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
-import java.com.shinjiindustrial.portmapper.persistance.PortMappingDao
-import java.com.shinjiindustrial.portmapper.persistance.PortMappingEntity
 import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
@@ -41,7 +43,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
     init {
         upnpClient.deviceFoundEvent += { device ->
             // this is on the cling thread
-            AddDevice(device)
+            addDevice(device)//TODO test with suspend
             runBlocking {
                 enumeratePortMappings(device.getIpAddress())
             }
@@ -64,8 +66,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         private var portMappingLookup : MutableMap<PortMappingKey, PortMappingWithPref> = mutableMapOf()
 
         // I think this should be a local var inside mutable state flow
-        private var portMappingsSortedSource : TreeSet<PortMappingWithPref> = TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))
-        private val _portMappings = MutableStateFlow(portMappingsSortedSource)  // TreeSet<PortMapping>
+        private val _portMappings = MutableStateFlow( TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)))  // TreeSet<PortMapping>
         val portMappings : StateFlow<Set<PortMappingWithPref>> = _portMappings
 //
 //        fun update(pm: PortMapping) = _setFlow.update { old ->
@@ -91,10 +92,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
         
-        fun clearDevices()
-        {
-            _devices.update { listOf<IGDDevice>() }
-        }
 
         private fun addOrUpdateMapping(pm: PortMappingWithPref)
         {
@@ -107,6 +104,15 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                 }
                 portMappingLookup[pm.getKey()] = pm
                 TreeSet(old).apply { add(pm) }
+//                var pmToUse = pm
+//                // if they are the same reference then the UI will not update
+//                // TODO we really need to make portMapping a dataclass immutable
+//                if (existingRule === pm)
+//                {
+//                    pmToUse = pm.clone()
+//                }
+//                portMappingLookup[pm.getKey()] = pmToUse
+//                TreeSet(old).apply { add(pmToUse) }
             }
 
             if (existingRule != null && MainActivity.MultiSelectItems?.remove(existingRule) ?: false) {
@@ -207,8 +213,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             if (onlyIfNotYetSearched && HasSearched) {
                 return false
             }
-            SearchStarted?.invoke(null)
-            ClearOldData()
+            SearchStarted.invoke(null)
+            clearOldData()
             //NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
             HasSearched = true
             // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
@@ -464,7 +470,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         if (res is UPnPCreateMappingWrapperResult.Success) {
             addOrUpdateMapping(
                 PortMappingWithPref(
-                    portMapping.portMapping,
+                    res.resultingMapping,
                     portMapping.portMappingPref
                 )
             )
@@ -477,7 +483,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
     ) {
         // this is so it "refreshes"
         if (res is UPnPCreateMappingWrapperResult.Success) {
-            addOrUpdateMapping(portMapping)
+            addOrUpdateMapping(PortMappingWithPref(res.resultingMapping, portMapping.portMappingPref))
         }
     }
 
@@ -652,9 +658,11 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         //region DataUpdate
 
-        fun ClearOldData() {
+        private fun clearOldData() {
             upnpClient.clearOldDevices()
-            clearDevices()
+            _devices.update { listOf<IGDDevice>() }
+            portMappingLookup.clear()
+            _portMappings.update {TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))}
         }
 
         private fun removeForDelete(result : UPnPResult, portMappingWithPref: PortMappingWithPref) {
@@ -666,7 +674,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             }
         }
 
-        fun AddDevice(igdDevice: IIGDDevice) {
+        private fun addDevice(igdDevice: IIGDDevice) {
             add(igdDevice)
             Log.i("portmapperUI", "IGD device added")
             OurLogger.log(
@@ -685,7 +693,7 @@ data class PortMappingRequest(val description : String, val internalIp : String,
 {
     fun realize() : PortMapping
     {
-        return PortMapping(description, remoteHost, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, System.currentTimeMillis(), GetPsuedoSlot())
+        return PortMapping(description, remoteHost, internalIp, externalPort.toInt(), internalPort.toInt(), protocol, enabled, leaseDuration.toInt(), externalIp, SystemClock.elapsedRealtime(), GetPsuedoSlot())
     }
 
     companion object {

@@ -1,10 +1,9 @@
-package java.com.shinjiindustrial.portmapper.persistance
+package com.shinjiindustrial.portmapper.persistence
 
 import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
-import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Query
 import androidx.room.Room
@@ -43,7 +42,7 @@ data class PortMappingEntity(
 @Dao
 interface PortMappingDao {
     @Query("SELECT * FROM port_mappings")
-    fun getAll(): List<PortMappingEntity>
+    suspend fun getAll(): List<PortMappingEntity>
 
     @Query("""
         SELECT * FROM port_mappings

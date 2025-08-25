@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper.client
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -13,7 +14,6 @@ import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -240,7 +240,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                     enabled.toString().toInt() == 1,
                     leaseDuration.toString().toInt(),
                     remoteIp,
-                    System.currentTimeMillis(),
+                    SystemClock.elapsedRealtime(),
                     GetPsuedoSlot()
                 ) // best bet for DateTime.UtcNow
 
@@ -305,7 +305,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                     enabled.toString().toInt() == 1,
                     leaseDuration.toString().toInt(),
                     ipAddress,
-                    System.currentTimeMillis(),
+                    SystemClock.elapsedRealtime(),
                     slotIndex
                 )
                 val result = UPnPGetSpecificMappingResult.Success(portMapping, portMapping)

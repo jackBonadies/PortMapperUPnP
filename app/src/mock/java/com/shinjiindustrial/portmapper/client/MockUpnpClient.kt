@@ -1,5 +1,6 @@
 package com.shinjiindustrial.portmapper.client
 
+import android.os.SystemClock
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
@@ -13,7 +14,7 @@ import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.RemoteService
 
-class MockIGDDevice(private val displayName : String, private val ipAddress : String, private val upnpTypeVersion : Int = 2) : IIGDDevice
+class MockIGDDevice(private val displayName : String, private val ipAddress : String, override val udn : String, private val upnpTypeVersion : Int = 2) : IIGDDevice
 {
     override fun getDisplayName(): String {
         return displayName
@@ -30,6 +31,10 @@ class MockIGDDevice(private val displayName : String, private val ipAddress : St
     override fun getActionInvocation(actionName: String): ActionInvocation<*> {
         // not actually used
         return ActionInvocation<RemoteService>(ActionException(0, ""))
+    }
+
+    override fun getDeviceSignature(): String {
+        return udn
     }
 
     override fun getUpnpVersion() : Int {
@@ -106,15 +111,15 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
             enabled = enabled,
             leaseDuration = leaseDuration,
             deviceIP = actionExternalIP,
-            timeReadLeaseDurationMs = System.currentTimeMillis(),
+            timeReadLeaseDurationMs = SystemClock.elapsedRealtime(),
             pseudoSlot = pseudoSlot
         )
 
     init {
-        var igdDevice = MockIGDDevice("IGD Other", "192.168.1.255")
+        var igdDevice = MockIGDDevice("IGD Other", "192.168.1.255", "UUID-1")
         store.put(igdDevice, linkedMapOf())
 
-        igdDevice = MockIGDDevice("IGD Main", "192.168.1.1")
+        igdDevice = MockIGDDevice("IGD Main", "192.168.1.1", "UUID-2")
         var mappings: List<PortMapping> =
             (1..200).map { i ->
                 makePortMapping(
@@ -132,7 +137,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
         store.put(igdDevice, linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
 
-        igdDevice = MockIGDDevice("IGD Other2", "192.168.1.244")
+        igdDevice = MockIGDDevice("IGD Other2", "192.168.1.244", "UUID-3")
         mappings =
             (1..2).map { i ->
                 makePortMapping(

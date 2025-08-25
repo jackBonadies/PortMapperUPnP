@@ -1,6 +1,6 @@
 package com.shinjiindustrial.portmapper.ui
 
-import android.content.res.Configuration
+import android.os.SystemClock
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -212,7 +212,7 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 
 
                     Text(text, color = AdditionalColors.TextColor)
-                    val urgency = portMapping.getUrgency(false, now)
+                    val urgency = portMapping.getUrgency(portMappingWithPref.getAutoRenewOrDefault(), now)
                     val color by urgencyColor(urgency, AdditionalColors.TextColor, AdditionalColors.LogWarningText, AdditionalColors.LogErrorText)
                     Text(portMapping.getRemainingLeaseTimeRoughString(portMappingWithPref.getAutoRenewOrDefault(), now), color = color)
                 }
@@ -265,7 +265,7 @@ fun urgencyColor(
 //            true,
 //            0,
 //            "192.168.18.1",
-//            System.currentTimeMillis(),
+//            SystemClock.elapsedRealtime(),
 //            0
 //        )
 //    )
@@ -289,7 +289,7 @@ fun PortMappingCardAltPreview() // TODO: rename?
                 true,
                 0,
                 "192.168.18.1",
-                System.currentTimeMillis(),
+                SystemClock.elapsedRealtime(),
                 0
             )
         )
@@ -559,11 +559,11 @@ fun PortMappingContent(uiState : PortUiState)
 @Composable
 fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
     Log.i("rememberTicker", "called")
-    val now = remember { mutableStateOf(System.currentTimeMillis()) }
+    val now = remember { mutableStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(periodMillis)
-            now.value = System.currentTimeMillis()
+            now.value = SystemClock.elapsedRealtime()
         }
     }
     return now
@@ -587,7 +587,6 @@ fun Conversation(messages: List<UpnpViewRow>) {
 
         ) {
 
-        // TODO key?
         itemsIndexed(messages, key = { index, message -> message.key }) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
 
             when(message) {
