@@ -145,12 +145,12 @@ data class PortMapping(
             return Urgency.Normal
         }
         val totalSecs = getRemainingLeaseTime(now)
-        val dhms = getDHMS(totalSecs)
-        if (dhms.minutes <= 1)
+        val totalMinutes = totalSecs / 60
+        if (totalMinutes <= 1)
         {
             return Urgency.Error
         }
-        else if (dhms.minutes <= 5)
+        else if (totalMinutes <= 5)
         {
             return Urgency.Warn
         }
