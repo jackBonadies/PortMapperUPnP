@@ -3,7 +3,7 @@ package com.shinjiindustrial.portmapper.domain
 import android.os.SystemClock
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 
-class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
+data class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
 {
     fun getKey() : PortMappingKey
     {
@@ -29,18 +29,18 @@ data class PortMappingKey(val deviceIP: String, val externalPort: Int, val proto
 
 // this is what is on the router
 // with additional field for timeRead and psuedoSlot
-class PortMapping(
-    description: String,
-    remoteHost: String,
-    localIP: String,
-    externalPort: Int,
-    internalPort: Int,
-    protocol: String,
-    enabled: Boolean,
-    leaseDuration: Int,
-    deviceIP : String,
-    timeReadLeaseDurationMs : Long,
-    pseudoSlot : Int)
+data class PortMapping(
+    val Description : String,
+    val RemoteHost : String,
+    val InternalIP : String,
+    val ExternalPort : Int,
+    val InternalPort : Int,
+    val Protocol : String,
+    val Enabled : Boolean,
+    val LeaseDuration : Int,
+    val DeviceIP : String,
+    val TimeReadLeaseDurationMs : Long,
+    val Slot : Int)
 {
     // the returned ip from get port mapping
     // https://upnp.org/specs/gw/UPnP-gw-WANIPConnection-v2-Service.pdf page 17
@@ -64,19 +64,7 @@ class PortMapping(
     //4787]). When RemoteHost is specified as a specific external IP address as opposed to a wildcard, the NAT
     //will only forward inbound packets from this RemoteHost to the InternalClient. All other packets will
     //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
-    var RemoteHost : String = remoteHost
-    // the actual ip of the IGD device
-    var DeviceIP : String = deviceIP
-    var InternalIP : String = localIP
-    var ExternalPort : Int = externalPort
-    var InternalPort : Int= internalPort
-    var Protocol : String = protocol
-    var Enabled : Boolean = enabled
-    var LeaseDuration : Int  = leaseDuration
-    var Description : String = description
 
-    var TimeReadLeaseDurationMs : Long = timeReadLeaseDurationMs
-    var Slot : Int = pseudoSlot
 
     // needs to be * for Verizon Router - CR1000B, but only for delete call
     // else one will get InvalidArgs exception

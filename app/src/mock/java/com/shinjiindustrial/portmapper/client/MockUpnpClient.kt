@@ -66,10 +66,11 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
     private fun getKey(portMapping : PortMapping) : Key
     {
-        return Key(portMapping.DeviceIP, portMapping.ExternalPort.toString(), portMapping.Protocol)
+        return Key(portMapping.RemoteHost, portMapping.ExternalPort.toString(), portMapping.Protocol)
     }
 
-    data class Key(val externalIp: String, val remotePort: String, val protocol: String)
+    // remoteHost is literally remoteHost (since that's what get specific key mapping uses)
+    data class Key(val remoteHost: String, val remotePort: String, val protocol: String)
 
     private val store = mutableMapOf<IIGDDevice, LinkedHashMap<Key, PortMapping>>()
     private val interfacesUsed = false
@@ -102,17 +103,17 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         pseudoSlot: Int
     ): PortMapping =
         PortMapping(
-            description = description,
-            remoteHost = "",
-            localIP = localIP,
-            externalPort = externalPort,
-            internalPort = internalPort,
-            protocol = protocol,
-            enabled = enabled,
-            leaseDuration = leaseDuration,
-            deviceIP = actionExternalIP,
-            timeReadLeaseDurationMs = SystemClock.elapsedRealtime(),
-            pseudoSlot = pseudoSlot
+            Description = description,
+            RemoteHost = "",
+            InternalIP = localIP,
+            ExternalPort = externalPort,
+            InternalPort = internalPort,
+            Protocol = protocol,
+            Enabled = enabled,
+            LeaseDuration = leaseDuration,
+            DeviceIP = actionExternalIP,
+            TimeReadLeaseDurationMs = SystemClock.elapsedRealtime(),
+            Slot = pseudoSlot
         )
 
     init {
