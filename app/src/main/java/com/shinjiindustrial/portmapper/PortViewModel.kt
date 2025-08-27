@@ -9,9 +9,10 @@ import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
+import com.shinjiindustrial.portmapper.common.SortBy
+import com.shinjiindustrial.portmapper.common.SortInfo
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
-import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
@@ -76,9 +77,11 @@ class PortViewModel @Inject constructor(
             initialValue = false
         )
 
-    val uiState: StateFlow<PortUiState> = combine( // !! todo
-        upnpRepository.devices, upnpRepository.portMappings
-    ) { devices, portMappings ->
+    val uiState: StateFlow<PortUiState> = combine(
+        preferencesRepository.sortInfo,
+        upnpRepository.devices,
+        upnpRepository.portMappings
+    ) { sortInfo, devices, portMappings ->
 
         Log.i("Port", "UI STATE FLOW is running")
 
@@ -90,7 +93,7 @@ class PortViewModel @Inject constructor(
         {
             var index = 0
             val curDevice : IIGDDevice? = devices.elementAt(0)
-            val portMappingsList = portMappings.toList()
+            val portMappingsList = portMappings.values.sortedWith(sortInfo.sortBy.getComparer(!sortInfo.sortDesc))
             for (curDevice in devices)
             {
                 // do we have any port mappings
@@ -137,8 +140,14 @@ class PortViewModel @Inject constructor(
         return upnpRepository.GetUPnPClient().isInitialized()
     }
 
-    fun updateSorting() {
-        upnpRepository.UpdateSorting()
+    val sortInfo: StateFlow<SortInfo> = preferencesRepository.sortInfo
+
+    fun updateSortingDesc(sortDesc : Boolean) = viewModelScope.launch {
+        preferencesRepository.updateSortDesc(sortDesc)
+    }
+
+    fun updateSortingSortBy(sortBy : SortBy) = viewModelScope.launch {
+       preferencesRepository.updateSortBy(sortBy)
     }
 
     fun getIGDDevice(ipAddress: String): IIGDDevice {

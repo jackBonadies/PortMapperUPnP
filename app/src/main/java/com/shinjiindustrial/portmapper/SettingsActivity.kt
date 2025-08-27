@@ -42,9 +42,16 @@ import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import dagger.hilt.android.AndroidEntryPoint
+import java.com.shinjiindustrial.portmapper.PreferencesManager
+import javax.inject.Inject
 
-
+@AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,25 +83,25 @@ class SettingsActivity : ComponentActivity() {
                         )
                     },
                     content = { it ->
-                        Settings(Modifier.padding(it))
+                        Settings(preferencesManager, Modifier.padding(it))
                     }
                 )
             }
         }
     }
 }
+//
+//@Composable
+//@Preview
+//fun SettingsPreview()
+//{
+//    SetupPreview()
+//    Settings()
+//}
+
 
 @Composable
-@Preview
-fun SettingsPreview()
-{
-    SetupPreview()
-    Settings()
-}
-
-
-@Composable
-fun Settings(modifier : Modifier = Modifier)
+fun Settings(preferencesManager : PreferencesManager, modifier : Modifier = Modifier)
 {
     MyApplicationTheme()
     {
@@ -108,7 +115,7 @@ fun Settings(modifier : Modifier = Modifier)
                 // alert dialog...
                 AlertDialog(
                     onDismissRequest = {
-                        PortForwardApplication.instance.SaveSharedPrefs()
+                        preferencesManager.saveSharedPrefs()
                         showThemeAlertDialog.value = false
                                        },
                     title = { Text("Theme") },
@@ -120,7 +127,7 @@ fun Settings(modifier : Modifier = Modifier)
                     confirmButton = {
                         Button(onClick = {
                             showThemeAlertDialog.value = false
-                            PortForwardApplication.instance.SaveSharedPrefs()
+                            preferencesManager.saveSharedPrefs()
                         }
                         ) {
                             Text("OK")
@@ -138,9 +145,7 @@ fun Settings(modifier : Modifier = Modifier)
             Column(
                 modifier = Modifier
                     .clickable(onClick = {
-
                         showThemeAlertDialog.value = true
-
                     })
                     .fillMaxWidth())
             {

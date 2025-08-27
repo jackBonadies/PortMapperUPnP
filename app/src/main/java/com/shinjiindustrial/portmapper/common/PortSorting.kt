@@ -13,6 +13,8 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 
 // TODO organize re other portmappingsort file
 
+data class SortInfo(val sortBy : SortBy, val sortDesc : Boolean)
+
 enum class SortBy(val sortByValue : Int) {
     Slot(0),
     Description(1),

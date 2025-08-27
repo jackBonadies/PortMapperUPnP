@@ -12,8 +12,6 @@ object SharedPrefValues
 {
     var DayNightPref : DayNightMode = DayNightMode.FOLLOW_SYSTEM
     var MaterialYouTheme : Boolean = false
-    var SortByPortMapping : SortBy = SortBy.Slot
-    var Ascending : Boolean = true
 }
 
 enum class DayNightMode(val intVal : Int) {

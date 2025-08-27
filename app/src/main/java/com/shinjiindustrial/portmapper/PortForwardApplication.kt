@@ -20,10 +20,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.com.shinjiindustrial.portmapper.PreferencesManager
 import java.util.logging.Logger
+import javax.inject.Inject
 
-
-private val Context.dataStore by preferencesDataStore("preferences")
 
 //TODO clean up create (picker for duration, indication that 0 is max), port range, full screen (?)
 //TODO group by algorithm. way to convert from grouped port mappings to individial
@@ -32,13 +32,16 @@ private val Context.dataStore by preferencesDataStore("preferences")
 @HiltAndroidApp
 class PortForwardApplication : Application() {
 
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+
     override fun onCreate() {
 
         super.onCreate()
 
         FirebaseConditional.Initialize(this)
 
-        RestoreSharedPrefs()
+        preferencesManager.restoreSharedPrefs()
 
         instance = this
         appContext = applicationContext
@@ -49,34 +52,6 @@ class PortForwardApplication : Application() {
         println("PortForwardApplication onCreate Finished")
     }
 
-    // TODO move these
-    fun RestoreSharedPrefs()
-    {
-        runBlocking {
-            val preferences = dataStore.data.first()
-            val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
-            SharedPrefValues.DayNightPref = DayNightMode.from(preferences[nightModeKey] ?: 0)
-            val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
-            SharedPrefValues.MaterialYouTheme = preferences[materialYouKey] ?: false
-            //val descAsc = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-            //SharedPrefValues.Ascending = preferences[descAsc] ?: true
-        }
-    }
-
-    fun SaveSharedPrefs() {
-        GlobalScope.launch(Dispatchers.IO) {
-            dataStore.edit { preferences ->
-                val nightModeKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.dayNightPref)
-                preferences[nightModeKey] = SharedPrefValues.DayNightPref.intVal
-                val materialYouKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.materialYouPref)
-                preferences[materialYouKey] = SharedPrefValues.MaterialYouTheme
-//                val sortKey = androidx.datastore.preferences.core.intPreferencesKey(SharedPrefKeys.sortOrderPref)
-//                preferences[sortKey] = SharedPrefValues.SortByPortMapping.sortByValue
-//                val descAscKey = androidx.datastore.preferences.core.booleanPreferencesKey(SharedPrefKeys.descAscPref)
-//                preferences[descAscKey] = SharedPrefValues.Ascending
-            }
-        }
-    }
 
 
     companion object {

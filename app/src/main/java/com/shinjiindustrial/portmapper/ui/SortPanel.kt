@@ -8,16 +8,14 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.SharedPrefValues
-import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import java.com.shinjiindustrial.portmapper.PortViewModel
@@ -42,7 +40,8 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
         {
             val numRow = 2
             val numCol = 3
-            val curIndex = remember { mutableStateOf(SharedPrefValues.SortByPortMapping.sortByValue) }
+            val sortInfo by portViewModel.sortInfo.collectAsStateWithLifecycle()
+            val curIndex = sortInfo.sortBy.sortByValue
 
             for (i in 0 until numRow) {
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -54,14 +53,9 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
                         SortSelectButton(
                             modifier = Modifier.weight(1.0f),
                             text = SortBy.from(index).getShortName(),//FilterField.from(i).name,
-                            isSelected = index == curIndex.value,
+                            isSelected = index == curIndex,
                             onClick = {
-
-                                curIndex.value = index
-                                SharedPrefValues.SortByPortMapping = SortBy.from(index)
-                                portViewModel.updateSorting()
-                                PortForwardApplication.instance.SaveSharedPrefs()
-
+                                portViewModel.updateSortingSortBy(SortBy.from(index))
                             })
                     }
                     //}
@@ -70,7 +64,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
 
             Divider(modifier = Modifier.fillMaxWidth())
 
-            val asc = remember { mutableStateOf(SharedPrefValues.Ascending) }
+            val desc = sortInfo.sortDesc
 
             Row(modifier = Modifier.fillMaxWidth()) {
 //                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
@@ -80,14 +74,9 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
                     SortSelectButton(
                         modifier = Modifier.weight(1.0f),
                         text = if(ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
-                        isSelected = ascendingButton == asc.value,
+                        isSelected = ascendingButton == !desc,
                         onClick = {
-
-                            asc.value = ascendingButton
-                            SharedPrefValues.Ascending = ascendingButton
-                            portViewModel.updateSorting()
-                            PortForwardApplication.instance.SaveSharedPrefs()
-
+                            portViewModel.updateSortingDesc(!ascendingButton)
                         })
                 }
             }
