@@ -20,7 +20,6 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.com.shinjiindustrial.portmapper.PreferencesManager
 import java.util.logging.Logger
 import javax.inject.Inject
 
@@ -40,8 +39,6 @@ class PortForwardApplication : Application() {
         super.onCreate()
 
         FirebaseConditional.Initialize(this)
-
-        preferencesManager.restoreSharedPrefs()
 
         instance = this
         appContext = applicationContext

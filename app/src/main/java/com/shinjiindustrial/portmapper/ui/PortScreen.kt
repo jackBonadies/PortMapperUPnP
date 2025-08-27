@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.IsMultiSelectMode
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
@@ -68,6 +69,7 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import java.com.shinjiindustrial.portmapper.PortUiState
+import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 @OptIn(
     ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
@@ -78,11 +80,6 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 {
     val portMapping = portMappingWithPref.portMapping
     println("external ip test ${portMapping.DeviceIP}")
-
-    MyApplicationTheme {
-
-        //var isRound by remember { mutableStateOf(true)}
-        //val borderRadius by animateIntAsState(targetValue = if(isRound) 100 else 0, animationSpec = tween(durationMillis = 2000))
 
         Card(
 //        onClick = {
@@ -229,8 +226,6 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
                 }
             }
         }
-
-    }
 }
 
 @Composable
@@ -276,7 +271,7 @@ fun urgencyColor(
 fun PortMappingCardAltPreview() // TODO: rename?
 {
     SetupPreview()
-    MyApplicationTheme {
+    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
 
         PortMappingCardAlt(
             PortMapping(
@@ -424,7 +419,7 @@ fun NoMappingsCard(remoteDevice : IIGDDevice) {
 @Composable
 fun NoMappingsCard()
 {
-    MyApplicationTheme {
+    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         Card(
 //        onClick = {
 //            if(PortForwardApplication.showPopup != null)
@@ -515,7 +510,6 @@ fun ScaffoldDemo() {
             TopAppBar(
                 modifier = Modifier.Companion.height(36.dp),  // change the height here
                 title = { Text(text = "hello world") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.Companion.Yellow)
             )
         },
         floatingActionButton = {
@@ -538,7 +532,7 @@ fun ScaffoldDemo() {
 @Composable
 fun PreviewConversation() {
     SetupPreview()
-    MyApplicationTheme {
+    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         val msgs = mutableListOf<UpnpViewRow>()
         val pm = _getDefaultPortMapping()
         val upnpViewEl = UpnpViewRow.PortViewRow(pm)
@@ -597,7 +591,7 @@ fun Conversation(messages: List<UpnpViewRow>) {
                     NoMappingsCard(message.device)
                 }
                 is UpnpViewRow.PortViewRow -> {
-                    PortMappingCard(message.portMapping, now, Modifier.animateItemPlacement())
+                    PortMappingCard(message.portMapping, now, Modifier.animateItem())
                 }
             }
         }

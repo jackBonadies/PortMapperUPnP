@@ -21,18 +21,39 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.collections.filter
+import kotlin.collections.forEach
 import kotlin.collections.map
+import kotlin.collections.plus
 import kotlin.collections.remove
 import kotlin.collections.set
 import kotlin.system.measureTimeMillis
@@ -48,7 +69,113 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                 enumeratePortMappings(device.getIpAddress())
             }
         }
+        //subscribeForAutoRenew()
+        //subscribeForAutoRenewCancelTimerNotWork()
+        subscribeForAutoRenewCancelTimerNotWork()
     }
+
+    fun subscribeForAutoRenewCancelTimerNotWork()
+    {
+        // too early for app scope
+        MainScope().launch {
+            portMappings.mapNotNull {
+                    it -> it.filter { it.value.getAutoRenewOrDefault() }.minByOrNull { it.value.portMapping.getExpiresTimeMillis() }
+            }.onEach{
+                // null check
+                    it -> println("running with ${it.value.portMapping.shortName()}")
+            }.collectLatest {
+                delayUntilExpiryBuffer((it.value.portMapping.getExpiresTimeMillis()), renewWithinXSecondsOfExpiring)
+                println("delay is over launching")
+                withContext(NonCancellable)
+                {
+                    performBatchRenew()
+                }
+            }
+        }
+    }
+
+    private val renewMutex = Mutex()
+    private var counter = 1
+
+    private suspend fun performBatchRenew() = renewMutex.withLock {
+        println("renewing all rules")
+        val snapshot = portMappings.first()
+
+        val now = SystemClock.elapsedRealtime()
+        val expiring = snapshot.filter { it.value.portMapping.getExpiresTimeMillis() - now <= 1000*(renewWithinXSecondsOfExpiring + renewBatchWithinXSeconds) }
+        if (expiring.isEmpty())
+        {
+            println("batch is empty")
+            return
+        }
+        expiring.forEach {
+            println("our batch $counter: ${it.value.portMapping.shortName()}")
+        }
+        counter++
+
+        expiring.forEach {
+            println("renewed ${it.value.portMapping.shortName()}")
+            try {
+                renewRule(it.value)
+            }
+            catch (exception : Exception)
+            {
+                // we already logged just continue for now (TODO)
+            }
+            println("updated ${it.value.portMapping.shortName()}")
+        }
+        //delay(1000) // just to prove that we do not cancel
+        println("end renewing all rules")
+    }
+
+    private val renewWithinXSecondsOfExpiring = 30L;
+    private val renewBatchWithinXSeconds = 10L;
+
+    private suspend fun delayUntilExpiryBuffer(expirationTime: Long, renewWithinXSecondsOfExpiring: Long)
+    {
+        val delayMilliseconds = (expirationTime - renewWithinXSecondsOfExpiring * 1000 - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        println("wait for $delayMilliseconds ms")
+        delay(delayMilliseconds)
+    }
+
+//    private fun delayUntilExpiryBufferThenEmit(portMapping: PortMappingWithPref, expirationTime: Long, renewWithinXSecondsOfExpiring: Long = 45L): Flow<Unit> = flow {
+//        val delaySeconds = (expirationTime - renewWithinXSecondsOfExpiring).coerceAtLeast(0L)
+//        println("wait for $delaySeconds seconds")
+//        delay(delaySeconds * 1000)
+//        emit(portMapping)
+//    }
+//
+//    @OptIn(ExperimentalCoroutinesApi::class)
+//    private fun subscribeForAutoRenew()
+//    {
+//        val ruleClosestToExpirationFlow = portMappings.mapNotNull { items ->
+//            items
+//                .filter { it.getAutoRenewOrDefault() }
+//                .minByOrNull { it.portMapping.getExpiresTimeMillis() }
+//                ?.let { pm -> pm to pm.portMapping.getExpiresTimeMillis() }
+//        }.onEach { it -> println("Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
+//        val ruleClosestToExpirationDoNotEmitIfSameRuleSameTime = ruleClosestToExpirationFlow.distinctUntilChanged { oldUser, newUser ->
+//            oldUser.first.portMapping === newUser.first.portMapping && oldUser.second == newUser.second
+//        }.onEach { it -> println("UPDATE: Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
+//        val emitOnRenewTime = ruleClosestToExpirationDoNotEmitIfSameRuleSameTime.flatMapLatest { it ->
+//            delayUntilExpiryBufferThenEmit(it.first, it.first.portMapping.getExpiresTimeMillis())
+//            // this is a problem if we are done but we edited or deleted the rule in the meantime. i.e. we will get a rule created that we did not want.
+//            // get next time to renew
+//        }
+//
+//        ruleClosestToExpirationDoNotEmitIfSameRuleSameTime.onEach
+//                portMappings.map { it ->
+//            val minPortMappingOrNull = it.minByOrNull { if(it.getAutoRenewOrDefault()) it.portMapping.getExpiresTimeMillis() else Long.MAX_VALUE }
+//            if (minPortMappingOrNull == null) {
+//                null
+//            }else {
+//                Pair<PortMappingWithPref, Long>(
+//                    minPortMappingOrNull,
+//                    minPortMappingOrNull.portMapping.getExpiresTimeMillis()
+//                )
+//            }
+//        }.filter(it -> it != null)
+//    }
 
         // region data
 
@@ -63,11 +190,10 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         val anyDevices : Flow<Boolean> = _devices.map { !it.isEmpty() }
 
 //        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
-        private var portMappingLookup : MutableMap<PortMappingKey, PortMappingWithPref> = mutableMapOf()
+        private var _portMappings : MutableStateFlow<Map<PortMappingKey, PortMappingWithPref>> = MutableStateFlow(mapOf())
 
         // I think this should be a local var inside mutable state flow
-        private val _portMappings = MutableStateFlow( TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)))  // TreeSet<PortMapping>
-        val portMappings : StateFlow<Set<PortMappingWithPref>> = _portMappings
+        val portMappings : StateFlow<Map<PortMappingKey, PortMappingWithPref>> = _portMappings
 //
 //        fun update(pm: PortMapping) = _setFlow.update { old ->
 //            TreeSet(old).apply { add(pm) }
@@ -98,21 +224,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             var existingRule : PortMappingWithPref? = null
             val key = pm.getKey()
             _portMappings.update { old ->
-                if (portMappingLookup.containsKey(key)) {
-                    existingRule = this.portMappingLookup[key]
-                    old.remove(existingRule)
-                }
-                portMappingLookup[pm.getKey()] = pm
-                TreeSet(old).apply { add(pm) }
-//                var pmToUse = pm
-//                // if they are the same reference then the UI will not update
-//                // TODO we really need to make portMapping a dataclass immutable
-//                if (existingRule === pm)
-//                {
-//                    pmToUse = pm.clone()
-//                }
-//                portMappingLookup[pm.getKey()] = pmToUse
-//                TreeSet(old).apply { add(pmToUse) }
+                old + (pm.getKey() to pm)
             }
 
             if (existingRule != null && MainActivity.MultiSelectItems?.remove(existingRule) ?: false) {
@@ -123,22 +235,9 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         fun removeMapping(pm: PortMappingWithPref)
         {
             _portMappings.update { old ->
-                portMappingLookup.remove(pm.getKey())
-                // todo does this work?
-                TreeSet(old).apply { remove(pm) }
+                old - pm.getKey()
             }
             MainActivity.MultiSelectItems?.remove(pm)
-        }
-
-        //
-        fun UpdateSorting() {
-            _portMappings.update { old ->
-                val newMappings = TreeSet<PortMappingWithPref>(
-                    SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending)
-                )
-                newMappings.addAll(old)
-                newMappings
-            }
         }
 
         // endregion
@@ -151,7 +250,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         // returns anyEnabled, anyDisabled
         fun GetEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMappingWithPref> {
-            return portMappings.value.filter { it.portMapping.Enabled == enabledRules }.toMutableList()
+            return portMappings.value.filter { it.value.portMapping.Enabled == enabledRules }.values.toMutableList()
         }
 
         // TODO: we need a flow for just the IGD , port mappings that are available
@@ -160,7 +259,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         // UI can subscribe to both
 
         fun GetAllRules(): MutableList<PortMappingWithPref> {
-            return portMappings.value.toMutableList()
+            return portMappings.value.values.toMutableList()
         }
 
         fun GetGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
@@ -186,8 +285,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         // returns anyEnabled, anyDisabled
         fun GetExistingRuleInfos(): Pair<Boolean, Boolean> {
-            val anyEnabled: Boolean = portMappings.value.any { pm -> pm.portMapping.Enabled }
-            val anyDisabled: Boolean = portMappings.value.any { pm -> !pm.portMapping.Enabled }
+            val anyEnabled: Boolean = portMappings.value.any { pm -> pm.value.portMapping.Enabled }
+            val anyDisabled: Boolean = portMappings.value.any { pm -> !pm.value.portMapping.Enabled }
             return Pair(anyEnabled, anyDisabled)
         }
 
@@ -661,8 +760,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         private fun clearOldData() {
             upnpClient.clearOldDevices()
             _devices.update { listOf<IGDDevice>() }
-            portMappingLookup.clear()
-            _portMappings.update {TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))}
+            //_portMappings.update {TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))}
+            _portMappings.update { mapOf() }
         }
 
         private fun removeForDelete(result : UPnPResult, portMappingWithPref: PortMappingWithPref) {

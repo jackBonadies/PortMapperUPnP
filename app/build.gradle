@@ -105,6 +105,7 @@ android {
 }
 
 def room_version = "2.6.0"
+def compose_version = "2.8.2"
 
 dependencies {
 
@@ -121,17 +122,18 @@ dependencies {
     implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.3.1'
     implementation 'androidx.activity:activity-compose:1.5.1'
-    implementation platform('androidx.compose:compose-bom:2022.10.00')
+    implementation platform('androidx.compose:compose-bom:2025.08.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
 
     implementation 'androidx.compose.material3:material3'
-    implementation 'androidx.compose.material:material:1.4.3'
+    implementation 'androidx.compose.material:material:1.9.0'
     implementation 'androidx.compose.material:material-icons-extended'
     //implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation "androidx.datastore:datastore-preferences:1.0.0"
-    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.6.0'
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:$compose_version"
+    implementation("androidx.compose.animation:animation")
 
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
@@ -152,9 +154,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation "io.mockk:mockk:1.13.16"
 
-    //implementation "androidx.navigation:navigation-compose:2.6.0"
-    implementation "com.google.accompanist:accompanist-navigation-animation:0.29.0-alpha"
-
     // domain specific
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
 
@@ -163,6 +162,7 @@ dependencies {
 
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("androidx.navigation:navigation-compose:$compose_version")
 
     implementation("com.google.dagger:hilt-android:2.48")
     ksp("com.google.dagger:hilt-compiler:2.48")

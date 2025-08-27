@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shinjiindustrial.portmapper.PortForwardApplication
+import com.shinjiindustrial.portmapper.PreferencesManager
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
@@ -46,7 +47,8 @@ data class PortUiState(
 
 @HiltViewModel
 class PortViewModel @Inject constructor(
-    private val upnpRepository: UpnpManager
+    private val upnpRepository: UpnpManager,
+    private val preferencesRepository: PreferencesManager
 ) : ViewModel() {
 
     sealed interface UiEvent {
@@ -77,8 +79,14 @@ class PortViewModel @Inject constructor(
             initialValue = false
         )
 
+    val sortInfo : StateFlow<SortInfo> = preferencesRepository.sortInfo.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        SortInfo(SortBy.ExternalPort, false)
+    )
+
     val uiState: StateFlow<PortUiState> = combine(
-        preferencesRepository.sortInfo,
+        sortInfo,
         upnpRepository.devices,
         upnpRepository.portMappings
     ) { sortInfo, devices, portMappings ->
@@ -139,8 +147,6 @@ class PortViewModel @Inject constructor(
     fun isInitialized(): Boolean {
         return upnpRepository.GetUPnPClient().isInitialized()
     }
-
-    val sortInfo: StateFlow<SortInfo> = preferencesRepository.sortInfo
 
     fun updateSortingDesc(sortDesc : Boolean) = viewModelScope.launch {
         preferencesRepository.updateSortDesc(sortDesc)
@@ -318,7 +324,7 @@ class PortViewModel @Inject constructor(
     init {
         upnpRepository.SearchStarted += { o -> searchStarted(o) }
     }
-
+    
     override fun onCleared() {
         upnpRepository.SearchStarted -= { o -> searchStarted(o) }
         super.onCleared()

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.SharedPrefValues
+import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 fun getBlend(first : Color, second : Color, ratio : Double) : Color
 {
@@ -129,8 +130,6 @@ object AdditionalColors {
         override var LogWarningText =  Color(0xffBBB529)
 
     }
-    var ThemeSetting = mutableStateOf(SharedPrefValues.DayNightPref.intVal)
-    var ThemeSettingMaterialYou = mutableStateOf(SharedPrefValues.MaterialYouTheme)
 }
 
 
@@ -138,13 +137,14 @@ object AdditionalColors {
 
 @Composable
 fun MyApplicationTheme(
+    themeState: ThemeUiState,
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
 
-    var dayNightMode = DayNightMode.from(AdditionalColors.ThemeSetting.value)
+    var dayNightMode = themeState.dayNightMode
 
     var useDark = darkTheme
     if(dayNightMode == DayNightMode.FORCE_DAY)
@@ -156,7 +156,7 @@ fun MyApplicationTheme(
         useDark = true
     }
 
-    var useMaterialYou = AdditionalColors.ThemeSettingMaterialYou.value
+    var useMaterialYou = themeState.materialYou
     key(useMaterialYou, dayNightMode)
     {
         val colorSchemeToUse = when {

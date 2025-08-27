@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -37,20 +39,21 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
-import java.com.shinjiindustrial.portmapper.PreferencesManager
+import java.com.shinjiindustrial.portmapper.ThemeUiState
+import java.com.shinjiindustrial.portmapper.SettingsViewModel
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var preferencesManager: PreferencesManager
+    val settingsViewModel : SettingsViewModel by viewModels()
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -59,37 +62,53 @@ class SettingsActivity : ComponentActivity() {
 
         PortForwardApplication.CurrentActivity = this
         setContent {
-            MyApplicationTheme {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            navigationIcon = {
-                                IconButton(onClick = {
-                                    this.finish()
-                                }) {
-                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = AdditionalColors.TextColorStrong)
-                                }
-                            },
-//                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
-                            title = {
-                                Text(
-                                    text = "Settings",
-                                    color = AdditionalColors.TextColorStrong,
-                                    fontWeight = FontWeight.Normal
-                                )
-                            },
-                            //actions = { OverflowMenu() }
-                        )
-                    },
-                    content = { it ->
-                        Settings(preferencesManager, Modifier.padding(it))
-                    }
-                )
-            }
+            Settings()
         }
     }
-}
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun Settings() {
+        val themeState by this.settingsViewModel.uiState.collectAsStateWithLifecycle()
+        MyApplicationTheme(themeState) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                this.finish()
+                            }) {
+                                Icon(
+                                    Icons.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = AdditionalColors.TextColorStrong
+                                )
+                            }
+                        },
+//                                modifier = Modifier.height(40.dp),
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
+                        title = {
+                            Text(
+                                text = "Settings",
+                                color = AdditionalColors.TextColorStrong,
+                                fontWeight = FontWeight.Normal
+                            )
+                        },
+                        //actions = { OverflowMenu() }
+                    )
+                },
+                content = { it ->
+                    val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+                    SettingsContent(
+                        uiState,
+                        settingsViewModel::updateMaterialYou,
+                        settingsViewModel::updateDayNight,
+                        Modifier.padding(it)
+                    )
+                }
+            )
+        }
+    }
 //
 //@Composable
 //@Preview
@@ -100,102 +119,106 @@ class SettingsActivity : ComponentActivity() {
 //}
 
 
-@Composable
-fun Settings(preferencesManager : PreferencesManager, modifier : Modifier = Modifier)
-{
-    MyApplicationTheme()
-    {
-        Column(modifier = Modifier.then(modifier))
+    @Composable
+    fun SettingsContent(
+        uiState: ThemeUiState,
+        updateMaterialYou: (Boolean) -> Unit,
+        updateDayNight: (DayNightMode) -> Unit,
+        modifier: Modifier = Modifier
+    ) {
+        MyApplicationTheme(uiState)
         {
-
-            var showThemeAlertDialog = remember { mutableStateOf(false) }
-
-            if(showThemeAlertDialog.value)
+            Column(modifier = Modifier.then(modifier))
             {
-                // alert dialog...
-                AlertDialog(
-                    onDismissRequest = {
-                        preferencesManager.saveSharedPrefs()
-                        showThemeAlertDialog.value = false
-                                       },
-                    title = { Text("Theme") },
-                    text = {
 
-                        RadioGroupExample()
+                var showThemeAlertDialog = remember { mutableStateOf(false) }
 
-                    },
-                    confirmButton = {
-                        Button(onClick = {
+                if (showThemeAlertDialog.value) {
+                    // alert dialog...
+                    AlertDialog(
+                        onDismissRequest = {
                             showThemeAlertDialog.value = false
-                            preferencesManager.saveSharedPrefs()
-                        }
-                        ) {
-                            Text("OK")
-                        }
-                    })
-            }
-
-            Text(
-                "Appearance",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(12.dp, 8.dp, 0.dp, 4.dp),
-            )
-            Column(
-                modifier = Modifier
-                    .clickable(onClick = {
-                        showThemeAlertDialog.value = true
-                    })
-                    .fillMaxWidth())
-            {
-
-                Text("Theme", fontSize = 26.sp, color = AdditionalColors.TextColorStrong, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
-                var pref = when(AdditionalColors.ThemeSetting.value){
-                    0 -> followSystem
-                    1 -> light
-                    2 -> dark
-                    else -> followSystem
+                        },
+                        title = { Text("Theme") },
+                        text = {
+                            ThemeRadioGroup(uiState, updateDayNight)
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showThemeAlertDialog.value = false
+                            }
+                            ) {
+                                Text("OK")
+                            }
+                        })
                 }
-                Text(pref, fontSize = 16.sp, modifier = Modifier
-                    .padding(12.dp, 0.dp, 0.dp, 4.dp)
-                    .offset(
-                        0.dp, (-4).dp
-                    ), color = AdditionalColors.TextColorWeak)
-            }
-            Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
 
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Text(
+                    "Appearance",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(12.dp, 8.dp, 0.dp, 4.dp),
+                )
                 Column(
                     modifier = Modifier
+                        .clickable(onClick = {
+                            showThemeAlertDialog.value = true
+                        })
                         .fillMaxWidth()
                 )
                 {
-                    Row(verticalAlignment = Alignment.CenterVertically)
-                    {
-                        //Icon(Icons.Filled.Palette, "Material You", tint=MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
-                        Text(
-                            "Material You",
-                            fontSize = 26.sp,
-                            color = AdditionalColors.TextColorStrong,
-                            modifier = Modifier
-                                .padding(12.dp, 18.dp, 0.dp, 18.dp)
-                                .weight(1.0f)
-                        )
-                        Switch(
-                            AdditionalColors.ThemeSettingMaterialYou.value,
-                            onCheckedChange = {
 
-                                AdditionalColors.ThemeSettingMaterialYou.value = it
-                                SharedPrefValues.MaterialYouTheme = it
-
-                            },
-                            modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
-                        )
+                    Text(
+                        "Theme",
+                        fontSize = 26.sp,
+                        color = AdditionalColors.TextColorStrong,
+                        modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp)
+                    )
+                    var pref = when (uiState.dayNightMode.intVal) {
+                        0 -> followSystem
+                        1 -> light
+                        2 -> dark
+                        else -> followSystem
                     }
+                    Text(
+                        pref, fontSize = 16.sp, modifier = Modifier
+                            .padding(12.dp, 0.dp, 0.dp, 4.dp)
+                            .offset(
+                                0.dp, (-4).dp
+                            ), color = AdditionalColors.TextColorWeak
+                    )
                 }
                 Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
-            }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    )
+                    {
+                        Row(verticalAlignment = Alignment.CenterVertically)
+                        {
+                            //Icon(Icons.Filled.Palette, "Material You", tint=MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
+                            Text(
+                                "Material You",
+                                fontSize = 26.sp,
+                                color = AdditionalColors.TextColorStrong,
+                                modifier = Modifier
+                                    .padding(12.dp, 18.dp, 0.dp, 18.dp)
+                                    .weight(1.0f)
+                            )
+                            Switch(
+                                uiState.materialYou,
+                                onCheckedChange = {
+                                    updateMaterialYou(it)
+                                },
+                                modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                            )
+                        }
+                    }
+                    Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
+                }
 
 //            Column(
 //                modifier = Modifier.clickable(onClick = {
@@ -217,68 +240,62 @@ fun Settings(preferencesManager : PreferencesManager, modifier : Modifier = Modi
 //            Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 4.dp, 0.dp, 0.dp))
 
 
+            }
         }
     }
-}
 
-@Composable
-@Preview
-fun RadioGroupPreviewTheme()
-{
-    MyApplicationTheme() {
-        RadioGroupExample()
+    @Composable
+    @Preview
+    fun RadioGroupPreviewTheme() {
+        val themeState = ThemeUiState(DayNightMode.FORCE_NIGHT, false)
+        MyApplicationTheme(themeState) {
+            ThemeRadioGroup(themeState, {_ -> Unit})
+        }
     }
-}
 
-val followSystem = "Follow System"
-val light = "Light"
-val dark = "Dark"
+    val followSystem = "Follow System"
+    val light = "Light"
+    val dark = "Dark"
 
-@Composable
-fun RadioGroupExample() {
+    @Composable
+    fun ThemeRadioGroup(themeState : ThemeUiState, setDayNightMode : (DayNightMode) -> Unit) {
         val options = listOf(followSystem, light, dark)
-        var selectedOption = remember { mutableStateOf(options[AdditionalColors.ThemeSetting.value]) }
+        val selectedOption = options[themeState.dayNightMode.intVal]
 
         Column {
             options.forEach { text ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
-                        selected = (text == selectedOption.value),
+                        selected = (text == selectedOption),
                         onClick = {
-                            var dayNightMode = when(text)
-                            {
+                            val dayNightMode = when (text) {
                                 followSystem -> DayNightMode.FOLLOW_SYSTEM
                                 light -> DayNightMode.FORCE_DAY
                                 dark -> DayNightMode.FORCE_NIGHT
                                 else -> DayNightMode.FOLLOW_SYSTEM
                             }
-
-                            AdditionalColors.ThemeSetting.value = dayNightMode.intVal
-                            //AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO) //useless
-                            selectedOption.value = text
-                            SharedPrefValues.DayNightPref = DayNightMode.FORCE_DAY
-
+                            setDayNightMode(dayNightMode)
                         }
                     )
                     Text(text = text)
                 }
             }
         }
-}
+    }
 
-@Composable
-@Preview
-fun RadioGroupPreview()
-{
-    SetupPreview()
-    RadioGroupExample()
-}
+    @Composable
+    @Preview
+    fun RadioGroupPreview() {
+        val themeState = ThemeUiState(DayNightMode.FORCE_NIGHT, false)
+        SetupPreview()
+        ThemeRadioGroup(themeState,{_->Unit})
+    }
 
-@Composable
-@Preview
-fun RadioGroupPreview5()
-{
-    RuleCreationDialog(rememberNavController(), hiltViewModel())
-    Text("test")
-}
+    @Composable
+    @Preview
+    fun RadioGroupPreview5() {
+        RuleCreationDialog(rememberNavController(), hiltViewModel())
+        Text("test")
+    }
 
+}

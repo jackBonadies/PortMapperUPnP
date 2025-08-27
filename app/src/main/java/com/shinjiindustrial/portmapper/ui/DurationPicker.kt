@@ -47,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.domain.DayHourMinSec
 import com.shinjiindustrial.portmapper.domain.getDHMS
@@ -54,6 +55,7 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 
 @Composable
@@ -61,7 +63,7 @@ import kotlinx.coroutines.flow.map
 fun DurationPickerDialogPreview()
 {
     SetupPreview()
-    MyApplicationTheme() {
+    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         val showDialog = remember { mutableStateOf(true) }
         val leaseDurationValueSeconds = remember { mutableStateOf("3661") }
         DurationPickerDialog(showDialog, leaseDurationValueSeconds, true)

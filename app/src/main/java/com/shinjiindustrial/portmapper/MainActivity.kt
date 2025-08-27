@@ -135,11 +135,11 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.R
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.common.ValidationError
@@ -169,6 +169,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.com.shinjiindustrial.portmapper.PortViewModel
+import java.com.shinjiindustrial.portmapper.SettingsViewModel
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -222,6 +223,7 @@ enum class Protocol(val protocol: String) {
 class MainActivity : ComponentActivity() {
 
     private val portViewModel: PortViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     companion object {
 
@@ -305,13 +307,20 @@ class MainActivity : ComponentActivity() {
         portViewModel.start()
 
         setContent {
-            MyApplicationTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AppNavigator()
-                }
+            MainContent()
+        }
+    }
+
+    @Composable
+    fun MainContent()
+    {
+        val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+        MyApplicationTheme(themeState) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                AppNavigator()
             }
         }
     }
@@ -320,9 +329,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalAnimationApi::class)
     @Composable
     fun AppNavigator() {
-        val navController = rememberAnimatedNavController()
+        val navController = rememberNavController()
 
-        AnimatedNavHost(navController = navController, startDestination = "main_screen") {
+        NavHost(navController = navController, startDestination = "main_screen") {
             composable("main_screen",
                 exitTransition = {
                     fadeOut(animationSpec = tween(300))
@@ -434,7 +443,8 @@ class MainActivity : ComponentActivity() {
                 PortForwardApplication.currentSingleSelectedObject, // why is this not typed??
                 showMoreInfoDialogState,
                 navController,
-                portViewModel
+                portViewModel,
+                settingsViewModel
             )
         }
 
@@ -762,6 +772,7 @@ class MainActivity : ComponentActivity() {
 
         }
     }
+
 }
 
 fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
@@ -788,7 +799,7 @@ fun fallbackRecursiveSearch(rootDevice : RemoteDevice)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnterContextMenu(singleSelectedItem : MutableState<PortMappingWithPref?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController, portViewModel : PortViewModel)
+fun EnterContextMenu(singleSelectedItem : MutableState<PortMappingWithPref?>, showMoreInfoDialog : MutableState<Boolean>, navController : NavHostController, portViewModel : PortViewModel, settingsViewModel : SettingsViewModel)
 {
     if(singleSelectedItem.value == null)
     {
@@ -802,7 +813,8 @@ fun EnterContextMenu(singleSelectedItem : MutableState<PortMappingWithPref?>, sh
         usePlatformDefaultWidth = false,
         decorFitsSystemWindows = true,
     )
-    MyApplicationTheme {
+    val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+    MyApplicationTheme(themeState) {
         Dialog(
             onDismissRequest = { PortForwardApplication.showContextMenu.value = false },
             properties = prop,
