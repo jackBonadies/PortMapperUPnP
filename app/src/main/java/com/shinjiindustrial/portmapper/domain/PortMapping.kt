@@ -108,7 +108,7 @@ data class PortMapping(
         if (totalSecs < 60)
         {
             if (autoRenew) {
-                if (totalSecs < PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + 3)
+                if (totalSecs < PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + 10)
                 {
                     return "Renewing now"
                 }

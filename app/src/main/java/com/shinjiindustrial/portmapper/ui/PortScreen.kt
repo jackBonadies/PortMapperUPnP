@@ -568,7 +568,7 @@ fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
 @Composable
 fun Conversation(messages: List<UpnpViewRow>) {
 
-    val now by rememberTicker(20_000)
+    val now by rememberTicker(8_000)
 
     LazyColumn(
         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
