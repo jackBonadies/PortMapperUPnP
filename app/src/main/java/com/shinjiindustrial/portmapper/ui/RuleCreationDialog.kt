@@ -228,7 +228,14 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 autoRenew.value
                             )
 
-                            val errorString = portMappingRequestInput.validateRange()
+                            var errorString = portMappingRequestInput.validateAutoRenew()
+                            if(errorString.isNotEmpty())
+                            {
+                                MainActivity.showSnackBarLongNoAction(errorString)
+                                return@TextButton
+                            }
+
+                            errorString = portMappingRequestInput.validateRange()
                             if(errorString.isNotEmpty())
                             {
                                 MainActivity.showSnackBarLongNoAction(errorString)

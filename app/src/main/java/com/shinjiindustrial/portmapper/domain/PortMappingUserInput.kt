@@ -2,6 +2,7 @@ package com.shinjiindustrial.portmapper.domain
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.Protocol
+import com.shinjiindustrial.portmapper.toIntOrMaxValue
 
 // this is the information the user gives us to create a rule. i.e. what the router needs + any preference info (autorenew)
 data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val autoRenew : Boolean)
@@ -84,6 +85,14 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
             }
         }
         return portMappingRequests
+    }
+
+    fun validateAutoRenew() : String {
+        if (this.autoRenew && this.leaseDuration.toIntOrMaxValue() != 0 && this.leaseDuration.toIntOrMaxValue() < 90)
+        {
+            return "If auto renew is enabled, lease duration must at least be 90 seconds"
+        }
+        return ""
     }
 
 }

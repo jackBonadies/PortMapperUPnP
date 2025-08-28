@@ -65,6 +65,9 @@ class PortForwardApplication : Application() {
         val ScrollToBottom = "ScrollToBottom"
         var crashlyticsEnabled: Boolean = false
 
+        val RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING = 30L;
+        val RENEW_BATCH_WITHIN_X_SECONDS = 5L;
+
         fun ShowToast( msg : String,  toastLength : Int)
         {
             GlobalScope.launch(Dispatchers.Main) {

@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper.domain
 
 import android.os.SystemClock
+import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 
 data class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
@@ -107,7 +108,14 @@ data class PortMapping(
         if (totalSecs < 60)
         {
             if (autoRenew) {
-                return "Renewing now"
+                if (totalSecs < PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + 3)
+                {
+                    return "Renewing now"
+                }
+                else
+                {
+                    return "Renewing <1 minute"
+                }
             }
             else {
                 return "$renewsExpiresString <1 minute"

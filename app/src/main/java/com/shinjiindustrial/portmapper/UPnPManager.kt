@@ -21,9 +21,6 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -31,12 +28,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
@@ -46,7 +38,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.TreeSet
 import java.util.logging.Level
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,8 +45,6 @@ import kotlin.collections.filter
 import kotlin.collections.forEach
 import kotlin.collections.map
 import kotlin.collections.plus
-import kotlin.collections.remove
-import kotlin.collections.set
 import kotlin.system.measureTimeMillis
 
 @Singleton
@@ -64,9 +53,18 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
     init {
         upnpClient.deviceFoundEvent += { device ->
             // this is on the cling thread
-            addDevice(device)//TODO test with suspend
-            runBlocking {
-                enumeratePortMappings(device.getIpAddress())
+            if (_devices.value.any { it.getIpAddress() == device.getIpAddress() })
+            {
+                OurLogger.log(
+                    Level.WARNING,
+                    "device ${device.udn} came in again at ${device.getIpAddress()}. ignoring.")
+            }
+            else
+            {
+                addDevice(device)//TODO test with suspend
+                runBlocking {
+                    enumeratePortMappings(device.getIpAddress())
+                }
             }
         }
         //subscribeForAutoRenew()
@@ -84,7 +82,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                 // null check
                     it -> println("running with ${it.value.portMapping.shortName()}")
             }.collectLatest {
-                delayUntilExpiryBuffer((it.value.portMapping.getExpiresTimeMillis()), renewWithinXSecondsOfExpiring)
+                delayUntilExpiryBuffer((it.value.portMapping.getExpiresTimeMillis()), PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING)
                 println("delay is over launching")
                 withContext(NonCancellable)
                 {
@@ -102,7 +100,7 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         val snapshot = portMappings.first()
 
         val now = SystemClock.elapsedRealtime()
-        val expiring = snapshot.filter { it.value.portMapping.getExpiresTimeMillis() - now <= 1000*(renewWithinXSecondsOfExpiring + renewBatchWithinXSeconds) }
+        val expiring = snapshot.filter { it.value.portMapping.getExpiresTimeMillis() - now <= 1000*(PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + PortForwardApplication.RENEW_BATCH_WITHIN_X_SECONDS) }
         if (expiring.isEmpty())
         {
             println("batch is empty")
@@ -127,9 +125,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         //delay(1000) // just to prove that we do not cancel
         println("end renewing all rules")
     }
-
-    private val renewWithinXSecondsOfExpiring = 30L;
-    private val renewBatchWithinXSeconds = 10L;
 
     private suspend fun delayUntilExpiryBuffer(expirationTime: Long, renewWithinXSecondsOfExpiring: Long)
     {
@@ -201,6 +196,10 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         fun add(device: IIGDDevice)
         {
             // list is sorted
+            if (_devices.value.any { it.getIpAddress() == device.getIpAddress() })
+            {
+                return
+            }
             _devices.update { curList ->
                 buildList {
                     addAll(curList)
