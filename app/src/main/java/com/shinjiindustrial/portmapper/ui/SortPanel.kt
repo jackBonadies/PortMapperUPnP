@@ -26,7 +26,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(12.dp)
+            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
     ) {
         Text(
             text = "Sort By",

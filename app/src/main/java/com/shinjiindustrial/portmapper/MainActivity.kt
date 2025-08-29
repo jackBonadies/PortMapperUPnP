@@ -56,8 +56,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.Checkbox
 import androidx.compose.material.CheckboxDefaults
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ModalBottomSheetLayout
-import androidx.compose.material.ModalBottomSheetValue
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -85,6 +84,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
@@ -93,8 +93,11 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -509,7 +512,9 @@ class MainActivity : ComponentActivity() {
         rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
 
-        val bottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
+        var openBottomSheet by remember {mutableStateOf(false)}
+        val bottomSheetState =
+            rememberModalBottomSheetState(true)
 
         ModalBottomSheetLayout(
             sheetState = bottomSheetState,
@@ -527,6 +532,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         ) {
+        if (openBottomSheet)
+        {
+            ModalBottomSheet(
+                onDismissRequest =  { openBottomSheet = false },
+                sheetState = bottomSheetState,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                tonalElevation = 24.dp,
+                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                content = {
+                    // This is what will be shown in the bottom sheet
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        BottomSheetSortBy(portViewModel)
+                    }
+                }
+            )
+//
+//            LaunchedEffect(Unit) {
+//                bottomSheetState.expand()
+//            }
+        }
 
             Scaffold(
 
@@ -597,6 +626,7 @@ class MainActivity : ComponentActivity() {
                             {
                                 IconButton(onClick = {
                                     coroutineScope.launch {
+                                        openBottomSheet = true
                                         bottomSheetState.show()
                                     }
                                 })
@@ -1189,17 +1219,24 @@ fun ColumnScope.CreateRuleContents(hasSubmitted : MutableState<Boolean>,
 //            },
 //            state = rememberTooltipState()
 //        ) {
-        //TODO where is tooltipbox?
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = {
+                PlainTooltip { Text("This is auto renew...") }
+            },
+            state = rememberTooltipState()
+        ) {
             //MaterialTheme.colorScheme.outline
             Checkbox(
                 autoRenew.value,
-                onCheckedChange = {autoRenew.value = it},
+                onCheckedChange = { autoRenew.value = it },
                 // uncheckedColor == border color
                 colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
 
 
             )
-        Text("Auto Renew", color = AdditionalColors.TextColor)
+            Text("Auto Renew", color = AdditionalColors.TextColor)
+        }
     }
 }
 
