@@ -34,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,13 +53,11 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper.DayNightMode
-import com.shinjiindustrial.portmapper.IsMultiSelectMode
-import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
@@ -75,7 +72,7 @@ import java.com.shinjiindustrial.portmapper.ThemeUiState
     ExperimentalFoundationApi::class
 )
 @Composable
-fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
+fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, isInMultiSelectMode : Boolean = false, toggleSelection : (PortMappingKey) -> Unit = {}, selectedIds : Set<PortMappingKey>, additionalModifier : Modifier = Modifier.Companion)
 {
     val portMapping = portMappingWithPref.portMapping
     println("external ip test ${portMapping.DeviceIP}")
@@ -95,8 +92,8 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
                 .combinedClickable(
                     onClick = {
 
-                        if (IsMultiSelectMode()) {
-                            ToggleSelection(portMappingWithPref)
+                        if (isInMultiSelectMode) {
+                            toggleSelection(portMappingWithPref.getKey())
                         } else {
                             // TODO cleanup
                             PortForwardApplication.Companion.showContextMenu.value = true
@@ -106,7 +103,7 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 
                     },
                     onLongClick = {
-                        ToggleSelection(portMappingWithPref)
+                        toggleSelection(portMappingWithPref.getKey())
                     }
                 ),
 
@@ -136,7 +133,6 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 
             ) {
 
-                val multiSelectMode = IsMultiSelectMode()
                 //var padLeft = if(multiSelectMode) 5.dp else 13.dp
 
                 //TODO need to do existing content slide to right and fade new element in
@@ -171,18 +167,16 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 //            offsetState.targetState = multiSelectMode
 
                 AnimatedVisibility(
-                    visible = multiSelectMode,
+                    visible = isInMultiSelectMode,
                 ) {
 
 
                     CircleCheckbox(
-                        MainActivity.Companion.MultiSelectItems!!.contains(portMappingWithPref),
+                        selectedIds.contains(portMappingWithPref.getKey()),
                         true,
                         Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
                     ) {
-
-                        ToggleSelection(portMappingWithPref)
-
+                        toggleSelection(portMappingWithPref.getKey())
                     }
                 }
 
@@ -539,14 +533,14 @@ fun PreviewConversation() {
         {
             msgs.add(upnpViewEl)
         }
-        Conversation(msgs)
+        PortMappingsListContent(msgs, false, {}, emptySet())
     }
 }
 
 @Composable
-fun PortMappingContent(uiState : PortUiState)
+fun PortMappingContent(uiState : PortUiState, isInMultiSelectMode : Boolean, onToggle : (PortMappingKey) -> Unit, selectedIds : Set<PortMappingKey>)
 {
-    Conversation(uiState.items)
+    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, selectedIds)
 }
 
 @Composable
@@ -565,7 +559,7 @@ fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
 //lazy column IS recycler view basically. both recycle.
 @OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class)
 @Composable
-fun Conversation(messages: List<UpnpViewRow>) {
+fun PortMappingsListContent(messages: List<UpnpViewRow>, isInMultiSelectMode : Boolean, onToggle : (PortMappingKey) -> Unit, selectedIds : Set<PortMappingKey>) {
 
     val now by rememberTicker(8_000)
 
@@ -590,7 +584,7 @@ fun Conversation(messages: List<UpnpViewRow>) {
                     NoMappingsCard(message.device)
                 }
                 is UpnpViewRow.PortViewRow -> {
-                    PortMappingCard(message.portMapping, now, Modifier.animateItem())
+                    PortMappingCard(message.portMapping, now, isInMultiSelectMode, onToggle,selectedIds, Modifier.animateItem())
                 }
             }
         }

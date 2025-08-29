@@ -282,7 +282,6 @@ class MainActivity : ComponentActivity() {
         }
 
         var OurSnackbarHostState: SnackbarHostState? = null
-        var MultiSelectItems : SnapshotStateList<PortMappingWithPref>? = null
     }
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -295,9 +294,9 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this)
         {
             println("My Back Pressed Callback")
-            if(IsMultiSelectMode())
+            if(portViewModel.inMultiSelectMode.value)
             {
-                MultiSelectItems!!.clear()
+                portViewModel.clearSelection()
             }
             else
             {
@@ -420,6 +419,8 @@ class MainActivity : ComponentActivity() {
         val showAboutDialogState = remember { mutableStateOf(false) }
         val showMoreInfoDialogState = remember { mutableStateOf(false) }
         val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
+        val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
+        val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
 
         LaunchedEffect(Unit) {
             portViewModel.events.collect { ev ->
@@ -508,7 +509,6 @@ class MainActivity : ComponentActivity() {
 
 
         OurSnackbarHostState = remember { SnackbarHostState() }
-        MultiSelectItems = remember { mutableStateListOf<PortMappingWithPref>() }
         rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
 
@@ -581,10 +581,10 @@ class MainActivity : ComponentActivity() {
                 topBar = {
                     TopAppBar(
                         navigationIcon = {
-                            if(IsMultiSelectMode())
+                            if(inMultiSelectMode)
                             {
                                 IconButton(onClick = {
-                                    MultiSelectItems!!.clear()
+                                    portViewModel.clearSelection()
                                 })
                                 {
                                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -597,7 +597,7 @@ class MainActivity : ComponentActivity() {
                         ),
                         //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                         title = {
-                            val title = if(MultiSelectItems!!.isEmpty()) "PortMapper" else "${MultiSelectItems!!.count()} Selected"
+                            val title = if(inMultiSelectMode) "${selectedIds.size} Selected" else "PortMapper"
                             Text(
                                 text = title,
                                 color = AdditionalColors.TextColorStrong,
@@ -606,7 +606,23 @@ class MainActivity : ComponentActivity() {
                         },
                         actions = {
 
-                            if(MultiSelectItems!!.isEmpty())
+                            if(inMultiSelectMode)
+                            {
+                                IconButton(onClick = {
+                                    if (inMultiSelectMode)
+                                    {
+                                        portViewModel.deleteAll(selectedIds)
+                                    }
+                                    else
+                                    {
+                                        portViewModel.deleteAll()
+                                    }
+                                })
+                                {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                }
+                            }
+                            else
                             {
                                 IconButton(onClick = {
                                     coroutineScope.launch {
@@ -616,15 +632,6 @@ class MainActivity : ComponentActivity() {
                                 })
                                 {
                                     Icon(Icons.Default.Sort, contentDescription = "Sort")
-                                }
-                            }
-                            else
-                            {
-                                IconButton(onClick = {
-                                    portViewModel.deleteAll(MultiSelectItems)
-                                })
-                                {
-                                    Icon(Icons.Default.Delete, contentDescription = "Sort")
                                 }
                             }
 
@@ -771,7 +778,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else {
                                 val uiState by portViewModel.uiState.collectAsStateWithLifecycle()
-                                PortMappingContent(uiState)
+                                val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+                                val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
+                                PortMappingContent(uiState, isInMultiSelectMode, portViewModel::toggle, selectedIds)
                             }
                         }
 
@@ -1617,8 +1626,8 @@ fun DeviceRow(content: @Composable RowScope.() -> Unit) {
 fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : PortViewModel) {
     var expanded by remember { mutableStateOf(false) }
 
-
-
+    val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
+    val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
 
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Default.MoreVert, contentDescription = "menu")
@@ -1631,7 +1640,20 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
         // this gets called on expanded, so I dont think we need to monitor additional state.
 
         val items : MutableList<Int> = mutableListOf()
-        if(MainActivity.MultiSelectItems!!.isEmpty())
+        if(isInMultiSelectMode)
+        {
+            val anyEnabled = portViewModel.getSelectedItems(selectedIds).any { it -> it.portMapping.Enabled }
+            val anyDisabled = portViewModel.getSelectedItems(selectedIds).any { it -> !it.portMapping.Enabled }
+            if(anyEnabled)
+            {
+                items.add(R.string.disable_action)
+            }
+            if(anyDisabled)
+            {
+                items.add(R.string.enable_action)
+            }
+        }
+        else
         {
             items.add(R.string.refresh_action)
             if(portViewModel.isInitialized())
@@ -1655,21 +1677,6 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
             items.add(R.string.settings)
             items.add(R.string.about)
         }
-        else
-        {
-            val anyEnabled = MainActivity.MultiSelectItems!!.any { it -> it.portMapping.Enabled }
-            val anyDisabled = MainActivity.MultiSelectItems!!.any { it -> !it.portMapping.Enabled }
-            if(anyEnabled)
-            {
-                items.add(R.string.disable_action)
-            }
-            if(anyDisabled)
-            {
-                items.add(R.string.enable_action)
-            }
-        }
-
-        MainActivity.MultiSelectItems
 
         items.forEach { label ->
             DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = {
@@ -1691,11 +1698,21 @@ fun OverflowMenu(showAboutDialogState : MutableState<Boolean>, portViewModel : P
                     }
                     R.string.disable_action ->
                     {
-                        portViewModel.enableDisableAll(false, MainActivity.MultiSelectItems)
+                        if (isInMultiSelectMode){
+                            portViewModel.enableDisableAll(false, selectedIds)
+                        }
+                        else{
+                            portViewModel.enableDisableAll(false)
+                        }
                     }
                     R.string.enable_action ->
                     {
-                        portViewModel.enableDisableAll(true, MainActivity.MultiSelectItems)
+                        if (isInMultiSelectMode){
+                            portViewModel.enableDisableAll(true, selectedIds)
+                        }
+                        else{
+                            portViewModel.enableDisableAll(true)
+                        }
                     }
                     R.string.delete_all_action ->
                     {
@@ -1753,22 +1770,4 @@ class IGDDeviceHolder
             return ""
         }
 
-}
-
-fun ToggleSelection(portMapping : PortMappingWithPref)
-{
-    val has = MainActivity.MultiSelectItems!!.contains(portMapping)
-    if(has)
-    {
-        MainActivity.MultiSelectItems!!.remove(portMapping)
-    }
-    else
-    {
-        MainActivity.MultiSelectItems!!.add(portMapping)
-    }
-}
-
-fun IsMultiSelectMode() : Boolean
-{
-    return MainActivity.MultiSelectItems!!.isNotEmpty()
 }

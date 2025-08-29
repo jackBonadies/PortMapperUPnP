@@ -220,14 +220,8 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
 
         private fun addOrUpdateMapping(pm: PortMappingWithPref)
         {
-            var existingRule : PortMappingWithPref? = null
-            val key = pm.getKey()
             _portMappings.update { old ->
                 old + (pm.getKey() to pm)
-            }
-
-            if (existingRule != null && MainActivity.MultiSelectItems?.remove(existingRule) ?: false) {
-                MainActivity.MultiSelectItems!!.add(pm)
             }
         }
 
@@ -236,7 +230,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             _portMappings.update { old ->
                 old - pm.getKey()
             }
-            MainActivity.MultiSelectItems?.remove(pm)
         }
 
         // endregion
@@ -774,6 +767,24 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
         }
 
         //endregion
+
+    fun portMappingsFromIds(selectedIds : Set<PortMappingKey>) : List<PortMappingWithPref>
+    {
+        val portMappingWithPrefList = mutableListOf<PortMappingWithPref>()
+        for(id in selectedIds)
+        {
+            if (portMappings.value.containsKey(id))
+            {
+                portMappingWithPrefList.add(portMappings.value[id]!!)
+            }
+            else
+            {
+                OurLogger.log(Level.SEVERE, "Cannot find port mapping with key $id");
+            }
+        }
+
+        return portMappingWithPrefList
+    }
 
 }
 

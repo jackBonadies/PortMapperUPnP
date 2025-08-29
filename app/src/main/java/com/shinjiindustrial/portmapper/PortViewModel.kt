@@ -3,6 +3,7 @@ package java.com.shinjiindustrial.portmapper
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shinjiindustrial.portmapper.PortForwardApplication
@@ -14,6 +15,7 @@ import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.common.SortInfo
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
@@ -30,10 +32,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.logging.Level
@@ -48,7 +54,8 @@ data class PortUiState(
 @HiltViewModel
 class PortViewModel @Inject constructor(
     private val upnpRepository: UpnpManager,
-    private val preferencesRepository: PreferencesManager
+    private val preferencesRepository: PreferencesManager,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     sealed interface UiEvent {
@@ -63,6 +70,29 @@ class PortViewModel @Inject constructor(
     val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
     private val applicationScope : CoroutineScope = MainScope()
+
+    // we want to use key for selections.  so if a rule renews while the user is in multi select
+    //   mode, don't deselect that rule.  but if we lose a rule (i.e. it gets deleted) then
+    //   we still want to deselect.
+    private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(
+        savedStateHandle["selected_ids"] ?: emptySet()
+    )
+    val selectedIds: StateFlow<Set<PortMappingKey>> = _selectedIds
+
+    val inMultiSelectMode: StateFlow<Boolean> =
+        _selectedIds.map { it.isNotEmpty() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun toggle(id: PortMappingKey) {
+        _selectedIds.update { s -> if (id in s) s - id else s + id }
+    }
+
+    fun getSelectedItems(selectedIds : Set<PortMappingKey>) : List<PortMappingWithPref>
+    {
+        return upnpRepository.portMappingsFromIds(selectedIds)
+    }
+
+    fun clearSelection() { _selectedIds.value = emptySet() }
 
     val anyDevices: StateFlow<Boolean> = upnpRepository.devices.map { devices -> devices.isNotEmpty() }.stateIn( scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -241,6 +271,11 @@ class PortViewModel @Inject constructor(
             }
         }
 
+    fun enableDisableAll(enable : Boolean, selectedIds : Set<PortMappingKey>)
+    {
+        enableDisableAll(enable, upnpRepository.portMappingsFromIds(selectedIds))
+    }
+
     fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMappingWithPref>? = null) =
         applicationScope.launch {
 
@@ -323,6 +358,20 @@ class PortViewModel @Inject constructor(
 
     init {
         upnpRepository.SearchStarted += { o -> searchStarted(o) }
+        combine(_selectedIds, upnpRepository.portMappings) { selectedIds, currentMappings ->
+            val cur = currentMappings.keys
+            val sel = selectedIds
+            // map to the intersection of the two sets, in most cases this should be the same.
+            //   if a rule got deleted then it will be different. in which case we update selectedIds
+            //   to be the new pruned set.
+            sel intersect cur }
+            .distinctUntilChanged()
+            .onEach { filtered ->
+                println("filtered changed ...")
+                if (filtered != _selectedIds.value) _selectedIds.value = filtered
+                savedStateHandle["selected_ids"] = filtered
+            }
+            .launchIn(viewModelScope)
     }
     
     override fun onCleared() {
@@ -341,6 +390,11 @@ class PortViewModel @Inject constructor(
                 searchStartedRecently.value = false
             }
         }
+    }
+
+    fun deleteAll(selectedIds : Set<PortMappingKey>)
+    {
+        deleteAll(upnpRepository.portMappingsFromIds(selectedIds))
     }
 
     fun deleteAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {

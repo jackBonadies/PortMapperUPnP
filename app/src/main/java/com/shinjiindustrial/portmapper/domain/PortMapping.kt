@@ -1,8 +1,10 @@
 package com.shinjiindustrial.portmapper.domain
 
+import android.os.Parcelable
 import android.os.SystemClock
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
+import kotlinx.parcelize.Parcelize
 
 data class PortMappingWithPref(val portMapping: PortMapping, val portMappingPref: PortMappingPref? = null)
 {
@@ -26,7 +28,9 @@ data class PortMappingPref(val autoRenew : Boolean, val desiredLeaseDuration: In
 
 }
 
-data class PortMappingKey(val deviceIP: String, val externalPort: Int, val protocol: String)
+@Parcelize
+data class PortMappingKey(val deviceIP: String, val externalPort: Int, val protocol: String) :
+    Parcelable
 
 // this is what is on the router
 // with additional field for timeRead and psuedoSlot
