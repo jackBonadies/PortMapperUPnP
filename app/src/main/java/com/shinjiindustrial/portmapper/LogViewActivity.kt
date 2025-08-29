@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,114 +33,136 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.com.shinjiindustrial.portmapper.SettingsViewModel
+import java.com.shinjiindustrial.portmapper.ThemeUiState
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class LogViewActivity : ComponentActivity() {
+
+    val settingsViewModel : SettingsViewModel by viewModels()
+
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);
 
         PortForwardApplication.CurrentActivity = this
-        var scrollToBottom = this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false);
-
-        var logLines = PortForwardApplication.Logs
 
         setContent {
-            MyApplicationTheme {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            navigationIcon = {
-                                IconButton(onClick = {
-                                    this.finish()
-                                }) {
-                                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                                }
-                            },
-//                                modifier = Modifier.height(40.dp),
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
-                            title = {
-                                Text(
-                                    text = "Logs",
-                                    color = AdditionalColors.TextColorStrong,
-                                    fontWeight = FontWeight.Normal
-                                )
-                            },
-                            actions = {
+            LogViewContent()
+        }
+    }
 
-                                IconButton(onClick = {
-                                    PortForwardApplication.Logs.clear()
-                                }) {
-                                    Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
-                                }
-
-                                IconButton(onClick = { CopyTextToClipboard(PortForwardApplication.Logs.joinToString("\n")) }) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy to Clipboard")
-                                }
-
-                                IconButton(onClick = { logsSaveAs() }) {
-                                    Icon(Icons.Default.SaveAs, contentDescription = "Save to File")
-                                }
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun LogViewInner(themeUiState: ThemeUiState, logLines : List<String>, scrollToBottom : Boolean)
+    {
+        MyApplicationTheme(themeUiState) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                this.finish()
+                            }) {
+                                Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                             }
-                        )
-                    },
-                    content = { it ->
+                        },
+//                                modifier = Modifier.height(40.dp),
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
+                        title = {
+                            Text(
+                                text = "Logs",
+                                color = AdditionalColors.TextColorStrong,
+                                fontWeight = FontWeight.Normal
+                            )
+                        },
+                        actions = {
 
-                        val listState = rememberLazyListState()
-                        val coroutineScope = rememberCoroutineScope()
+                            IconButton(onClick = {
+                                PortForwardApplication.Logs.clear()
+                            }) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
+                            }
 
-                        if(scrollToBottom)
-                        {
-                            //scrollToBottom = true // not necessary?
-                            // launched effect - action to take when composable is first launched / relaunched
-                            //   passing in Unit ensures its only done the first time.
-                            LaunchedEffect(Unit) {
-                                listState.scrollToItem(logLines.size - 1)
+                            IconButton(onClick = { CopyTextToClipboard(PortForwardApplication.Logs.joinToString("\n")) }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy to Clipboard")
+                            }
+
+                            IconButton(onClick = { logsSaveAs() }) {
+                                Icon(Icons.Default.SaveAs, contentDescription = "Save to File")
                             }
                         }
+                    )
+                },
+                content = { it ->
 
+                    val listState = rememberLazyListState()
+                    val coroutineScope = rememberCoroutineScope()
 
-                        LazyColumn( state = listState,
-                            //modifier = Modifier.background(MaterialTheme.colorScheme.background),
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.background)
-                                .padding(it)
-                                .fillMaxHeight()
-                                .fillMaxWidth(),
-                            contentPadding = PaddingValues(0.dp),
-                            verticalArrangement = Arrangement.spacedBy(0.dp),
-
-                            ) {
-
-
-
-                            itemsIndexed(logLines) { index, message ->
-                                val color = when
-                                {
-                                    message.startsWith("W: ") -> AdditionalColors.LogWarningText
-                                    message.startsWith("E: ") -> AdditionalColors.LogErrorText
-                                    else -> AdditionalColors.TextColor
-                                }
-                                Text(message, color = color)
-
-                            }
-
+                    if(scrollToBottom)
+                    {
+                        //scrollToBottom = true // not necessary?
+                        // launched effect - action to take when composable is first launched / relaunched
+                        //   passing in Unit ensures its only done the first time.
+                        LaunchedEffect(Unit) {
+                            listState.scrollToItem(logLines.size - 1)
                         }
                     }
-                )
-            }
+
+
+                    LazyColumn( state = listState,
+                        //modifier = Modifier.background(MaterialTheme.colorScheme.background),
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(it)
+                            .fillMaxHeight()
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(0.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+
+                        itemsIndexed(logLines) { index, message ->
+                            val color = when
+                            {
+                                message.startsWith("W: ") -> AdditionalColors.LogWarningText
+                                message.startsWith("E: ") -> AdditionalColors.LogErrorText
+                                else -> AdditionalColors.TextColor
+                            }
+                            Text(message, color = color)
+
+                        }
+
+                    }
+                }
+            )
         }
+
+    }
+
+    @Composable
+    fun LogViewContent()
+    {
+        val scrollToBottom = this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false);
+        val logLines = PortForwardApplication.Logs
+        val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+        LogViewInner(themeState, logLines, scrollToBottom)
     }
 
     private val CREATE_LOG_FILE = 1

@@ -18,11 +18,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.tooling.preview.Preview
 
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.SharedPrefValues
+import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 fun getBlend(first : Color, second : Color, ratio : Double) : Color
 {
@@ -34,12 +34,12 @@ fun getBlend(first : Color, second : Color, ratio : Double) : Color
 
 
 val Blue40 = Color(0xff014C69)
-val Blue40_Ligher = Color(0xff0A7B9C)
+val Blue40_Lighter = Color(0xff0A7B9C)
 val Blue80 = Color(0xff93C3F4)
 val Blue80_Darker = Color(0xff509BEC)
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Blue40_Ligher,
+    primary = Blue40_Lighter,
     secondary = Blue40,
     tertiary = Pink80,
 
@@ -59,20 +59,6 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = AdditionalColors.AdditionalColorsLight.TextColorStrong,
     secondaryContainer = Blue80,
     background = Color(0xffF0F0F2),
-//    surface = Color.Red,
-//    onPrimary = Color.Red,
-//    onSecondary = Color.Red,
-//    onTertiary = Color.Red,
-//    onBackground = Color.Red,
-//    onSurface = Color.Red,
-
-//    background = Color(0xFFFFFBFE),
-//    surface = Color(0xFFC2DDF0),
-//    onPrimary = Color.White,
-//    onSecondary = Color.White,
-//    onTertiary = Color.White,
-//    onBackground = Color(0xFF1C1B1F),
-//    onSurface = Color(0xFF1C1B1F),
 )
 
 
@@ -144,8 +130,6 @@ object AdditionalColors {
         override var LogWarningText =  Color(0xffBBB529)
 
     }
-    var ThemeSetting = mutableStateOf(SharedPrefValues.DayNightPref.intVal)
-    var ThemeSettingMaterialYou = mutableStateOf(SharedPrefValues.MaterialYouTheme)
 }
 
 
@@ -153,13 +137,14 @@ object AdditionalColors {
 
 @Composable
 fun MyApplicationTheme(
+    themeState: ThemeUiState,
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
 
-    var dayNightMode = DayNightMode.from(AdditionalColors.ThemeSetting.value)
+    var dayNightMode = themeState.dayNightMode
 
     var useDark = darkTheme
     if(dayNightMode == DayNightMode.FORCE_DAY)
@@ -171,7 +156,7 @@ fun MyApplicationTheme(
         useDark = true
     }
 
-    var useMaterialYou = AdditionalColors.ThemeSettingMaterialYou.value
+    var useMaterialYou = themeState.materialYou
     key(useMaterialYou, dayNightMode)
     {
         val colorSchemeToUse = when {

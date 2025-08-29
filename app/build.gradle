@@ -3,6 +3,9 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id "com.google.firebase.crashlytics"
     id "com.google.gms.google-services"
+    id("com.google.dagger.hilt.android")
+    id 'kotlin-parcelize'
+    id("com.google.devtools.ksp")
 }
 
 // must be after the plugin is applied otherwise no tasks will be found
@@ -15,14 +18,14 @@ android.applicationVariants.all { variant ->
 
 android {
     namespace 'com.example.myapplication'
-    compileSdk 33
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.shinjiindustrial.portmapper"
         minSdk 21
-        targetSdk 33
-        versionCode 5
-        versionName "1.1.3"
+        targetSdk 35
+        versionCode 7
+        versionName '1.2.0'
         multiDexEnabled true
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -73,7 +76,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.3.2'
+        kotlinCompilerExtensionVersion '1.5.8' // <-- UPDATED for Kotlin 1.9.22
     }
     packagingOptions {
         resources {
@@ -81,26 +84,56 @@ android {
         }
         exclude 'META-INF/beans.xml'
     }
+    flavorDimensions 'env'
+    productFlavors {
+        prod {
+            dimension 'env'
+        }
+        mock {
+            dimension 'env'
+        }
+    }
+    variantFilter { variant ->
+        def env = variant.flavors.find { it.dimension == "env" }?.name
+        if (variant.buildType.name == "release" && env != "prod") {
+            setIgnore(true)
+        }
+        if (variant.buildType.name == "release_no_gps" && env != "prod") {
+            setIgnore(true)
+        }
+    }
 }
 
+def room_version = "2.6.0"
+def compose_version = "2.8.2"
 
 dependencies {
+
+    implementation("androidx.room:room-runtime:$room_version")
+
+    // If this project uses any Kotlin source, use Kotlin Symbol Processing (KSP)
+    // See Add the KSP plugin to your project
+    ksp("androidx.room:room-compiler:$room_version")
+
+    // optional - Kotlin Extensions and Coroutines support for Room
+    implementation("androidx.room:room-ktx:$room_version")
 
     implementation 'androidx.core:core-ktx:1.8.0'
     implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.3.1'
     implementation 'androidx.activity:activity-compose:1.5.1'
-    implementation platform('androidx.compose:compose-bom:2022.10.00')
+    implementation platform('androidx.compose:compose-bom:2025.08.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
 
     implementation 'androidx.compose.material3:material3'
-    implementation 'androidx.compose.material:material:1.4.3'
+    implementation 'androidx.compose.material:material:1.9.0'
     implementation 'androidx.compose.material:material-icons-extended'
     //implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation "androidx.datastore:datastore-preferences:1.0.0"
-
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:$compose_version"
+    implementation("androidx.compose.animation:animation")
 
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
@@ -112,17 +145,14 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:1.7.30'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android'
     implementation 'androidx.compose.runtime:runtime'
-    implementation 'androidx.compose.runtime:runtime-livedata'
 
     // manages versions, not actually included with apk
     releaseImplementation platform('com.google.firebase:firebase-bom:32.2.2')
     releaseImplementation 'com.google.firebase:firebase-crashlytics'
 
 
-
-
-    //implementation "androidx.navigation:navigation-compose:2.6.0"
-    implementation "com.google.accompanist:accompanist-navigation-animation:0.29.0-alpha"
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation "io.mockk:mockk:1.13.16"
 
     // domain specific
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
@@ -131,6 +161,11 @@ dependencies {
     implementation 'org.fourthline.cling:cling-support:2.1.2'
 
     implementation 'javax.servlet:javax.servlet-api:3.1.0'
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("androidx.navigation:navigation-compose:$compose_version")
+
+    implementation("com.google.dagger:hilt-android:2.48")
+    ksp("com.google.dagger:hilt-compiler:2.48")
 
     // exclude the org.eclipse.jetty.orbit transitive dependency
     //   it caused problems building with minsdk <24
@@ -153,5 +188,6 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     androidTestImplementation platform('androidx.compose:compose-bom:2022.10.00')
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    testImplementation "org.jetbrains.kotlin:kotlin-test:1.7.20"
 
 }

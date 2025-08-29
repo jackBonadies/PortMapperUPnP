@@ -1,4 +1,4 @@
-package com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper.ui
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.LocalContentColor
 import androidx.compose.material.LocalTextStyle
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
@@ -48,10 +47,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.shinjiindustrial.portmapper.DayNightMode
+import com.shinjiindustrial.portmapper.common.capLeaseDur
+import com.shinjiindustrial.portmapper.domain.DayHourMinSec
+import com.shinjiindustrial.portmapper.domain.getDHMS
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 
 @Composable
@@ -59,7 +63,7 @@ import kotlinx.coroutines.flow.map
 fun DurationPickerDialogPreview()
 {
     SetupPreview()
-    MyApplicationTheme() {
+    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         val showDialog = remember { mutableStateOf(true) }
         val leaseDurationValueSeconds = remember { mutableStateOf("3661") }
         DurationPickerDialog(showDialog, leaseDurationValueSeconds, true)
@@ -98,7 +102,8 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 
                     TextButton(onClick = {
                         showDialog.value = false
-                        leaseDurationValueSeconds.value = capLeaseDur(chosenValue.value, wanIpConnectionV1)
+                        leaseDurationValueSeconds.value =
+                            capLeaseDur(chosenValue.value, wanIpConnectionV1)
                     }) {
                         Text("Set", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
                     }
@@ -138,7 +143,7 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
         val hoursValuesPickerState = rememberPickerState(dhms.hours)
 
         val minsValues = remember { getStringRange(0, 59, infiniteScroll) }
-        val minsValuesPickerState = rememberPickerState(dhms.mins)
+        val minsValuesPickerState = rememberPickerState(dhms.minutes)
 
         val secsValues = remember { getStringRange(0, 59, infiniteScroll) }
         val secsValuesPickerState = rememberPickerState(dhms.seconds)
@@ -181,31 +186,18 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
                 modifier = Modifier.width(120.dp),
                 textModifier = Modifier.padding(8.dp),
                 textStyle = TextStyle(fontSize = 32.sp),
-                startIndex = dhms.mins,
+                startIndex = dhms.minutes,
             )
 
-            chosenValue.value = DayHourMinSec(dayValuesPickerState.selectedItem.toInt(),hoursValuesPickerState.selectedItem.toInt(), minsValuesPickerState.selectedItem.toInt(),0).totalSeconds().toString()
-//                Picker(
-//                    header = "Seconds",
-//                    infinite = infiniteScroll,
-//                    state = secsValuesPickerState,
-//                    items = secsValues,
-//                    visibleItemsCount = 3,
-//                    modifier = Modifier.width(120.dp),
-//                    textModifier = Modifier.padding(8.dp),
-//                    textStyle = TextStyle(fontSize = 32.sp),
-//                    startIndex = dhms.seconds,
-//                )
+            chosenValue.value = DayHourMinSec(
+                dayValuesPickerState.selectedItem.toInt(),
+                hoursValuesPickerState.selectedItem.toInt(),
+                minsValuesPickerState.selectedItem.toInt(),
+                0
+            ).totalSeconds().toString()
         }
-
-//            Text(
-//                text = "Interval: ${dayValuesPickerState.selectedItem} ${hoursValuesPickerState.selectedItem}",
-//                modifier = Modifier.padding(vertical = 16.dp)
-//            )
-
     }
 }
-
 
 class PickerState(initialValue : Int) {
     var selectedItem by mutableStateOf(initialValue.toString())
