@@ -636,13 +636,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
             // we enumerate port mappings later
             val device: IIGDDevice = getIGDDevice(externalIp)
             val timeTakenMillis = measureTimeMillis {
-
-//        if(actionsMap.containsKey(UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings))
-//        {
-//            OurLogger.log(Level.INFO, "Enumerating Port Listings using GetListOfPortMappings")
-//            var getPortMapping = actionsMap[UpnpManager.Companion.ACTION_NAMES.GetListOfPortMappings]!!
-//            getAllPortMappingsUsingListPortMappings(getPortMapping)
-//        }
                 if(device.supportsAction(ACTION_NAMES.GetGenericPortMappingEntry))
                 {
                     OurLogger.log(Level.INFO, "Enumerating Port Listings using GetGenericPortMappingEntry")
@@ -652,7 +645,6 @@ class UpnpManager @Inject constructor(private val upnpClient : IUpnpClient, priv
                     //TODO firebase integration
                     OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
                 }
-
             }
             OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
         }
