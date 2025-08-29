@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterialApi::class)
-
 package com.shinjiindustrial.portmapper
 
 
@@ -37,7 +35,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -53,9 +50,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.Checkbox
-import androidx.compose.material.CheckboxDefaults
-import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -69,10 +65,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
@@ -94,8 +86,14 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
+import androidx.compose.material3.pulltorefresh.pullToRefreshIndicator
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.surfaceColorAtElevation
@@ -105,10 +103,12 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -286,7 +286,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -297,7 +297,7 @@ class MainActivity : ComponentActivity() {
             println("My Back Pressed Callback")
             if(IsMultiSelectMode())
             {
-                MainActivity.MultiSelectItems!!.clear()
+                MultiSelectItems!!.clear()
             }
             else
             {
@@ -410,7 +410,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MainScreen(navController : NavHostController) {
         // A surface container using the 'background' color from the theme
@@ -507,8 +507,8 @@ class MainActivity : ComponentActivity() {
         }
 
 
-        MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
-        MainActivity.MultiSelectItems = remember { mutableStateListOf<PortMappingWithPref>() }
+        OurSnackbarHostState = remember { SnackbarHostState() }
+        MultiSelectItems = remember { mutableStateListOf<PortMappingWithPref>() }
         rememberCoroutineScope()
         val coroutineScope: CoroutineScope = rememberCoroutineScope()
 
@@ -516,22 +516,6 @@ class MainActivity : ComponentActivity() {
         val bottomSheetState =
             rememberModalBottomSheetState(true)
 
-        ModalBottomSheetLayout(
-            sheetState = bottomSheetState,
-            sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            sheetElevation = 24.dp,
-            sheetBackgroundColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-            sheetContent = {
-                // This is what will be shown in the bottom sheet
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    BottomSheetSortBy(portViewModel)
-                }
-            }
-        ) {
         if (openBottomSheet)
         {
             ModalBottomSheet(
@@ -560,7 +544,7 @@ class MainActivity : ComponentActivity() {
             Scaffold(
 
                 snackbarHost = {
-                    SnackbarHost(MainActivity.OurSnackbarHostState!!) { data ->
+                    SnackbarHost(OurSnackbarHostState!!) { data ->
                         // custom snackbar with the custom colors
                         Snackbar(
                             data,
@@ -652,44 +636,45 @@ class MainActivity : ComponentActivity() {
                 },
                 content = { it ->
 
-                    val refreshScope = rememberCoroutineScope()
+                    // TODO can revisit this - if we already know we have some kind of device
+                    //   then we can forget the main loading circle and show this until we
+                    //   finish enumerating our first device (or have a flow which is like
+                    //   combine (deviceNotFound, anyDeviceStillBeingSearched))
+                    // still the issue of if search finishes really fast then it can hang if
+                    //   you set isRefreshing to false too fast (can fix by having an arbitrary delay)
 
-                    val refreshState = remember { mutableStateOf(false) }
-                    var refreshing by refreshState
+                    val state = rememberPullToRefreshState()
+                    val scope = rememberCoroutineScope()
+                    val isRefreshing = remember { mutableStateOf(false) }
+                    fun refresh() = scope.launch {
 
-                    val isRefreshing = remember { derivedStateOf { refreshing && searchStartedRecentlyAndNothingFoundYet } }
-
-                    val onlyShowMainProgressBar = true // looks slightly better in practice
-
-                    fun refresh() = refreshScope.launch {
-                        refreshing = !onlyShowMainProgressBar
+                        state.animateToHidden()
                         portViewModel.fullRefresh()
-
-                        //TODO cancel if already done
-
-                        delay(6000)
-                        println("finish refreshing $refreshing")
-                        refreshing = false
                     }
 
-                    val state = rememberPullRefreshState(isRefreshing.value, ::refresh)
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing.value,
+                        onRefresh = ::refresh,
+                        modifier = Modifier.padding(it),
+                        state = state,
+                        indicator = {
+                            // dont show after initially pulling down
+                            if (state.distanceFraction > 0f)
+                            {
+                                Indicator(
+                                    state = state,
+                                    isRefreshing = isRefreshing.value,
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
 
-                    BoxWithConstraints(
-                        Modifier
-                            .padding(it)
-                            .pullRefresh(state)
-                            .fillMaxHeight()
-                            .fillMaxWidth()
-                    )
-                    {
-
-                        val boxHeight =
-                            with(LocalDensity.current) { constraints.maxHeight.toDp() }
-
-
-
+                            }
+                        }
+                    ) {
+                        var heightPx by remember { mutableIntStateOf(0) }
+                        val boxHeight = with(LocalDensity.current) { heightPx.toDp() }
                         Column(
                             Modifier
+                                .onSizeChanged { heightPx = it.height }
                                 .fillMaxHeight()
                                 .fillMaxWidth()
                         ) {
@@ -790,17 +775,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        PullRefreshIndicator(
-                            refreshing,
-                            state,
-                            Modifier.align(Alignment.TopCenter)
-                        )
                     }
 
                 }
             )
 
-        }
+
     }
 
 }

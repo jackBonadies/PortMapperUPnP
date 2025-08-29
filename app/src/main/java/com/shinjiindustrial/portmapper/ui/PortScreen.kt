@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -564,7 +563,7 @@ fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
 }
 
 //lazy column IS recycler view basically. both recycle.
-@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class)
 @Composable
 fun Conversation(messages: List<UpnpViewRow>) {
 
