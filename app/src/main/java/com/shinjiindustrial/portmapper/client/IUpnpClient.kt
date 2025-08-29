@@ -2,12 +2,10 @@ package com.shinjiindustrial.portmapper.client
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import org.fourthline.cling.model.message.UpnpResponse
-import java.util.concurrent.Future
 
 // Wrapper around cling provided upnp service
 // allows us to better mock interactions
@@ -18,7 +16,7 @@ interface IUpnpClient {
     suspend fun createPortMappingRule(
         device: IIGDDevice,
         portMappingRequest: PortMappingRequest,
-    ) : UPnPCreateMappingResult
+    ): UPnPCreateMappingResult
 
     suspend fun deletePortMapping(
         device: IIGDDevice,
@@ -30,11 +28,12 @@ interface IUpnpClient {
         remoteHost: String,
         remotePort: String,
         protocol: String,
-    ) : UPnPCreateMappingWrapperResult
+    ): UPnPCreateMappingWrapperResult
 
-    suspend fun getGenericPortMappingRule(device : IIGDDevice,
-        slotIndex : Int,
-    ) : UPnPGetSpecificMappingResult
+    suspend fun getGenericPortMappingRule(
+        device: IIGDDevice,
+        slotIndex: Int,
+    ): UPnPGetSpecificMappingResult
 
     fun search(maxSeconds: Int)
 
@@ -49,26 +48,31 @@ interface IUpnpClient {
     val deviceFoundEvent: Event<IIGDDevice>
 }
 
-sealed class UPnPCreateMappingWrapperResult
-{
-    data class Success(val requestInfo: PortMapping, val resultingMapping: PortMapping, val wasReadBack: Boolean) : UPnPCreateMappingWrapperResult()
-    data class Failure(val reason: String, val response: UpnpResponse) : UPnPCreateMappingWrapperResult()
+sealed class UPnPCreateMappingWrapperResult {
+    data class Success(
+        val requestInfo: PortMapping,
+        val resultingMapping: PortMapping,
+        val wasReadBack: Boolean
+    ) : UPnPCreateMappingWrapperResult()
+
+    data class Failure(val reason: String, val response: UpnpResponse) :
+        UPnPCreateMappingWrapperResult()
 }
 
-sealed class UPnPCreateMappingResult
-{
+sealed class UPnPCreateMappingResult {
     data class Success(val requestInfo: PortMapping) : UPnPCreateMappingResult()
     data class Failure(val reason: String, val response: UpnpResponse) : UPnPCreateMappingResult()
 }
 
-sealed class UPnPGetSpecificMappingResult
-{
-    data class Success(val requestInfo: PortMapping, val resultingMapping: PortMapping) : UPnPGetSpecificMappingResult()
-    data class Failure(val reason: String, val response: UpnpResponse) : UPnPGetSpecificMappingResult()
+sealed class UPnPGetSpecificMappingResult {
+    data class Success(val requestInfo: PortMapping, val resultingMapping: PortMapping) :
+        UPnPGetSpecificMappingResult()
+
+    data class Failure(val reason: String, val response: UpnpResponse) :
+        UPnPGetSpecificMappingResult()
 }
 
-sealed class UPnPResult
-{
+sealed class UPnPResult {
     data class Success(val requestInfo: PortMapping) : UPnPResult()
     data class Failure(val reason: String, val response: UpnpResponse) : UPnPResult()
 }

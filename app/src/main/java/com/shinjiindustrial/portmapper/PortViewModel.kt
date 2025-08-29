@@ -69,7 +69,7 @@ class PortViewModel @Inject constructor(
 
     val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
-    private val applicationScope : CoroutineScope = MainScope()
+    private val applicationScope: CoroutineScope = MainScope()
 
     // we want to use key for selections.  so if a rule renews while the user is in multi select
     //   mode, don't deselect that rule.  but if we lose a rule (i.e. it gets deleted) then
@@ -87,29 +87,32 @@ class PortViewModel @Inject constructor(
         _selectedIds.update { s -> if (id in s) s - id else s + id }
     }
 
-    fun getSelectedItems(selectedIds : Set<PortMappingKey>) : List<PortMappingWithPref>
-    {
+    fun getSelectedItems(selectedIds: Set<PortMappingKey>): List<PortMappingWithPref> {
         return upnpRepository.portMappingsFromIds(selectedIds)
     }
 
-    fun clearSelection() { _selectedIds.value = emptySet() }
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
 
-    val anyDevices: StateFlow<Boolean> = upnpRepository.devices.map { devices -> devices.isNotEmpty() }.stateIn( scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
-
-    val searchStartedRecentlyAndNothingFoundYet: StateFlow<Boolean> = combine(upnpRepository.devices, searchStartedRecently)
-    {
-        devices, searchStartedRecently ->
-        devices.isEmpty() && searchStartedRecently
-    }.stateIn(
+    val anyDevices: StateFlow<Boolean> =
+        upnpRepository.devices.map { devices -> devices.isNotEmpty() }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = false
         )
 
-    val sortInfo : StateFlow<SortInfo> = preferencesRepository.sortInfo.stateIn(
+    val searchStartedRecentlyAndNothingFoundYet: StateFlow<Boolean> =
+        combine(upnpRepository.devices, searchStartedRecently)
+        { devices, searchStartedRecently ->
+            devices.isEmpty() && searchStartedRecently
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    val sortInfo: StateFlow<SortInfo> = preferencesRepository.sortInfo.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         SortInfo(SortBy.ExternalPort, false)
@@ -124,28 +127,22 @@ class PortViewModel @Inject constructor(
         Log.i("Port", "UI STATE FLOW is running")
 
         val upnpElements = mutableListOf<UpnpViewRow>()
-        if (devices.isEmpty())
-        {
-        }
-        else
-        {
+        if (devices.isEmpty()) {
+        } else {
             var index = 0
-            val curDevice : IIGDDevice? = devices.elementAt(0)
-            val portMappingsList = portMappings.values.sortedWith(sortInfo.sortBy.getComparer(!sortInfo.sortDesc))
-            for (curDevice in devices)
-            {
+            val curDevice: IIGDDevice? = devices.elementAt(0)
+            val portMappingsList =
+                portMappings.values.sortedWith(sortInfo.sortBy.getComparer(!sortInfo.sortDesc))
+            for (curDevice in devices) {
                 // do we have any port mappings
                 upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
-                if (index >= portMappingsList.size || portMappingsList.elementAt(index).portMapping.DeviceIP != curDevice.getIpAddress())
-                {
+                if (index >= portMappingsList.size || portMappingsList.elementAt(index).portMapping.DeviceIP != curDevice.getIpAddress()) {
                     // emit empty and continue
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
                     continue
                 }
-                while (index < portMappingsList.size)
-                {
-                    if (portMappingsList.elementAt(index).portMapping.DeviceIP == curDevice.getIpAddress())
-                    {
+                while (index < portMappingsList.size) {
+                    if (portMappingsList.elementAt(index).portMapping.DeviceIP == curDevice.getIpAddress()) {
                         upnpElements.add(UpnpViewRow.PortViewRow(portMappingsList.elementAt(index)))
                     }
                     index++
@@ -161,8 +158,7 @@ class PortViewModel @Inject constructor(
             initialValue = PortUiState(isLoading = true)
         )
 
-    fun initialize(context : Context, force : Boolean)
-    {
+    fun initialize(context: Context, force: Boolean) {
         upnpRepository.Initialize(context, force)
     }
 
@@ -178,12 +174,12 @@ class PortViewModel @Inject constructor(
         return upnpRepository.GetUPnPClient().isInitialized()
     }
 
-    fun updateSortingDesc(sortDesc : Boolean) = viewModelScope.launch {
+    fun updateSortingDesc(sortDesc: Boolean) = viewModelScope.launch {
         preferencesRepository.updateSortDesc(sortDesc)
     }
 
-    fun updateSortingSortBy(sortBy : SortBy) = viewModelScope.launch {
-       preferencesRepository.updateSortBy(sortBy)
+    fun updateSortingSortBy(sortBy: SortBy) = viewModelScope.launch {
+        preferencesRepository.updateSortBy(sortBy)
     }
 
     fun getIGDDevice(ipAddress: String): IIGDDevice {
@@ -194,8 +190,7 @@ class PortViewModel @Inject constructor(
         return upnpRepository.GetGatewayIpsWithDefault(deviceGateway)
     }
 
-    fun fullRefresh()
-    {
+    fun fullRefresh() {
         upnpRepository.FullRefresh()
     }
 
@@ -204,19 +199,17 @@ class PortViewModel @Inject constructor(
     }
 
     fun renew(portMapping: PortMappingWithPref) = applicationScope.launch {
-            try {
-                val res = upnpRepository.renewRule(portMapping)
-                if (res is UPnPCreateMappingWrapperResult.Success) {
-                    _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
-                }
-                else
-                {
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
-                }
-            } catch (e: Exception) {
-                _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+        try {
+            val res = upnpRepository.renewRule(portMapping)
+            if (res is UPnPCreateMappingWrapperResult.Success) {
+                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            } else {
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
             }
+        } catch (e: Exception) {
+            _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
         }
+    }
 
     fun renewAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
@@ -239,12 +232,10 @@ class PortViewModel @Inject constructor(
 
             val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
 
-            if(anyFailed) {
+            if (anyFailed) {
                 val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
                 _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
-            }
-            else
-            {
+            } else {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             }
         } catch (e: Exception) {
@@ -254,37 +245,37 @@ class PortViewModel @Inject constructor(
 
     fun enableDisable(
         portMapping: PortMappingWithPref,
-        enable: Boolean) =
+        enable: Boolean
+    ) =
         applicationScope.launch {
             try {
                 val res = upnpRepository.disableEnablePortMappingEntry(portMapping, enable)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
-                }
-                else
-                {
+                } else {
                     _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
                 }
             } catch (e: Exception) {
-                val enableDisableString = if(enable) "Enable" else "Disable"
+                val enableDisableString = if (enable) "Enable" else "Disable"
                 _events.emit(UiEvent.SnackBarViewLogEvent("$enableDisableString Port Mapping Failed"))
             }
         }
 
-    fun enableDisableAll(enable : Boolean, selectedIds : Set<PortMappingKey>)
-    {
+    fun enableDisableAll(enable: Boolean, selectedIds: Set<PortMappingKey>) {
         enableDisableAll(enable, upnpRepository.portMappingsFromIds(selectedIds))
     }
 
-    fun enableDisableAll(enable : Boolean, chosenRulesOnly : List<PortMappingWithPref>? = null) =
+    fun enableDisableAll(enable: Boolean, chosenRulesOnly: List<PortMappingWithPref>? = null) =
         applicationScope.launch {
 
             try {
                 val result = when {
                     chosenRulesOnly != null -> {
-                        val rules = chosenRulesOnly.filter { it -> it.portMapping.Enabled != enable }
+                        val rules =
+                            chosenRulesOnly.filter { it -> it.portMapping.Enabled != enable }
                         upnpRepository.disableEnablePortMappingEntries(rules, enable)
                     }
+
                     else -> {
                         val rules = upnpRepository.GetEnabledDisabledRules(!enable)
                         upnpRepository.disableEnablePortMappingEntries(rules, enable)
@@ -308,25 +299,20 @@ class PortViewModel @Inject constructor(
 
                 val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
 
-                if(anyFailed) {
+                if (anyFailed) {
                     val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
                     _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
-                }
-                else
-                {
+                } else {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
-            } catch(e : Exception)
-            {
-                val enableDisableString = if(enable) "Enable" else "Disable"
+            } catch (e: Exception) {
+                val enableDisableString = if (enable) "Enable" else "Disable"
                 _events.emit(UiEvent.SnackBarViewLogEvent("$enableDisableString Port Mappings Failed"))
             }
-    }
+        }
 
 
-
-    fun start()
-    {
+    fun start() {
         if (upnpRepository.FailedToInitialize) {
             searchStartedRecently.value = false
         } else {
@@ -364,7 +350,8 @@ class PortViewModel @Inject constructor(
             // map to the intersection of the two sets, in most cases this should be the same.
             //   if a rule got deleted then it will be different. in which case we update selectedIds
             //   to be the new pruned set.
-            sel intersect cur }
+            sel intersect cur
+        }
             .distinctUntilChanged()
             .onEach { filtered ->
                 println("filtered changed ...")
@@ -373,7 +360,7 @@ class PortViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
     }
-    
+
     override fun onCleared() {
         upnpRepository.SearchStarted -= { o -> searchStarted(o) }
         super.onCleared()
@@ -392,8 +379,7 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun deleteAll(selectedIds : Set<PortMappingKey>)
-    {
+    fun deleteAll(selectedIds: Set<PortMappingKey>) {
         deleteAll(upnpRepository.portMappingsFromIds(selectedIds))
     }
 
@@ -417,17 +403,15 @@ class PortViewModel @Inject constructor(
                 }
             }
 
-                val anyFailed = result.any { it is UPnPResult.Failure }
+            val anyFailed = result.any { it is UPnPResult.Failure }
 
-                if(anyFailed) {
-                    val res = result.first { it is UPnPResult.Failure }
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).reason}"))
-                }
-                else
-                {
-                    _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
-                }
-        } catch (e : Exception) {
+            if (anyFailed) {
+                val res = result.first { it is UPnPResult.Failure }
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).reason}"))
+            } else {
+                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
             _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mappings Failed"))
         }
     }
@@ -440,77 +424,79 @@ class PortViewModel @Inject constructor(
             } else {
                 _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).reason}"))
             }
-    } catch (e : Exception) {
-        _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mapping Failed"))
-    }
+        } catch (e: Exception) {
+            _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mapping Failed"))
+        }
     }
 
-    fun editRule(oldRule : PortMappingWithPref, portMappingRequestInput : PortMappingUserInput) = applicationScope.launch {
-        try {
-            val res = upnpRepository.deletePortMappingEntry(oldRule)
-            if (res is UPnPResult.Failure) {
+    fun editRule(oldRule: PortMappingWithPref, portMappingRequestInput: PortMappingUserInput) =
+        applicationScope.launch {
+            try {
+                val res = upnpRepository.deletePortMappingEntry(oldRule)
+                if (res is UPnPResult.Failure) {
+                    _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                    return@launch
+                }
+            } catch (exception: Exception) {
+                PortForwardApplication.OurLogger.log(
+                    Level.SEVERE,
+                    "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                )
                 _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
                 return@launch
             }
-        } catch (exception: Exception) {
-            PortForwardApplication.OurLogger.log(
-                Level.SEVERE,
-                "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-            )
-            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
-            return@launch
+            // delete was successful, create new rules
+            createRules(portMappingRequestInput, true)
         }
-        // delete was successful, create new rules
-        createRules(portMappingRequestInput, true)
-    }
 
-    fun createRules(portMappingUserInput: PortMappingUserInput, modifyCase : Boolean = false) = applicationScope.launch {
-        try {
-            val result = upnpRepository.createPortMappingRulesEntry(portMappingUserInput)
-            result.forEach { res ->
-                when (res) {
-                    is UPnPCreateMappingWrapperResult.Success -> {
-                        print("success")
-                        print(res.requestInfo.Description)
+    fun createRules(portMappingUserInput: PortMappingUserInput, modifyCase: Boolean = false) =
+        applicationScope.launch {
+            try {
+                val result = upnpRepository.createPortMappingRulesEntry(portMappingUserInput)
+                result.forEach { res ->
+                    when (res) {
+                        is UPnPCreateMappingWrapperResult.Success -> {
+                            print("success")
+                            print(res.requestInfo.Description)
+                        }
+
+                        is UPnPCreateMappingWrapperResult.Failure -> {
+                            print("failure")
+                            print(res.reason)
+                            print(res.response)
+                        }
                     }
 
-                    is UPnPCreateMappingWrapperResult.Failure -> {
-                        print("failure")
-                        print(res.reason)
-                        print(res.response)
-                    }
                 }
 
-            }
+                val numFailed = result.count { it is UPnPCreateMappingWrapperResult.Failure }
 
-            val numFailed = result.count { it is UPnPCreateMappingWrapperResult.Failure }
+                val anyFailed = numFailed > 0
 
-            val anyFailed = numFailed > 0
+                if (anyFailed) {
 
-            if (anyFailed) {
+                    val verbString = if (modifyCase) "modify" else "create"
 
-                val verbString = if(modifyCase) "modify" else "create"
-
-                // all failed
-                if (numFailed == result.size) {
-                    if (result.size == 1) {
-                        _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rule."))
+                    // all failed
+                    if (numFailed == result.size) {
+                        if (result.size == 1) {
+                            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rule."))
+                        } else {
+                            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rules."))
+                        }
                     } else {
-                        _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rules."))
+                        _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString some rules."))
                     }
                 } else {
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString some rules."))
+                    _events.emit(UiEvent.SnackBarViewShortNoEvent("Success"))
                 }
-            } else {
-                _events.emit(UiEvent.SnackBarViewShortNoEvent("Success"))
+            } catch (exception: Exception) {
+                PortForwardApplication.OurLogger.log(
+                    Level.SEVERE,
+                    "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                )
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                return@launch
             }
-        } catch (exception: Exception) {
-            PortForwardApplication.OurLogger.log(
-                Level.SEVERE,
-                "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
-            )
-            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
-            return@launch
         }
-    }
 }

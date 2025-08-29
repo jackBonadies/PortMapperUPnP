@@ -31,33 +31,44 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun CircleCheckbox(selected: Boolean, enabled: Boolean = true, modifier : Modifier = Modifier, onChecked: () -> Unit) {
+fun CircleCheckbox(
+    selected: Boolean,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onChecked: () -> Unit
+) {
 
     val color = MaterialTheme.colorScheme
     val imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle
-    val tint = if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
+    val tint =
+        if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
     val background = if (selected) Color.White else Color.Transparent
 
-    IconButton(onClick = {  },
-        enabled = enabled, modifier = modifier.then(Modifier.size(28.dp))) {
+    IconButton(
+        onClick = { },
+        enabled = enabled, modifier = modifier.then(Modifier.size(28.dp))
+    ) {
 
-        Icon(imageVector = imageVector, tint = tint,
-            modifier = Modifier.background(background, shape = CircleShape).size(28.dp),
-            contentDescription = "checkbox")
+        Icon(
+            imageVector = imageVector, tint = tint,
+            modifier = Modifier
+                .background(background, shape = CircleShape)
+                .size(28.dp),
+            contentDescription = "checkbox"
+        )
     }
 }
 
 @Preview
 @Composable
-fun CircleCheckboxPreview()
-{
-    val selected = remember { mutableStateOf(false)}
+fun CircleCheckboxPreview() {
+    val selected = remember { mutableStateOf(false) }
     CircleCheckbox(selected.value, true) { selected.value = !selected.value }
 }
 
 @ExperimentalMaterial3Api
 @Composable
-fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onClick: () -> Unit) {
+fun SortSelectButton(modifier: Modifier, text: String, isSelected: Boolean, onClick: () -> Unit) {
     val buttonColor: Color
     val textColor: Color
     if (isSelected) {
@@ -72,7 +83,8 @@ fun SortSelectButton(modifier : Modifier, text: String, isSelected: Boolean, onC
         modifier = modifier.then(
             Modifier
                 .height(60.dp)
-                .padding(6.dp)),
+                .padding(6.dp)
+        ),
         colors = CardDefaults.cardColors(containerColor = buttonColor),
         shape = RoundedCornerShape(14.dp),
         onClick = onClick

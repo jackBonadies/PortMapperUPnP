@@ -16,23 +16,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
-import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 @Preview
 @Composable
-fun MoreInfoDialog()
-{
+fun MoreInfoDialog() {
     SetupPreview()
     MoreInfoDialog(_getDefaultPortMapping(), remember { mutableStateOf(true) })
 }
 
 @Composable
-fun MoreInfoDialog(portMappingWithPref : PortMappingWithPref, showDialog : MutableState<Boolean>)
-{
+fun MoreInfoDialog(portMappingWithPref: PortMappingWithPref, showDialog: MutableState<Boolean>) {
     val portMapping = portMappingWithPref.portMapping
-    if(showDialog.value) {
+    if (showDialog.value) {
         AlertDialog(
             onDismissRequest = { showDialog.value = false },
             title = { Text("Info") },

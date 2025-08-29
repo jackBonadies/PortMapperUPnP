@@ -16,7 +16,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Entity(tableName = "port_mappings", primaryKeys = ["deviceIp", "deviceSignature", "protocol", "externalPort"])
+@Entity(
+    tableName = "port_mappings",
+    primaryKeys = ["deviceIp", "deviceSignature", "protocol", "externalPort"]
+)
 data class PortMappingEntity(
 
     // uniquely identifies a rule
@@ -44,14 +47,16 @@ interface PortMappingDao {
     @Query("SELECT * FROM port_mappings")
     suspend fun getAll(): List<PortMappingEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM port_mappings
         WHERE deviceIp = :deviceIp
           AND deviceSignature = :deviceSignature
           AND protocol = :protocol
           AND externalPort = :externalPort
         LIMIT 1
-    """)
+    """
+    )
     suspend fun getByPrimaryKey(
         deviceIp: String,
         deviceSignature: String,
@@ -62,14 +67,21 @@ interface PortMappingDao {
     @Upsert
     suspend fun upsert(entity: PortMappingEntity)
 
-    @Query("""
+    @Query(
+        """
           DELETE FROM port_mappings
           WHERE deviceIp = :deviceIp
             AND deviceSignature = :deviceSignature
             AND externalPort = :externalPort
             AND protocol = :protocol
-        """)
-    suspend fun deleteByKey(deviceIp: String, deviceSignature: String, protocol: String, externalPort: Int): Int
+        """
+    )
+    suspend fun deleteByKey(
+        deviceIp: String,
+        deviceSignature: String,
+        protocol: String,
+        externalPort: Int
+    ): Int
 }
 
 @Database(entities = [PortMappingEntity::class], version = 1, exportSchema = true)

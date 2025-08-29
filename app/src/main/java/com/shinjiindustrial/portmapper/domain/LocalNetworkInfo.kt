@@ -11,7 +11,11 @@ import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.formatIpv4
 
-data class OurNetworkInfoBundle(val networkType: NetworkType, val ourIp: String?, val gatewayIp : String?)
+data class OurNetworkInfoBundle(
+    val networkType: NetworkType,
+    val ourIp: String?,
+    val gatewayIp: String?
+)
 
 class OurNetworkInfo {
     companion object { //singleton
@@ -83,14 +87,13 @@ class OurNetworkInfo {
 //    return null
         }
 
-        fun GetNameTypeMappings(context: Context) : MutableMap<String, NetworkType> {
+        fun GetNameTypeMappings(context: Context): MutableMap<String, NetworkType> {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val mappings : MutableMap<String, NetworkType> = mutableMapOf<String, NetworkType>()
-            for (net1 in cm.getAllNetworks()) {
+            val mappings: MutableMap<String, NetworkType> = mutableMapOf<String, NetworkType>()
+            for (net1 in cm.allNetworks) {
                 val netInfo = cm.getNetworkInfo(net1)
                 val name = cm.getLinkProperties(net1)?.interfaceName
-                if(name == null)
-                {
+                if (name == null) {
                     continue
                 }
                 val type = getNetworkType(cm, net1, netInfo)
@@ -99,25 +102,22 @@ class OurNetworkInfo {
             return mappings
         }
 
-        fun GetTypeFromInterfaceName(_mappings : MutableMap<String, NetworkType>?, interfaceName : String) : NetworkType
-        {
+        fun GetTypeFromInterfaceName(
+            _mappings: MutableMap<String, NetworkType>?,
+            interfaceName: String
+        ): NetworkType {
             var mappings = _mappings
-            if (mappings == null)
-            {
-                mappings = GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
+            if (mappings == null) {
+                mappings =
+                    GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
             }
             mappings
-            if (mappings.containsKey(interfaceName))
-            {
+            if (mappings.containsKey(interfaceName)) {
                 return mappings[interfaceName] ?: NetworkType.NONE
-            }
-            else {
-                if (interfaceName.contains("wlan"))
-                {
+            } else {
+                if (interfaceName.contains("wlan")) {
                     return NetworkType.WIFI
-                }
-                else if(interfaceName.contains("rmnet") || interfaceName.contains("data"))
-                {
+                } else if (interfaceName.contains("rmnet") || interfaceName.contains("data")) {
                     return NetworkType.DATA
                 }
             }
@@ -135,18 +135,19 @@ class OurNetworkInfo {
 
 
             //get type
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-            {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 networkType = getNetworkType(cm, cm.activeNetwork, cm.activeNetworkInfo)
-            }
-            else
-            {
+            } else {
                 networkType = getNetworkType(cm, null, cm.activeNetworkInfo)
             }
             return networkType as NetworkType
         }
 
-        fun getNetworkType(cm: ConnectivityManager, network : Network?, networkInfo : NetworkInfo?) : NetworkType {
+        fun getNetworkType(
+            cm: ConnectivityManager,
+            network: Network?,
+            networkInfo: NetworkInfo?
+        ): NetworkType {
             var result = NetworkType.NONE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 cm.getNetworkCapabilities(network)?.run {

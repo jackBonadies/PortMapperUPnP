@@ -10,8 +10,7 @@ import com.shinjiindustrial.portmapper.SharedPrefValues
 
 @Composable
 @Preview
-fun SetupPreview()
-{
+fun SetupPreview() {
     SharedPrefValues.DayNightPref = DayNightMode.FORCE_NIGHT
     SharedPrefValues.MaterialYouTheme = false
     PortForwardApplication.appContext = LocalContext.current

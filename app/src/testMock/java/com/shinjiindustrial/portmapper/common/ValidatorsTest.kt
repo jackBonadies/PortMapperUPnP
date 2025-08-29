@@ -40,27 +40,27 @@ import kotlin.test.assertEquals
 class ValidatorsTest {
     @Test
     fun `test description validation`() {
-        assertFalse(validateDescription("Description is required").hasError);
-        assertTrue(validateDescription("").hasError);
+        assertFalse(validateDescription("Description is required").hasError)
+        assertTrue(validateDescription("").hasError)
     }
 
     @Test
     fun `test start port validation`() {
-        assertTrue(validateStartPort("").hasError);
-        assertTrue(validateStartPort("70000").hasError);
-        assertTrue(validateStartPort("-100").hasError);
-        assertFalse(validateDescription("4000").hasError);
+        assertTrue(validateStartPort("").hasError)
+        assertTrue(validateStartPort("70000").hasError)
+        assertTrue(validateStartPort("-100").hasError)
+        assertFalse(validateDescription("4000").hasError)
     }
 
     @Test
     fun `test end port validation`() {
-        assertFalse(validateEndPort("", "").hasError);
-        assertFalse(validateEndPort("1000", "").hasError);
-        assertFalse(validateEndPort("1000", "").hasError);
-        assertTrue(validateEndPort("1000", "70000").hasError);
-        assertTrue(validateEndPort("1000", "-100").hasError);
-        assertTrue(validateEndPort("1000", "100").hasError);
-        assertFalse(validateEndPort("4000", "4040").hasError);
+        assertFalse(validateEndPort("", "").hasError)
+        assertFalse(validateEndPort("1000", "").hasError)
+        assertFalse(validateEndPort("1000", "").hasError)
+        assertTrue(validateEndPort("1000", "70000").hasError)
+        assertTrue(validateEndPort("1000", "-100").hasError)
+        assertTrue(validateEndPort("1000", "100").hasError)
+        assertFalse(validateEndPort("4000", "4040").hasError)
     }
 
     @Test
@@ -74,8 +74,7 @@ class ValidatorsTest {
     fun `flow map and collect`() = runBlocking  {
 
         val _devices = MutableStateFlow(listOf<Int>())  // TreeSet<PortMapping>
-        val devices: StateFlow<List<Int>> =
-            _devices//.map { it..sortedBy { d -> d.name } }
+        _devices//.map { it..sortedBy { d -> d.name } }
         _devices.update { it + 0 }
         val size_flow = _devices.map { it.size }.onEach { println("size is " + it) }
             //.also { println("size is " + it) }
@@ -133,7 +132,7 @@ class ValidatorsTest {
         val job = launch {
             intermediateFlow.collect() //{ it -> println("final " + it) }
         }
-        val job2 = launch {
+        launch {
             intermediateFlow.collect() //{ it -> println("final " + it) }
         }
 
@@ -185,7 +184,7 @@ class ValidatorsTest {
             repo.Search(false)
         }
         delay(60000)
-        val allRules = repo.GetAllRules()
+        repo.GetAllRules()
 
     }
 

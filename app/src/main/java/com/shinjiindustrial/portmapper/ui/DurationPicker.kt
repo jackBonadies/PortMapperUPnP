@@ -60,8 +60,7 @@ import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 @Composable
 @Preview
-fun DurationPickerDialogPreview()
-{
+fun DurationPickerDialogPreview() {
     SetupPreview()
     MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         val showDialog = remember { mutableStateOf(true) }
@@ -71,33 +70,50 @@ fun DurationPickerDialogPreview()
 }
 
 @Composable
-fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueSeconds : MutableState<String>, wanIpConnectionV1 : Boolean)
-{
+fun DurationPickerDialog(
+    showDialog: MutableState<Boolean>,
+    leaseDurationValueSeconds: MutableState<String>,
+    wanIpConnectionV1: Boolean
+) {
     val chosenValue = remember { mutableStateOf("") }
-    Dialog(onDismissRequest = { showDialog.value = false } ) {
+    Dialog(onDismissRequest = { showDialog.value = false }) {
         // Use Surface to apply elevation
         Surface(shape = MaterialTheme.shapes.medium, shadowElevation = 24.dp) {
             Column(modifier = Modifier.padding(0.dp)) {
-                Text("Duration", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(18.dp, 12.dp))
+                Text(
+                    "Duration",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(18.dp, 12.dp)
+                )
 
-                Divider(modifier = Modifier
-                    .height(2.dp)
-                    .fillMaxWidth())
+                Divider(
+                    modifier = Modifier
+                        .height(2.dp)
+                        .fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 PickerRow(leaseDurationValueSeconds.value, chosenValue, wanIpConnectionV1)
 
-                Divider(modifier = Modifier
-                    .height(2.dp)
-                    .fillMaxWidth())
+                Divider(
+                    modifier = Modifier
+                        .height(2.dp)
+                        .fillMaxWidth()
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = { showDialog.value = false }) {
-                        Text("Cancel", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
+                        Text(
+                            "Cancel",
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp)
+                        )
                     }
 
                     TextButton(onClick = {
@@ -105,7 +121,12 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
                         leaseDurationValueSeconds.value =
                             capLeaseDur(chosenValue.value, wanIpConnectionV1)
                     }) {
-                        Text("Set", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp))
+                        Text(
+                            "Set",
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -116,25 +137,29 @@ fun DurationPickerDialog(showDialog : MutableState<Boolean>, leaseDurationValueS
 }
 
 @Composable
-fun rememberPickerState(initialValue : Int) : PickerState
-{
+fun rememberPickerState(initialValue: Int): PickerState {
     return remember { PickerState(initialValue) }
 }
 
 @Composable
-fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIpConnectionV1 : Boolean) {
+fun PickerRow(
+    initialSeconds: String,
+    chosenValue: MutableState<String>,
+    wanIpConnectionV1: Boolean
+) {
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
 
-        val initSeconds = if(initialSeconds.isBlank()) 0 else initialSeconds.replace(" (max)", "").toInt()
+        val initSeconds =
+            if (initialSeconds.isBlank()) 0 else initialSeconds.replace(" (max)", "").toInt()
         val dhms = getDHMS(initSeconds)
 
         val infiniteScroll = true
 
-        val maxDays = if(wanIpConnectionV1) 365 else 7
+        val maxDays = if (wanIpConnectionV1) 365 else 7
 
         val dayValues = remember { getStringRange(0, maxDays, infiniteScroll) }
         val dayValuesPickerState = rememberPickerState(dhms.days)
@@ -145,16 +170,18 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
         val minsValues = remember { getStringRange(0, 59, infiniteScroll) }
         val minsValuesPickerState = rememberPickerState(dhms.minutes)
 
-        val secsValues = remember { getStringRange(0, 59, infiniteScroll) }
-        val secsValuesPickerState = rememberPickerState(dhms.seconds)
+        remember { getStringRange(0, 59, infiniteScroll) }
+        rememberPickerState(dhms.seconds)
 
 
 
 
 
-        Row(modifier = Modifier
-            .fillMaxWidth()
-            .height(240.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+        ) {
             Picker(
                 header = "Days",
                 infinite = infiniteScroll,
@@ -199,7 +226,7 @@ fun PickerRow(initialSeconds : String, chosenValue : MutableState<String>, wanIp
     }
 }
 
-class PickerState(initialValue : Int) {
+class PickerState(initialValue: Int) {
     var selectedItem by mutableStateOf(initialValue.toString())
 }
 
@@ -218,19 +245,17 @@ fun RowScope.Picker(
     dividerColor: Color = AdditionalColors.TextColorWeak,
 ) {
     val visibleItemsMiddle = visibleItemsCount / 2
-    val listScrollCount = remember { if(infinite) Integer.MAX_VALUE else (items.count() - 4) }//Integer.MAX_VALUE
+    val listScrollCount =
+        remember { if (infinite) Integer.MAX_VALUE else (items.count() - 4) }//Integer.MAX_VALUE
     val listScrollMiddle = listScrollCount / 2
-    val listStartIndex = listScrollMiddle - listScrollMiddle % items.size - visibleItemsMiddle + startIndex + 1 + (if(infinite) -1 else 0)
+    val listStartIndex =
+        listScrollMiddle - listScrollMiddle % items.size - visibleItemsMiddle + startIndex + 1 + (if (infinite) -1 else 0)
 
-    fun getItem(index: Int) : String
-    {
-        if(infinite)
-        {
+    fun getItem(index: Int): String {
+        if (infinite) {
             return items[index % items.size]
-        }
-        else
-        {
-            return if(index < -1) items[0] else items[index % items.size]
+        } else {
+            return if (index < -1) items[0] else items[index % items.size]
         }
     }
 
@@ -257,10 +282,12 @@ fun RowScope.Picker(
 
     Column(modifier.weight(1f, true)) {
 
-        Text(header,
+        Text(
+            header,
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold)
+            fontWeight = FontWeight.SemiBold
+        )
 
         Spacer(Modifier.height(6.dp))
 
@@ -276,11 +303,10 @@ fun RowScope.Picker(
                     .fadingEdge(fadingEdgeGradient)
             ) {
                 items(listScrollCount) { index ->
-                    Log.e("",index.toString())
+                    Log.e("", index.toString())
                     var style = textStyle
                     //var color = Color.Black
-                    if(state.selectedItem == getItem(index))
-                    {
+                    if (state.selectedItem == getItem(index)) {
                         //color = Color.Blue
                     }
                     Text(
@@ -330,14 +356,10 @@ private fun Modifier.fadingEdge(brush: Brush) = this
 @Composable
 private fun pixelsToDp(pixels: Int) = with(LocalDensity.current) { pixels.toDp() }
 
-fun getStringRange(low : Int, high : Int, infinite: Boolean) : List<String>
-{
-    if(infinite)
-    {
+fun getStringRange(low: Int, high: Int, infinite: Boolean): List<String> {
+    if (infinite) {
         return (low..high).map { it.toString() }
-    }
-    else
-    {
-        return ((low-1)..(high+5)).map { if(it < low || it > high) "" else it.toString() }
+    } else {
+        return ((low - 1)..(high + 5)).map { if (it < low || it > high) "" else it.toString() }
     }
 }

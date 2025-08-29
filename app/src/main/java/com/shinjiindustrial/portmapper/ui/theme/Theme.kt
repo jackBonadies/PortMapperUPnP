@@ -12,23 +12,19 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
-import com.shinjiindustrial.portmapper.SharedPrefValues
 import java.com.shinjiindustrial.portmapper.ThemeUiState
 
-fun getBlend(first : Color, second : Color, ratio : Double) : Color
-{
-    val newRed = first.red.toDouble() * (1f-ratio) + second.red.toDouble()  * (ratio)
-    val newGreen = first.green.toDouble() * (1f-ratio) + second.green.toDouble()  * (ratio)
-    val newBlue = first.blue.toDouble() * (1f-ratio) + second.blue.toDouble()  * (ratio)
+fun getBlend(first: Color, second: Color, ratio: Double): Color {
+    val newRed = first.red.toDouble() * (1f - ratio) + second.red.toDouble() * (ratio)
+    val newGreen = first.green.toDouble() * (1f - ratio) + second.green.toDouble() * (ratio)
+    val newBlue = first.blue.toDouble() * (1f - ratio) + second.blue.toDouble() * (ratio)
     return Color(newRed.toFloat(), newGreen.toFloat(), newBlue.toFloat(), 1f)
 }
 
@@ -48,10 +44,10 @@ private val DarkColorScheme = darkColorScheme(
     secondaryContainer = Blue40,
     background = Color(0xff181C1F),
 
-)
+    )
 
 private val LightColorScheme = lightColorScheme(
-    primary =  Blue80_Darker, //AAdditionalColors.PrimaryDarkerBlue,
+    primary = Blue80_Darker, //AAdditionalColors.PrimaryDarkerBlue,
     secondary = Blue80, //AdditionalColors.PrimaryBlue,
     tertiary = Pink40,
     // used in places where the background color isnt explicitly changed
@@ -88,7 +84,6 @@ object AdditionalColors {
     var LogWarningText = AdditionalColorsLight.LogWarningText
 
 
-
     interface IAdditionalColors {
         val Background: Color
         val SubtleBorder: Color
@@ -100,8 +95,7 @@ object AdditionalColors {
         val LogWarningText: Color
     }
 
-    object AdditionalColorsLight : IAdditionalColors
-    {
+    object AdditionalColorsLight : IAdditionalColors {
         override var Background = Color(0xffF0F0F2)
         override var SubtleBorder = Color(0xffE2E2E4)
         override var CardContainerColor = Color(0xffFCFCFE)
@@ -111,13 +105,12 @@ object AdditionalColors {
         override var TextColor = Color(0xff303037)
         override var TextColorWeak = Color(0xff45464F)
 
-        override var LogErrorText =  Color(0xffCD0000)
-        override var LogWarningText =  Color(0xFFAD9727)
+        override var LogErrorText = Color(0xffCD0000)
+        override var LogWarningText = Color(0xFFAD9727)
 
     }
 
-    object AdditionalColorsDark : IAdditionalColors
-    {
+    object AdditionalColorsDark : IAdditionalColors {
         override var Background = Color(0xff181C1F)
         override var SubtleBorder = Color(0xff3A3E41)
         override var CardContainerColor = Color(0xff2D3134)
@@ -126,13 +119,11 @@ object AdditionalColors {
         override var TextColor = Color(0xffd8dad9)
         override var TextColorWeak = Color(0xffa3a8a6)
 
-        override var LogErrorText =  Color(0xffCF5B56)
-        override var LogWarningText =  Color(0xffBBB529)
+        override var LogErrorText = Color(0xffCF5B56)
+        override var LogWarningText = Color(0xffBBB529)
 
     }
 }
-
-
 
 
 @Composable
@@ -147,14 +138,7 @@ fun MyApplicationTheme(
     var dayNightMode = themeState.dayNightMode
 
     var useDark = darkTheme
-    if(dayNightMode == DayNightMode.FORCE_DAY)
-    {
-        useDark = false
-    }
-    else
-    {
-        useDark = true
-    }
+    useDark = dayNightMode != DayNightMode.FORCE_DAY
 
     var useMaterialYou = themeState.materialYou
     key(useMaterialYou, dayNightMode)
@@ -194,7 +178,8 @@ fun MyApplicationTheme(
                 4.dp
             )
 
-            AdditionalColors.SubtleBorder = getBlend(colorSchemeToUse.surface, colorSchemeToUse.onSurface, 0.2)
+            AdditionalColors.SubtleBorder =
+                getBlend(colorSchemeToUse.surface, colorSchemeToUse.onSurface, 0.2)
         }
 
         //val colorScheme = if(colorSchemeToUse) DarkColorScheme else LightColorScheme
@@ -221,11 +206,11 @@ fun MyApplicationTheme(
         // both clauses are the same. this is a hack to get
         // theme to recompose.
         //if (AdditionalColors.ThemeSetting.value == 0) {
-            MaterialTheme(
-                colorScheme = colorSchemeToUse,
-                typography = Typography,
-                content = content
-            )
+        MaterialTheme(
+            colorScheme = colorSchemeToUse,
+            typography = Typography,
+            content = content
+        )
 //        } else {
 //            MaterialTheme(
 //                colorScheme = colorSchemeToUse,
