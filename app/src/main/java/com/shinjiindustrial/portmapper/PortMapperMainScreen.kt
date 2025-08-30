@@ -1,4 +1,4 @@
-package java.com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import android.os.Build
 import android.text.Html
@@ -55,15 +55,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
-import com.shinjiindustrial.portmapper.EnterContextMenu
 import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
 import com.shinjiindustrial.portmapper.MainActivity.Companion.showSnackBarViewLog
-import com.shinjiindustrial.portmapper.OverflowMenu
-import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy

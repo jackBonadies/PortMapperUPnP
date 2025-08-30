@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
-import java.com.shinjiindustrial.portmapper.PortViewModel
+import com.shinjiindustrial.portmapper.PortViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

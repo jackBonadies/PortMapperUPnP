@@ -55,7 +55,7 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.com.shinjiindustrial.portmapper.ThemeUiState
+import com.shinjiindustrial.portmapper.ThemeUiState
 
 
 @Composable

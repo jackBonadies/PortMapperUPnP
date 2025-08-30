@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
-import java.com.shinjiindustrial.portmapper.ThemeUiState
+import com.shinjiindustrial.portmapper.ThemeUiState
 
 fun getBlend(first: Color, second: Color, ratio: Double): Color {
     val newRed = first.red.toDouble() * (1f - ratio) + second.red.toDouble() * (ratio)

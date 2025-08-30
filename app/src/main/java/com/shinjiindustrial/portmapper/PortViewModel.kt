@@ -1,14 +1,10 @@
-package java.com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import android.content.Context
-import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.PreferencesManager
-import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.SortBy
@@ -124,28 +120,24 @@ class PortViewModel @Inject constructor(
         upnpRepository.portMappings
     ) { sortInfo, devices, portMappings ->
 
-        Log.i("Port", "UI STATE FLOW is running")
-
         val upnpElements = mutableListOf<UpnpViewRow>()
-        if (devices.isEmpty()) {
-        } else {
+        if (!devices.isEmpty()) {
             var index = 0
-            val curDevice: IIGDDevice? = devices.elementAt(0)
             val portMappingsList =
-                portMappings.values.sortedWith(sortInfo.sortBy.getComparer(!sortInfo.sortDesc))
+                portMappings.values.sortedWith(sortInfo.sortBy.getComparer(ascending = !sortInfo.sortDesc))
             for (curDevice in devices) {
-                // do we have any port mappings
                 upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
-                if (index >= portMappingsList.size || portMappingsList.elementAt(index).portMapping.DeviceIP != curDevice.getIpAddress()) {
-                    // emit empty and continue
-                    upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
-                    continue
-                }
-                while (index < portMappingsList.size) {
-                    if (portMappingsList.elementAt(index).portMapping.DeviceIP == curDevice.getIpAddress()) {
-                        upnpElements.add(UpnpViewRow.PortViewRow(portMappingsList.elementAt(index)))
+                var anyFound = false
+                for (portMapping in portMappingsList) {
+                    if (curDevice.getIpAddress() == portMapping.portMapping.DeviceIP)
+                    {
+                        upnpElements.add(UpnpViewRow.PortViewRow(portMapping))
+                        anyFound = true
                     }
-                    index++
+                }
+                if (!anyFound)
+                {
+                    upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
                 }
             }
         }
@@ -186,7 +178,7 @@ class PortViewModel @Inject constructor(
         return upnpRepository.getIGDDevice(ipAddress)
     }
 
-    fun GetGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
+    fun getGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
         return upnpRepository.GetGatewayIpsWithDefault(deviceGateway)
     }
 
@@ -213,7 +205,7 @@ class PortViewModel @Inject constructor(
 
     fun renewAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
-            val portMappings = chosen?.toList() ?: upnpRepository.GetAllRules()
+            val portMappings = chosen?.toList() ?: upnpRepository.getAllRules()
             val result = upnpRepository.renewRules(portMappings)
             result.forEach { res ->
                 when (res) {
@@ -342,8 +334,10 @@ class PortViewModel @Inject constructor(
                 initialValue = Unit
             )
 
+    private val onSearchStarted: (Any?) -> Unit = { o -> searchStarted(o) }
+
     init {
-        upnpRepository.SearchStarted += { o -> searchStarted(o) }
+        upnpRepository.SearchStarted += onSearchStarted
         combine(_selectedIds, upnpRepository.portMappings) { selectedIds, currentMappings ->
             val cur = currentMappings.keys
             val sel = selectedIds
@@ -362,11 +356,11 @@ class PortViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        upnpRepository.SearchStarted -= { o -> searchStarted(o) }
+        upnpRepository.SearchStarted -= onSearchStarted
         super.onCleared()
     }
 
-    // move to viewmodel
+
     var searchInProgressJob: Job? = null
     fun searchStarted(o: Any?) {
         searchStartedRecently.value = true // controls when loading bar is there
@@ -386,7 +380,7 @@ class PortViewModel @Inject constructor(
     fun deleteAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
             // get all enabled. note: need to clone.
-            val rules = chosen?.toList() ?: upnpRepository.GetAllRules()
+            val rules = chosen?.toList() ?: upnpRepository.getAllRules()
             val result = upnpRepository.deletePortMappingsEntry(rules)
             result.forEach { res ->
                 when (res) {

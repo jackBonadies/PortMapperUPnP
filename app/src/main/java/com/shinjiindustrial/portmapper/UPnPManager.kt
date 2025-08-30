@@ -251,7 +251,7 @@ class UpnpManager @Inject constructor(
     // autorenew can subscribe to the 1st
     // UI can subscribe to both
 
-    fun GetAllRules(): MutableList<PortMappingWithPref> {
+    fun getAllRules(): MutableList<PortMappingWithPref> {
         return portMappings.value.values.toMutableList()
     }
 

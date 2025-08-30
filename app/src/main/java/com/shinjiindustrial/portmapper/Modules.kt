@@ -1,4 +1,4 @@
-package java.com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import dagger.Module
 import dagger.hilt.InstallIn

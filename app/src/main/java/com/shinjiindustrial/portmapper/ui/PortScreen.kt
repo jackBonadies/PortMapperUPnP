@@ -37,6 +37,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -64,8 +65,8 @@ import com.shinjiindustrial.portmapper.domain.Urgency
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
-import java.com.shinjiindustrial.portmapper.PortUiState
-import java.com.shinjiindustrial.portmapper.ThemeUiState
+import com.shinjiindustrial.portmapper.PortUiState
+import com.shinjiindustrial.portmapper.ThemeUiState
 
 @OptIn(
     ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
@@ -562,8 +563,7 @@ fun PortMappingContent(
 
 @Composable
 fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
-    Log.i("rememberTicker", "called")
-    val now = remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    val now = remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(periodMillis)

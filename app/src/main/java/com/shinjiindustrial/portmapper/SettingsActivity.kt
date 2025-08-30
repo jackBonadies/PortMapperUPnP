@@ -45,8 +45,6 @@ import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
-import java.com.shinjiindustrial.portmapper.SettingsViewModel
-import java.com.shinjiindustrial.portmapper.ThemeUiState
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {

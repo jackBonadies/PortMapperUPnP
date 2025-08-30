@@ -1,41 +1,30 @@
 package com.shinjiindustrial.portmapper.common
 
-import android.os.SystemClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 
 import android.util.Log
-import androidx.compose.runtime.LaunchedEffect
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.MockUpnpClient
 import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
 import com.shinjiindustrial.portmapper.client.Speed
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import io.mockk.every
 import io.mockk.mockkStatic
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.Test
-import kotlin.test.assertEquals
 
 class ValidatorsTest {
     @Test
@@ -184,7 +173,7 @@ class ValidatorsTest {
             repo.Search(false)
         }
         delay(60000)
-        repo.GetAllRules()
+        repo.getAllRules()
 
     }
 

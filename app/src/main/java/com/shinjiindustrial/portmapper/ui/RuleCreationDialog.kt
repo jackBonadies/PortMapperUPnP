@@ -43,7 +43,7 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.com.shinjiindustrial.portmapper.PortViewModel
+import com.shinjiindustrial.portmapper.PortViewModel
 import java.util.logging.Level
 
 
@@ -119,7 +119,7 @@ fun RuleCreationDialog(
     val internalIpHasError =
         remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
     val (gatewayIps, defaultGatewayIp) = remember {
-        portViewModel.GetGatewayIpsWithDefault(
+        portViewModel.getGatewayIpsWithDefault(
             ourGatewayIp!!
         )
     }

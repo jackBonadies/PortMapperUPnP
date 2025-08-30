@@ -1,9 +1,7 @@
-package java.com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.shinjiindustrial.portmapper.DayNightMode
-import com.shinjiindustrial.portmapper.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
