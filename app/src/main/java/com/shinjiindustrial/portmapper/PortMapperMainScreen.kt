@@ -410,7 +410,6 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             Button(
                                 onClick = {
                                     portViewModel.initialize(
-                                        PortForwardApplication.appContext,
                                         true
                                     )
                                     portViewModel.fullRefresh()

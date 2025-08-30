@@ -1,6 +1,5 @@
 package com.shinjiindustrial.portmapper
 
-import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -17,8 +16,8 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -51,7 +51,8 @@ data class PortUiState(
 class PortViewModel @Inject constructor(
     private val upnpRepository: UpnpManager,
     private val preferencesRepository: PreferencesManager,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
     sealed interface UiEvent {
@@ -64,8 +65,6 @@ class PortViewModel @Inject constructor(
     val events: SharedFlow<UiEvent> = _events
 
     val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
-
-    private val applicationScope: CoroutineScope = MainScope()
 
     // we want to use key for selections.  so if a rule renews while the user is in multi select
     //   mode, don't deselect that rule.  but if we lose a rule (i.e. it gets deleted) then
@@ -122,7 +121,6 @@ class PortViewModel @Inject constructor(
 
         val upnpElements = mutableListOf<UpnpViewRow>()
         if (!devices.isEmpty()) {
-            var index = 0
             val portMappingsList =
                 portMappings.values.sortedWith(sortInfo.sortBy.getComparer(ascending = !sortInfo.sortDesc))
             for (curDevice in devices) {
@@ -143,15 +141,15 @@ class PortViewModel @Inject constructor(
         }
 
         PortUiState(upnpElements)
-    }
+    }.flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = PortUiState(isLoading = true)
         )
 
-    fun initialize(context: Context, force: Boolean) {
-        upnpRepository.Initialize(context, force)
+    fun initialize(force: Boolean) {
+        upnpRepository.initialize(force)
     }
 
     fun getExistingRuleInfos(): Pair<Boolean, Boolean> {
@@ -179,11 +177,11 @@ class PortViewModel @Inject constructor(
     }
 
     fun getGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
-        return upnpRepository.GetGatewayIpsWithDefault(deviceGateway)
+        return upnpRepository.getGatewayIpsWithDefault(deviceGateway)
     }
 
     fun fullRefresh() {
-        upnpRepository.FullRefresh()
+        upnpRepository.fullRefresh()
     }
 
     fun devices(): StateFlow<List<IIGDDevice>> {
@@ -269,7 +267,7 @@ class PortViewModel @Inject constructor(
                     }
 
                     else -> {
-                        val rules = upnpRepository.GetEnabledDisabledRules(!enable)
+                        val rules = upnpRepository.getEnabledDisabledRules(!enable)
                         upnpRepository.disableEnablePortMappingEntries(rules, enable)
                     }
                 }
@@ -305,11 +303,11 @@ class PortViewModel @Inject constructor(
 
 
     fun start() {
-        if (upnpRepository.FailedToInitialize) {
+        if (upnpRepository.failedToInitialize) {
             searchStartedRecently.value = false
         } else {
-            searchStartedRecently.value = !upnpRepository.HasSearched
-            upnpRepository.Search(true) // by default STAll
+            searchStartedRecently.value = !upnpRepository.hasSearched
+            upnpRepository.search(true) // by default STAll
         }
     }
 

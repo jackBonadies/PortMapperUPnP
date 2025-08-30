@@ -1,6 +1,5 @@
 package com.shinjiindustrial.portmapper
 
-import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
@@ -21,7 +20,7 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -46,8 +45,28 @@ import kotlin.system.measureTimeMillis
 @Singleton
 class UpnpManager @Inject constructor(
     private val upnpClient: IUpnpClient,
-    private val portMappingDao: PortMappingDao
+    private val portMappingDao: PortMappingDao,
+    @ApplicationScope private val applicationContext: CoroutineScope
 ) {
+    private val renewMutex = Mutex()
+    private var counter = 1
+
+    private var _initialized: Boolean = false
+    var hasSearched: Boolean = false
+    var failedToInitialize: Boolean = false
+
+    private val _devices = MutableStateFlow(listOf<IIGDDevice>())  // TreeSet<PortMapping>
+    val devices: StateFlow<List<IIGDDevice>> =
+        _devices//.map { it..sortedBy { d -> d.name } }
+
+    val anyDevices: Flow<Boolean> = _devices.map { !it.isEmpty() }
+
+    //        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
+    private var _portMappings: MutableStateFlow<Map<PortMappingKey, PortMappingWithPref>> =
+        MutableStateFlow(mapOf())
+
+    // I think this should be a local var inside mutable state flow
+    val portMappings: StateFlow<Map<PortMappingKey, PortMappingWithPref>> = _portMappings
 
     init {
         upnpClient.deviceFoundEvent += { device ->
@@ -71,7 +90,7 @@ class UpnpManager @Inject constructor(
 
     fun subscribeForAutoRenewCancelTimerNotWork() {
         // too early for app scope
-        MainScope().launch {
+        applicationContext.launch {
             portMappings.mapNotNull { it ->
                 it.filter { it.value.getAutoRenewOrDefault() }
                     .minByOrNull { it.value.portMapping.getExpiresTimeMillis() }
@@ -92,9 +111,6 @@ class UpnpManager @Inject constructor(
             }
         }
     }
-
-    private val renewMutex = Mutex()
-    private var counter = 1
 
     private suspend fun performBatchRenew() = renewMutex.withLock {
         println("renewing all rules")
@@ -178,23 +194,6 @@ class UpnpManager @Inject constructor(
 
     // region data
 
-    private var _initialized: Boolean = false
-    var HasSearched: Boolean = false
-    var FailedToInitialize: Boolean = false
-
-    private val _devices = MutableStateFlow(listOf<IIGDDevice>())  // TreeSet<PortMapping>
-    val devices: StateFlow<List<IIGDDevice>> =
-        _devices//.map { it..sortedBy { d -> d.name } }
-
-    //.stateIn(MainScope(), SharingStarted.Eagerly, emptyList())
-    val anyDevices: Flow<Boolean> = _devices.map { !it.isEmpty() }
-
-    //        private val cmp = compareBy<PortMapping>({ it.ActualExternalIP }, { it.InternalPort })
-    private var _portMappings: MutableStateFlow<Map<PortMappingKey, PortMappingWithPref>> =
-        MutableStateFlow(mapOf())
-
-    // I think this should be a local var inside mutable state flow
-    val portMappings: StateFlow<Map<PortMappingKey, PortMappingWithPref>> = _portMappings
 
     //
 //        fun update(pm: PortMapping) = _setFlow.update { old ->
@@ -242,7 +241,7 @@ class UpnpManager @Inject constructor(
     }
 
     // returns anyEnabled, anyDisabled
-    fun GetEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMappingWithPref> {
+    fun getEnabledDisabledRules(enabledRules: Boolean): MutableList<PortMappingWithPref> {
         return portMappings.value.filter { it.value.portMapping.Enabled == enabledRules }.values.toMutableList()
     }
 
@@ -255,7 +254,7 @@ class UpnpManager @Inject constructor(
         return portMappings.value.values.toMutableList()
     }
 
-    fun GetGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
+    fun getGatewayIpsWithDefault(deviceGateway: String): Pair<MutableList<String>, String> {
         val gatewayIps: MutableList<String> = mutableListOf()
         var defaultGatewayIp = ""
         synchronized(lockIgdDevices)
@@ -288,11 +287,9 @@ class UpnpManager @Inject constructor(
 
     // region uievents
 
-    var DeviceFoundEvent = Event<IGDDevice>()
-    var PortAddedEvent = Event<PortMapping>()
-    var PortInitialFoundEvent = Event<PortMapping>()
 
     // used if we finish and there are no ports to show the "no devices" card
+    var PortInitialFoundEvent = Event<PortMapping>()
     var FinishedListingPortsEvent = Event<IGDDevice>()
     var UpdateUIFromData = Event<Any?>()
     var SearchStarted = Event<Any?>()
@@ -301,14 +298,14 @@ class UpnpManager @Inject constructor(
 
     // region search
 
-    fun Search(onlyIfNotYetSearched: Boolean): Boolean {
-        if (onlyIfNotYetSearched && HasSearched) {
+    fun search(onlyIfNotYetSearched: Boolean): Boolean {
+        if (onlyIfNotYetSearched && hasSearched) {
             return false
         }
         SearchStarted.invoke(null)
         clearOldData()
         //NetworkInfoAtTimeOfSearch = OurNetworkInfo.GetNetworkInfo(PortForwardApplication.appContext, true)
-        HasSearched = true
+        hasSearched = true
         // can do urn:schemas-upnp-org:device:{deviceType}:{ver}
         // 0-1 second response time intentional delay from devices
         upnpClient.search(1)
@@ -323,12 +320,12 @@ class UpnpManager @Inject constructor(
     }
 
 
-    fun FullRefresh() {
-        Initialize(PortForwardApplication.appContext, true)
-        Search(false)
+    fun fullRefresh() {
+        initialize(true)
+        search(false)
     }
 
-    fun Initialize(context: Context, force: Boolean): Boolean {
+    fun initialize(force: Boolean): Boolean {
         if (_initialized && !force) {
             return true
         }
@@ -337,8 +334,8 @@ class UpnpManager @Inject constructor(
 
         // initialization failed. no point in trying as even if we later get service, we
         //   do not re-intialize automatically
-        FailedToInitialize = !upnpClient.isInitialized()
-        if (FailedToInitialize) {
+        failedToInitialize = !upnpClient.isInitialized()
+        if (failedToInitialize) {
             return false
         }
 

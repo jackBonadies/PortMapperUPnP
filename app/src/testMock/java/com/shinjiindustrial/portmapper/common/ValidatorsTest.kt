@@ -170,7 +170,7 @@ class ValidatorsTest {
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest))
         val repo = UpnpManager(client)
         GlobalScope.launch {
-            repo.Search(false)
+            repo.search(false)
         }
         delay(60000)
         repo.getAllRules()

@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        portViewModel.initialize(this, false)
+        portViewModel.initialize(false)
         portViewModel.start()
 
         setContent {
