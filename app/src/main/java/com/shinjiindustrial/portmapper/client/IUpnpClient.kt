@@ -2,6 +2,7 @@ package com.shinjiindustrial.portmapper.client
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
+import com.shinjiindustrial.portmapper.domain.ClingIGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -45,7 +46,7 @@ interface IUpnpClient {
 
     fun instantiateAndBindUpnpService()
 
-    val deviceFoundEvent: Event<IIGDDevice>
+    val deviceFoundEvent: Event<ClingIGDDevice>
 }
 
 sealed class UPnPCreateMappingWrapperResult {

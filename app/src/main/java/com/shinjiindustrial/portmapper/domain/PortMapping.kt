@@ -3,6 +3,8 @@ package com.shinjiindustrial.portmapper.domain
 import android.os.Parcelable
 import android.os.SystemClock
 import com.shinjiindustrial.portmapper.PortForwardApplication
+import com.shinjiindustrial.portmapper.persistence.DevicesDao
+import com.shinjiindustrial.portmapper.persistence.DevicesEntity
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.parcelize.Parcelize
 
@@ -258,3 +260,6 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String):
 
 fun PortMappingEntity.getPrefs(): PortMappingPref =
     PortMappingPref(this.autoRenew, this.desiredLeaseDuration)
+
+fun DevicesEntity.getPrefs(): DevicePreferences =
+    DevicePreferences(this.useWildcardForRemoteHostDelete)

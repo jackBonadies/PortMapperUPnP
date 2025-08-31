@@ -2,6 +2,7 @@ package com.shinjiindustrial.portmapper.domain
 
 import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import org.fourthline.cling.model.meta.RemoteDevice
+import org.fourthline.cling.model.meta.RemoteService
 import java.util.logging.Level
 
 object UPnPNames {
@@ -44,7 +45,9 @@ val ActionNames: List<String> = listOf(
     ACTION_NAMES.GetListOfPortMappings,
 )
 
-fun RemoteDevice.getIGDDevice(): IGDDevice? {
+data class ClingIGDDevice(val deviceDetails: DeviceDetails, val remoteService: RemoteService)
+
+fun RemoteDevice.getIGDDevice(): ClingIGDDevice? {
 
     if (this.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
     {
@@ -67,7 +70,7 @@ fun RemoteDevice.getIGDDevice(): IGDDevice? {
                 if (wanIPService != null) {
                     //get relevant actions here...
                     //TODO add relevant service (and cause event)
-                    val igdDevice = IGDDevice(this, wanIPService)
+                    val igdDevice = ClingIGDDevice(DeviceDetails.fromRemoteDevice(this), wanIPService)
                     return igdDevice
 
                 } else {

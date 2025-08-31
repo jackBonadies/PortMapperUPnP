@@ -11,6 +11,7 @@ import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
+import com.shinjiindustrial.portmapper.domain.DevicePreferences
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -20,6 +21,8 @@ import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getPrefs
+import com.shinjiindustrial.portmapper.persistence.DevicesDao
+import com.shinjiindustrial.portmapper.persistence.DevicesEntity
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +51,7 @@ import kotlin.system.measureTimeMillis
 class UpnpManager @Inject constructor(
     private val upnpClient: IUpnpClient,
     private val portMappingDao: PortMappingDao,
+    private val devicesDao: DevicesDao,
     @ApplicationScope private val applicationContext: CoroutineScope
 ) {
     private val renewMutex = Mutex()
@@ -73,15 +77,28 @@ class UpnpManager @Inject constructor(
     init {
         upnpClient.deviceFoundEvent += { device ->
             // this is on the cling thread
-            if (_devices.value.any { it.getIpAddress() == device.getIpAddress() }) {
+            if (_devices.value.any { it.getIpAddress() == device.deviceDetails.ipAddress }) {
                 OurLogger.log(
                     Level.WARNING,
-                    "device ${device.udn} came in again at ${device.getIpAddress()}. ignoring."
+                    "device ${device.deviceDetails.udn} came in again at ${device.deviceDetails.ipAddress}. ignoring."
                 )
             } else {
-                addDevice(device)//TODO test with suspend
+
+                val devicePreferencesNullable = runBlocking {
+                    devicesDao.getByPrimaryKey(device.deviceDetails.ipAddress, device.deviceDetails.udn)
+                }
+                if (devicePreferencesNullable == null) {
+                    OurLogger.log(Level.INFO, "Preferences not found for device")
+                } else {
+                    OurLogger.log(Level.INFO, "Preferences found for device")
+                }
+                val igdDevice =
+                    IGDDevice(device.deviceDetails,
+                        devicePreferencesNullable?.getPrefs() ?: DevicePreferences(),
+                        device.remoteService)
+                addDevice(igdDevice)//TODO test with suspend
                 runBlocking {
-                    enumeratePortMappings(device.getIpAddress())
+                    enumeratePortMappings(igdDevice.getIpAddress())
                 }
             }
         }
@@ -424,25 +441,46 @@ class UpnpManager @Inject constructor(
     }
 
     suspend fun deletePortMappingWithFallback(device: IIGDDevice, portMapping : PortMapping) : UPnPResult {
-        val result = upnpClient.deletePortMapping(device, portMapping)
+        // if set to something special then proceed as normal
+        if(!device.devicePreferences.isBlankOrStar(portMapping.RemoteHost))
+        {
+            return upnpClient.deletePortMapping(device, portMapping)
+        }
+
+        val result = upnpClient.deletePortMapping(device,
+            portMapping.copy(RemoteHost = device.devicePreferences.getDefaultWildcard()))
         if (result is UPnPResult.Failure)
         {
             if (result.details.response.statusCode == 500)
             {
                 // add breadcrumb? no only on another failure
-                val portMappingFallback = portMapping.copy(RemoteHost = "*")
+                val portMappingFallback = portMapping.copy(RemoteHost = device.devicePreferences.getBackupWildcard())
                 val fallbackResult = upnpClient.deletePortMapping(device, portMappingFallback)
+                //TODO when()
                 if (fallbackResult is UPnPResult.Success)
                 {
                     OurLogger.log(Level.INFO, "Fallback Delete Success")
-                    // TODO set new default
+                    // set new default to be the opposite of the old
+                    device.devicePreferences = device.devicePreferences.copy(useWildcardForRemoteHostDelete = !device.devicePreferences.useWildcardForRemoteHostDelete)
+                    devicesDao.upsert(
+                        DevicesEntity(
+                            device.getIpAddress(),
+                            device.udn,
+                            device.devicePreferences.useWildcardForRemoteHostDelete
+                        )
+                    )
                     return fallbackResult
                 }
-                else
+                else if (fallbackResult is UPnPResult.Failure)
                 {
-                    // this means we maybe should not have retried // log both original and fallback errors to firebase
+                    // this means we maybe should not have retried
+                    // log both original and fallback errors to firebase
                     OurLogger.log(Level.SEVERE, "Fallback Delete Failed")
-                    // failed even with fallback
+                    // log to firebase
+                    OurLogger.log(Level.SEVERE, "Fallback Original and Delete Failed")
+                    OurLogger.log(Level.SEVERE, result.details.toString())
+                    OurLogger.log(Level.SEVERE, fallbackResult.details.toString())
+                    //
                     return fallbackResult
                 }
             }
@@ -851,6 +889,7 @@ class UpnpManager @Inject constructor(
 
     private fun addDevice(igdDevice: IIGDDevice) {
         // get dao
+        portMappingDao
         add(igdDevice)
         OurLogger.log(
             Level.INFO,
