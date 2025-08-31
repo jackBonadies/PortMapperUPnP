@@ -194,7 +194,7 @@ class PortViewModel @Inject constructor(
             if (res is UPnPCreateMappingWrapperResult.Success) {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
             }
         } catch (e: Exception) {
             _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
@@ -214,8 +214,8 @@ class PortViewModel @Inject constructor(
 
                     is UPnPCreateMappingWrapperResult.Failure -> {
                         print("failure")
-                        print(res.reason)
-                        print(res.response)
+                        print(res.details.reason)
+                        print(res.details.response)
                     }
                 }
             }
@@ -224,7 +224,7 @@ class PortViewModel @Inject constructor(
 
             if (anyFailed) {
                 val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
             } else {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             }
@@ -243,7 +243,7 @@ class PortViewModel @Inject constructor(
                 if (res is UPnPCreateMappingWrapperResult.Success) {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 } else {
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
                 }
             } catch (e: Exception) {
                 val enableDisableString = if (enable) "Enable" else "Disable"
@@ -281,8 +281,8 @@ class PortViewModel @Inject constructor(
 
                         is UPnPCreateMappingWrapperResult.Failure -> {
                             print("failure")
-                            print(res.reason)
-                            print(res.response)
+                            print(res.details.reason)
+                            print(res.details.response)
                         }
                     }
                 }
@@ -291,7 +291,7 @@ class PortViewModel @Inject constructor(
 
                 if (anyFailed) {
                     val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).reason}"))
+                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
                 } else {
                     _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
@@ -389,8 +389,8 @@ class PortViewModel @Inject constructor(
 
                     is UPnPResult.Failure -> {
                         print("failure")
-                        print(res.reason)
-                        print(res.response)
+                        print(res.details.reason)
+                        print(res.details.response)
                     }
                 }
             }
@@ -399,7 +399,7 @@ class PortViewModel @Inject constructor(
 
             if (anyFailed) {
                 val res = result.first { it is UPnPResult.Failure }
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).reason}"))
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
             } else {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             }
@@ -414,7 +414,7 @@ class PortViewModel @Inject constructor(
             if (res is UPnPResult.Success) {
                 _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).reason}"))
+                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
             }
         } catch (e: Exception) {
             _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mapping Failed"))
@@ -454,8 +454,8 @@ class PortViewModel @Inject constructor(
 
                         is UPnPCreateMappingWrapperResult.Failure -> {
                             print("failure")
-                            print(res.reason)
-                            print(res.response)
+                            print(res.details.reason)
+                            print(res.details.response)
                         }
                     }
 

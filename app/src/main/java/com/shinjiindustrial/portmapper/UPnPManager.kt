@@ -423,6 +423,38 @@ class UpnpManager @Inject constructor(
         }
     }
 
+    suspend fun deletePortMappingWithFallback(device: IIGDDevice, portMapping : PortMapping) : UPnPResult {
+        val result = upnpClient.deletePortMapping(device, portMapping)
+        if (result is UPnPResult.Failure)
+        {
+            if (result.details.response.statusCode == 500)
+            {
+                // add breadcrumb? no only on another failure
+                val portMappingFallback = portMapping.copy(RemoteHost = "*")
+                val fallbackResult = upnpClient.deletePortMapping(device, portMappingFallback)
+                if (fallbackResult is UPnPResult.Success)
+                {
+                    OurLogger.log(Level.INFO, "Fallback Delete Success")
+                    // TODO set new default
+                    return fallbackResult
+                }
+                else
+                {
+                    // this means we maybe should not have retried // log both original and fallback errors to firebase
+                    OurLogger.log(Level.SEVERE, "Fallback Delete Failed")
+                    // failed even with fallback
+                    return fallbackResult
+                }
+            }
+            else
+            {
+                // we failed with non retriable error
+                return result
+            }
+        }
+        return result
+    }
+
 
     // DeletePortMappingRange is only available in v2.0 (also it can only delete
     //   a contiguous range)
@@ -433,13 +465,9 @@ class UpnpManager @Inject constructor(
             println("Requesting Delete: ${pm.shortName()}")
             val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
             portMappingDao.deleteByKey(pm.DeviceIP, device.udn, pm.Protocol, pm.ExternalPort)
-            val result = upnpClient.deletePortMapping(device, pm)
+            val result = deletePortMappingWithFallback(device, pm)
             if (result is UPnPResult.Success)
             {
-                PortForwardApplication.Companion.OurLogger.log(
-                    Level.INFO,
-                    "Successfully deleted rule (${pm.shortName()})."
-                )
                 removeMapping(portMappingWithPref)
             }
             else if (result is UPnPResult.Failure)
@@ -476,7 +504,7 @@ class UpnpManager @Inject constructor(
                     portMapping.Protocol,
                     portMapping.ExternalPort
                 )
-                val result = upnpClient.deletePortMapping(device, portMapping)
+                val result = deletePortMappingWithFallback(device, portMapping)
                 if (result is UPnPResult.Success)
                 {
                     PortForwardApplication.Companion.OurLogger.log(
@@ -822,8 +850,8 @@ class UpnpManager @Inject constructor(
     }
 
     private fun addDevice(igdDevice: IIGDDevice) {
+        // get dao
         add(igdDevice)
-        Log.i("portmapperUI", "IGD device added")
         OurLogger.log(
             Level.INFO,
             "Added Device ${igdDevice.getDisplayName()} at ${igdDevice.getIpAddress()}."

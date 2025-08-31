@@ -11,7 +11,6 @@ interface IIGDDevice {
     fun getUpnpVersion(): Int
     fun supportsAction(actionName: String): Boolean
     fun getActionInvocation(actionName: String): ActionInvocation<*>
-    fun getDeviceSignature(): String
     val udn: String
 }
 
@@ -55,11 +54,6 @@ class IGDDevice(private val rootDevice: RemoteDevice, private val wanIPService: 
     override fun getActionInvocation(actionName: String): ActionInvocation<*> {
         val action = this.actionsMap[actionName]
         return ActionInvocation(action)
-    }
-
-    override fun getDeviceSignature(): String {
-        this.actionsMap[""]
-        return ""
     }
 
     init {

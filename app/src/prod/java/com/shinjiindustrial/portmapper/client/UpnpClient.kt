@@ -154,7 +154,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         portMapping: PortMapping,
     ): UPnPResult {
         val actionInvocation = device.getActionInvocation(ACTION_NAMES.DeletePortMapping)
-        actionInvocation.setInput("NewRemoteHost", portMapping.getRemoteHostNormalizedForDelete())
+        actionInvocation.setInput("NewRemoteHost", portMapping.RemoteHost)
         // it does validate the args (to at least be in range of 2 unsigned bytes i.e. 65535)
         actionInvocation.setInput("NewExternalPort", "${portMapping.ExternalPort}")
         actionInvocation.setInput("NewProtocol", portMapping.Protocol)
