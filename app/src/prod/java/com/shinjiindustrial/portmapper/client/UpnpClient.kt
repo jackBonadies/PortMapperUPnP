@@ -17,7 +17,6 @@ import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImp
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
-import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getIGDDevice
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -32,7 +31,6 @@ import org.fourthline.cling.registry.Registry
 import org.fourthline.cling.registry.RegistryListener
 import java.util.logging.Level
 import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.coroutines.resume
 
 class UpnpClient @Inject constructor(@ApplicationContext private val context: Context) : IUpnpClient {
@@ -146,23 +144,9 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                     return result
         }
         is ClingExecutionResult.Failure -> {
-            // Handle failure
-            println(result.defaultMsg)
-
-            println(result.operation.statusMessage)
-            println(result.operation.responseDetails)
-            println(result.operation.statusCode)
-            println(result.operation.isFailed)
-
-            PortForwardApplication.Companion.OurLogger.log(
-                Level.SEVERE,
-                "Failed to create rule (${portMappingRequest.realize().shortName()})."
-            )
-            PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
-
-            return UPnPCreateMappingResult.Failure(result.defaultMsg, result.operation)
+            return UPnPCreateMappingResult.Failure(FailureDetails(result.defaultMsg, result.operation))
         }
-            }
+    }
 }
 
     override suspend fun deletePortMapping(
@@ -176,33 +160,13 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         actionInvocation.setInput("NewProtocol", portMapping.Protocol)
 
         val result = this.executeAction(actionInvocation)
-        when (result) {
+        return when (result) {
             is ClingExecutionResult.Success -> {
-                println("Successfully deleted")
-
-                PortForwardApplication.Companion.OurLogger.log(
-                    Level.INFO,
-                    "Successfully deleted rule (${portMapping.shortName()})."
-                )
-
-                return UPnPResult.Success(portMapping)
+                UPnPResult.Success(portMapping)
             }
+
             is ClingExecutionResult.Failure -> {
-                // Handle failure
-                println(result.defaultMsg)
-
-                println(result.operation.statusMessage)
-                println(result.operation.responseDetails)
-                println(result.operation.statusCode)
-                println(result.operation.isFailed)
-
-                PortForwardApplication.Companion.OurLogger.log(
-                    Level.SEVERE,
-                    "Failed to delete rule (${portMapping.shortName()})."
-                )
-                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
-
-                return UPnPResult.Failure(result.defaultMsg, result.operation)
+                UPnPResult.Failure(FailureDetails(result.defaultMsg, result.operation))
             }
         }
     }
@@ -212,7 +176,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         remoteHost: String,
         remotePort: String,
         protocol: String,
-    ): UPnPCreateMappingWrapperResult {
+    ): UPnPGetSpecificMappingResult {
 
         val remoteIp = device.getIpAddress()
         val actionInvocation = device.getActionInvocation(ACTION_NAMES.GetSpecificPortMappingEntry)
@@ -244,38 +208,19 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                     GetPsuedoSlot()
                 ) // best bet for DateTime.UtcNow
 
-                PortForwardApplication.Companion.OurLogger.log(
-                    Level.INFO,
-                    "Successfully read back our new rule (${pm.shortName()})"
-                )
-
-                val result = UPnPCreateMappingWrapperResult.Success(pm, pm, true)
+                val result = UPnPGetSpecificMappingResult.Success(pm, pm)
                 return result
             }
 
             is ClingExecutionResult.Failure -> {
-                println(result.defaultMsg)
-
-                println(result.operation.statusMessage)
-                println(result.operation.responseDetails)
-                println(result.operation.statusCode)
-                println(result.operation.isFailed)
-
-                val rule = formatShortName(protocol, remoteIp, remotePort)
-                PortForwardApplication.Companion.OurLogger.log(
-                    Level.SEVERE,
-                    "Failed to read back our new rule ($rule)."
-                )
-                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, "\t$result.defaultMsg")
-
-                val result = UPnPCreateMappingWrapperResult.Failure(result.defaultMsg, result.operation)
+                val result = UPnPGetSpecificMappingResult.Failure(FailureDetails(result.defaultMsg, result.operation))
                 return result
             }
         }
     }
 
     override suspend fun getGenericPortMappingRule(device : IIGDDevice,
-                                                   slotIndex : Int) : UPnPGetSpecificMappingResult
+                                                   slotIndex : Int) : UPnPGetGenericMappingResult
     {
         val ipAddress = device.getIpAddress()
         val actionInvocation = device.getActionInvocation(ACTION_NAMES.GetGenericPortMappingEntry)
@@ -285,7 +230,6 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         when (result) {
             is ClingExecutionResult.Success -> {
                 val invocation = result.invocation
-                PortForwardApplication.Companion.OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
 
                 val remoteHost = invocation.getOutput("NewRemoteHost") //string datatype // the .value is null (also empty if GetListOfPortMappings is used)
                 val externalPort = invocation.getOutput("NewExternalPort") //unsigned 2 byte int
@@ -308,11 +252,11 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                     SystemClock.elapsedRealtime(),
                     slotIndex
                 )
-                val result = UPnPGetSpecificMappingResult.Success(portMapping, portMapping)
+                val result = UPnPGetGenericMappingResult.Success(portMapping, portMapping)
                 return result
             }
             is ClingExecutionResult.Failure -> {
-                val result = UPnPGetSpecificMappingResult.Failure(result.defaultMsg, result.operation)
+                val result = UPnPGetGenericMappingResult.Failure(FailureDetails(result.defaultMsg, result.operation))
                 return result
             }
         }
@@ -348,6 +292,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 //data class DeviceFoundEvent(val remoteDevice: RemoteDevice)
 }
 
+//TODO move
 @Preview(showBackground = true)
 @Composable
 fun CreateRuleContentsPreview() {

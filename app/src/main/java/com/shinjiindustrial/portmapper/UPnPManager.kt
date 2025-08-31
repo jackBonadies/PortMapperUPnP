@@ -6,6 +6,7 @@ import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogge
 import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
+import com.shinjiindustrial.portmapper.client.UPnPGetGenericMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
@@ -17,6 +18,7 @@ import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
@@ -432,7 +434,23 @@ class UpnpManager @Inject constructor(
             val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
             portMappingDao.deleteByKey(pm.DeviceIP, device.udn, pm.Protocol, pm.ExternalPort)
             val result = upnpClient.deletePortMapping(device, pm)
-            removeForDelete(result, portMappingWithPref)
+            if (result is UPnPResult.Success)
+            {
+                PortForwardApplication.Companion.OurLogger.log(
+                    Level.INFO,
+                    "Successfully deleted rule (${pm.shortName()})."
+                )
+                removeMapping(portMappingWithPref)
+            }
+            else if (result is UPnPResult.Failure)
+            {
+                PortForwardApplication.Companion.OurLogger.log(
+                    Level.SEVERE,
+                    "Failed to delete rule (${pm.shortName()})."
+                )
+                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+                    result.details.toString())
+            }
             return result
         } catch (exception: Exception) {
             OurLogger.log(
@@ -459,7 +477,23 @@ class UpnpManager @Inject constructor(
                     portMapping.ExternalPort
                 )
                 val result = upnpClient.deletePortMapping(device, portMapping)
-                removeForDelete(result, portMappingWithPref)
+                if (result is UPnPResult.Success)
+                {
+                    PortForwardApplication.Companion.OurLogger.log(
+                        Level.INFO,
+                        "Successfully deleted rule (${portMapping.shortName()})."
+                    )
+                    removeMapping(portMappingWithPref)
+                }
+                else if (result is UPnPResult.Failure)
+                {
+                    PortForwardApplication.Companion.OurLogger.log(
+                        Level.SEVERE,
+                        "Failed to delete rule (${portMapping.shortName()})."
+                    )
+                    PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+                        result.details.toString())
+                }
                 result
 
             } catch (exception: Exception) {
@@ -623,15 +657,37 @@ class UpnpManager @Inject constructor(
                         portMappingRequest.externalPort,
                         portMappingRequest.protocol,
                     )
-                    return result
+                    if (result is UPnPGetSpecificMappingResult.Success) {
+                        PortForwardApplication.Companion.OurLogger.log(
+                            Level.INFO,
+                            "Successfully read back our new rule (${result.requestInfo.shortName()})"
+                        )
+                    }
+                    else if (result is UPnPGetSpecificMappingResult.Failure) {
+                        val rule = formatShortName(portMappingRequest.protocol,
+                            portMappingRequest.externalIp,
+                            portMappingRequest.externalPort)
+                        PortForwardApplication.Companion.OurLogger.log(
+                            Level.SEVERE,
+                            "Failed to read back our new rule ($rule). Remote Host: ${portMappingRequest.remoteHost}"
+                        )
+                        PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, result.details.toString())
+                    }
+
+                    return result.toCreatePortMappingResult()
                 }
             }
 
             is UPnPCreateMappingResult.Failure -> {
-                val result = UPnPCreateMappingWrapperResult.Failure(
-                    createMappingResult.reason,
-                    createMappingResult.response
+                PortForwardApplication.Companion.OurLogger.log(
+                    Level.SEVERE,
+                    "Failed to $createContext rule (${portMappingRequest.realize().shortName()})."
                 )
+                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+                    createMappingResult.details.toString())
+
+                val result = UPnPCreateMappingWrapperResult.Failure(
+                    createMappingResult.details)
                 return result
             }
         }
@@ -683,7 +739,8 @@ class UpnpManager @Inject constructor(
                 //future.get() // SYNCHRONOUS (note this can, and does, throw)
                 val result = upnpClient.getGenericPortMappingRule(device, slotIndex)
                 when (result) {
-                    is UPnPGetSpecificMappingResult.Success -> {
+                    is UPnPGetGenericMappingResult.Success -> {
+                        PortForwardApplication.Companion.OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
                         val portMapping = result.resultingMapping
                         val entity = portMappingDao.getByPrimaryKey(
                             device.getIpAddress(),
@@ -711,10 +768,10 @@ class UpnpManager @Inject constructor(
 
                     }
 
-                    is UPnPGetSpecificMappingResult.Failure -> {
+                    is UPnPGetGenericMappingResult.Failure -> {
                         OurLogger.log(
                             Level.INFO,
-                            "GetGenericPortMapping failed for entry $slotIndex: ${result.reason}.  NOTE: This is normal."
+                            "GetGenericPortMapping failed for entry $slotIndex: ${result.details}.  NOTE: This is normal."
                         )
                     }
                 }
@@ -764,14 +821,6 @@ class UpnpManager @Inject constructor(
         _portMappings.update { mapOf() }
     }
 
-    private fun removeForDelete(result: UPnPResult, portMappingWithPref: PortMappingWithPref) {
-
-        println("default adding rule callback")
-        if (result is UPnPResult.Success) {
-            removeMapping(portMappingWithPref)
-        }
-    }
-
     private fun addDevice(igdDevice: IIGDDevice) {
         add(igdDevice)
         Log.i("portmapperUI", "IGD device added")
@@ -798,6 +847,15 @@ class UpnpManager @Inject constructor(
 
 }
 
+fun UPnPGetSpecificMappingResult.toCreatePortMappingResult() : UPnPCreateMappingWrapperResult =
+    when(this){
+        is UPnPGetSpecificMappingResult.Failure -> {
+            UPnPCreateMappingWrapperResult.Failure(this.details)
+        }
+        is UPnPGetSpecificMappingResult.Success -> {
+            UPnPCreateMappingWrapperResult.Success(this.resultingMapping, this.resultingMapping, true)
+        }
+}
 
 // this is the request we give the router.  basically a port mapping minus time read and psuedo slot
 data class PortMappingRequest(

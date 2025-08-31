@@ -210,7 +210,6 @@ class MainActivity : ComponentActivity() {
                         (duration == SnackbarDuration.Indefinite),
                         duration
                     )
-                    println("shown")
                     when (snackbarResult) {
                         SnackbarResult.Dismissed -> {}
                         SnackbarResult.ActionPerformed -> onAction()

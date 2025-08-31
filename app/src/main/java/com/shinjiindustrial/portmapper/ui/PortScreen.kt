@@ -82,7 +82,6 @@ fun PortMappingCard(
     additionalModifier: Modifier = Modifier.Companion
 ) {
     val portMapping = portMappingWithPref.portMapping
-    println("external ip test ${portMapping.DeviceIP}")
 
     Card(
 //        onClick = {

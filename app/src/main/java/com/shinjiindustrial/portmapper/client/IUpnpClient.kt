@@ -28,12 +28,12 @@ interface IUpnpClient {
         remoteHost: String,
         remotePort: String,
         protocol: String,
-    ): UPnPCreateMappingWrapperResult
+    ): UPnPGetSpecificMappingResult
 
     suspend fun getGenericPortMappingRule(
         device: IIGDDevice,
         slotIndex: Int,
-    ): UPnPGetSpecificMappingResult
+    ): UPnPGetGenericMappingResult
 
     fun search(maxSeconds: Int)
 
@@ -55,24 +55,41 @@ sealed class UPnPCreateMappingWrapperResult {
         val wasReadBack: Boolean
     ) : UPnPCreateMappingWrapperResult()
 
-    data class Failure(val reason: String, val response: UpnpResponse) :
+    data class Failure(val details: FailureDetails) :
         UPnPCreateMappingWrapperResult()
 }
 
 sealed class UPnPCreateMappingResult {
     data class Success(val requestInfo: PortMapping) : UPnPCreateMappingResult()
-    data class Failure(val reason: String, val response: UpnpResponse) : UPnPCreateMappingResult()
+    data class Failure(val details: FailureDetails) : UPnPCreateMappingResult()
+}
+
+sealed class UPnPGetGenericMappingResult {
+    data class Success(val requestInfo: PortMapping, val resultingMapping: PortMapping) :
+        UPnPGetGenericMappingResult()
+
+    data class Failure(val details: FailureDetails) :
+        UPnPGetGenericMappingResult()
 }
 
 sealed class UPnPGetSpecificMappingResult {
     data class Success(val requestInfo: PortMapping, val resultingMapping: PortMapping) :
         UPnPGetSpecificMappingResult()
 
-    data class Failure(val reason: String, val response: UpnpResponse) :
+    data class Failure(val details: FailureDetails) :
         UPnPGetSpecificMappingResult()
+
+    companion object
 }
 
 sealed class UPnPResult {
     data class Success(val requestInfo: PortMapping) : UPnPResult()
-    data class Failure(val reason: String, val response: UpnpResponse) : UPnPResult()
+    data class Failure(val details: FailureDetails) : UPnPResult()
+}
+
+class FailureDetails(val reason: String, val response: UpnpResponse)
+{
+    override fun toString() : String{
+        return "\t${reason}\t${response}"
+    }
 }

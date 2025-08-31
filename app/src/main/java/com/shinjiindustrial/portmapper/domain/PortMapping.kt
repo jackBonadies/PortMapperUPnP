@@ -68,10 +68,12 @@ data class PortMapping(
     //dropped (this corresponds to the address dependent filtering behaviour defined in [RFC 4787])."
 
 
-    // needs to be * for Verizon Router - CR1000B, but only for delete call
+    // needs to be * for Verizon Router - CR1000B, but only for delete call (create works fine)
+    // I tried other port mapping tools PortMapper.jar - fails deletion (since it uses "")
+    // TinyUPnP.cpp has "" hardcoded in the soap response.
     // else one will get InvalidArgs exception
     fun getRemoteHostNormalizedForDelete(): String =
-        this.RemoteHost.ifBlank { "*" }
+        this.RemoteHost.ifBlank { "" }
 
     fun getKey(): PortMappingKey {
         return PortMappingKey(this.DeviceIP, this.ExternalPort, this.Protocol)
