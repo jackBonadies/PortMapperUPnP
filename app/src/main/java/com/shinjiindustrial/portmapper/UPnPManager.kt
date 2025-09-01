@@ -450,7 +450,7 @@ class UpnpManager @Inject constructor(
             portMapping.copy(RemoteHost = device.devicePreferences.getDefaultWildcard()))
         if (result is UPnPResult.Failure)
         {
-            if (result.details.response.statusCode == 500)
+            if (result.details.response != null && result.details.response.statusCode == 500)
             {
                 // add breadcrumb? no only on another failure
                 val portMappingFallback = portMapping.copy(RemoteHost = device.devicePreferences.getBackupWildcard())
