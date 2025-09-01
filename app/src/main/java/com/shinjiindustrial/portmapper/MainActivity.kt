@@ -144,58 +144,6 @@ class MainActivity : ComponentActivity() {
     private val portViewModel: PortViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
 
-    companion object {
-
-        fun viewLogCallback() {
-            val intent =
-                Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
-            intent.putExtra(PortForwardApplication.ScrollToBottom, true)
-            PortForwardApplication.CurrentActivity?.startActivity(intent)
-        }
-
-        fun showSnackBarViewLog(message: String) {
-            showSnackBar(message, "View Log", SnackbarDuration.Long, ::viewLogCallback)
-        }
-
-        fun showSnackBarShortNoAction(message: String) {
-            showSnackBar(message, null, SnackbarDuration.Short)
-        }
-
-        fun showSnackBarLongNoAction(message: String) {
-            showSnackBar(message, null, SnackbarDuration.Long)
-        }
-
-        fun showSnackBar(
-            message: String,
-            action: String?,
-            duration: SnackbarDuration,
-            onAction: () -> Unit = { }
-        ) {
-            if (OurSnackbarHostState == null) {
-                PortForwardApplication.ShowToast(
-                    message,
-                    if ((duration == SnackbarDuration.Long || duration == SnackbarDuration.Indefinite)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
-                )
-            } else {
-                GlobalScope.launch(Dispatchers.Main) {
-
-                    val snackbarResult = OurSnackbarHostState!!.showSnackbar(
-                        message,
-                        action,
-                        (duration == SnackbarDuration.Indefinite),
-                        duration
-                    )
-                    when (snackbarResult) {
-                        SnackbarResult.Dismissed -> {}
-                        SnackbarResult.ActionPerformed -> onAction()
-                    }
-                }
-            }
-        }
-
-        var OurSnackbarHostState: SnackbarHostState? = null
-    }
-
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -17,6 +17,7 @@ import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -53,17 +54,12 @@ class PortViewModel @Inject constructor(
     private val preferencesRepository: PreferencesManager,
     private val savedStateHandle: SavedStateHandle,
     private val ourLogger: ILogger,
+    val snackbarManager : SnackbarManager,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
-    sealed interface UiEvent {
-        data class ToastEvent(val msg: String, val duration: Int = Toast.LENGTH_SHORT) : UiEvent
-        data class SnackBarViewLogEvent(val msg: String) : UiEvent
-        data class SnackBarViewShortNoEvent(val msg: String) : UiEvent
-    }
-
-    private val _events = MutableSharedFlow<UiEvent>()
-    val events: SharedFlow<UiEvent> = _events
+    private val _events = MutableSharedFlow<UiSnackToastEvent>()
+    val events: SharedFlow<UiSnackToastEvent> = _events
 
     val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
@@ -193,12 +189,12 @@ class PortViewModel @Inject constructor(
         try {
             val res = upnpRepository.renewRule(portMapping)
             if (res is UPnPCreateMappingWrapperResult.Success) {
-                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
             }
         } catch (e: Exception) {
-            _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
         }
     }
 
@@ -225,12 +221,12 @@ class PortViewModel @Inject constructor(
 
             if (anyFailed) {
                 val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
             } else {
-                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             }
         } catch (e: Exception) {
-            _events.emit(UiEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
         }
     }
 
@@ -242,13 +238,13 @@ class PortViewModel @Inject constructor(
             try {
                 val res = upnpRepository.disableEnablePortMappingEntry(portMapping, enable)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
-                    _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                    snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 } else {
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+                    snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
                 }
             } catch (e: Exception) {
                 val enableDisableString = if (enable) "Enable" else "Disable"
-                _events.emit(UiEvent.SnackBarViewLogEvent("$enableDisableString Port Mapping Failed"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("$enableDisableString Port Mapping Failed"))
             }
         }
 
@@ -292,13 +288,13 @@ class PortViewModel @Inject constructor(
 
                 if (anyFailed) {
                     val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+                    snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
                 } else {
-                    _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                    snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
             } catch (e: Exception) {
                 val enableDisableString = if (enable) "Enable" else "Disable"
-                _events.emit(UiEvent.SnackBarViewLogEvent("$enableDisableString Port Mappings Failed"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("$enableDisableString Port Mappings Failed"))
             }
         }
 
@@ -337,6 +333,13 @@ class PortViewModel @Inject constructor(
 
     init {
         upnpRepository.SearchStarted += onSearchStarted
+        GlobalScope.launch {
+            while(true)
+            {
+                delay(10000)
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewShortNoEvent("Initializing..."))
+            }
+        }
         combine(_selectedIds, upnpRepository.portMappings) { selectedIds, currentMappings ->
             val cur = currentMappings.keys
             val sel = selectedIds
@@ -400,12 +403,12 @@ class PortViewModel @Inject constructor(
 
             if (anyFailed) {
                 val res = result.first { it is UPnPResult.Failure }
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
             } else {
-                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             }
         } catch (e: Exception) {
-            _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mappings Failed"))
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Delete Port Mappings Failed"))
         }
     }
 
@@ -413,12 +416,12 @@ class PortViewModel @Inject constructor(
         try {
             val res = upnpRepository.deletePortMappingEntry(portMapping)
             if (res is UPnPResult.Success) {
-                _events.emit(UiEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
             }
         } catch (e: Exception) {
-            _events.emit(UiEvent.SnackBarViewLogEvent("Delete Port Mapping Failed"))
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Delete Port Mapping Failed"))
         }
     }
 
@@ -427,7 +430,7 @@ class PortViewModel @Inject constructor(
             try {
                 val res = upnpRepository.deletePortMappingEntry(oldRule)
                 if (res is UPnPResult.Failure) {
-                    _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                    snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to modify entry."))
                     return@launch
                 }
             } catch (exception: Exception) {
@@ -435,7 +438,7 @@ class PortViewModel @Inject constructor(
                     Level.SEVERE,
                     "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to modify entry."))
                 return@launch
             }
             // delete was successful, create new rules
@@ -473,22 +476,22 @@ class PortViewModel @Inject constructor(
                     // all failed
                     if (numFailed == result.size) {
                         if (result.size == 1) {
-                            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rule."))
+                            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to $verbString rule."))
                         } else {
-                            _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString rules."))
+                            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to $verbString rules."))
                         }
                     } else {
-                        _events.emit(UiEvent.SnackBarViewLogEvent("Failed to $verbString some rules."))
+                        snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to $verbString some rules."))
                     }
                 } else {
-                    _events.emit(UiEvent.SnackBarViewShortNoEvent("Success"))
+                    snackbarManager.show(UiSnackToastEvent.SnackBarViewShortNoEvent("Success"))
                 }
             } catch (exception: Exception) {
                 ourLogger.log(
                     Level.SEVERE,
                     "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
-                _events.emit(UiEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to modify entry."))
                 return@launch
             }
         }
