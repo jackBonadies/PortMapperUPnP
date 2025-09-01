@@ -41,11 +41,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class LogViewActivity : ComponentActivity() {
 
     val settingsViewModel: SettingsViewModel by viewModels()
+
+    @Inject
+    lateinit var logStoreRepository : LogStoreRepository
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
@@ -85,14 +89,14 @@ class LogViewActivity : ComponentActivity() {
                         actions = {
 
                             IconButton(onClick = {
-                                PortForwardApplication.Logs.clear()
+                                logStoreRepository.logs.clear()
                             }) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
                             }
 
                             IconButton(onClick = {
                                 CopyTextToClipboard(
-                                    PortForwardApplication.Logs.joinToString(
+                                    logStoreRepository.logs.joinToString(
                                         "\n"
                                     )
                                 )
@@ -157,7 +161,7 @@ class LogViewActivity : ComponentActivity() {
     fun LogViewContent() {
         val scrollToBottom =
             this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false)
-        val logLines = PortForwardApplication.Logs
+        val logLines = logStoreRepository.logs
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         LogViewInner(themeState, logLines, scrollToBottom)
     }
@@ -179,7 +183,7 @@ class LogViewActivity : ComponentActivity() {
             resultData?.data?.also { uri ->
                 val contentResolver = applicationContext.contentResolver
                 contentResolver.openOutputStream(uri)?.bufferedWriter().use { out ->
-                    out?.write(PortForwardApplication.Logs.toString())
+                    out?.write(logStoreRepository.logs.toString())
                 }
             }
         }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
 import com.shinjiindustrial.portmapper.CreateRuleContents
 import com.shinjiindustrial.portmapper.GetPsuedoSlot
+import com.shinjiindustrial.portmapper.ILogger
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
@@ -34,7 +35,7 @@ import java.util.logging.Level
 import javax.inject.Inject
 import kotlin.coroutines.resume
 
-class UpnpClient @Inject constructor(@ApplicationContext private val context: Context) : IUpnpClient {
+class UpnpClient @Inject constructor(@ApplicationContext private val context: Context, private val ourLogger : ILogger) : IUpnpClient {
 
     sealed class ClingExecutionResult {
         data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()
@@ -67,7 +68,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
             // complete metadata
             override fun remoteDeviceAdded(registry: Registry, rootDevice: RemoteDevice) {
-                val igdDevice = rootDevice.getIGDDevice()
+                val igdDevice = rootDevice.getIGDDevice(ourLogger)
                 if (igdDevice != null) {
                     deviceFoundEvent.invoke(igdDevice)
                 }

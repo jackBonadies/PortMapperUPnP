@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,32 +127,6 @@ fun GetPsuedoSlot(): Int {
     return PseudoSlotCounter
 }
 
-
-class StringBuilderHandler(private val stringBuilder: SnapshotStateList<String>) :
-    java.util.logging.Handler() {
-
-    override fun publish(record: LogRecord?) {
-        record?.let {
-            val prefix = when (it.level) {
-                Level.INFO -> "I: "
-                Level.WARNING -> "W: "
-                Level.SEVERE -> "E: "
-                else -> return // i.e. do not log
-            }
-            stringBuilder.add(prefix + it.message)
-        }
-    }
-
-    //
-    override fun flush() {
-        // Nothing to do here since StringBuilder doesn't need to be flushed
-    }
-
-    override fun close() {
-        // Nothing to do here since StringBuilder doesn't need to be closed
-    }
-}
-
 enum class Protocol(val protocol: String) {
     TCP("TCP"),
     UDP("UDP"),
@@ -230,7 +205,6 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this)
         {
-            println("My Back Pressed Callback")
             if (portViewModel.inMultiSelectMode.value) {
                 portViewModel.clearSelection()
             } else {
@@ -731,16 +705,21 @@ fun ColumnScope.CreateRuleContents(
             },
             state = rememberTooltipState()
         ) {
-            //MaterialTheme.colorScheme.outline
-            Checkbox(
-                autoRenew.value,
-                onCheckedChange = { autoRenew.value = it },
-                // uncheckedColor == border color
-                colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                //MaterialTheme.colorScheme.outline
+                Checkbox(
+                    autoRenew.value,
+                    onCheckedChange = { autoRenew.value = it },
+                    // uncheckedColor == border color
+                    colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
 
 
-            )
-            Text("Auto Renew", color = AdditionalColors.TextColor)
+                )
+                Text("Auto Renew", color = AdditionalColors.TextColor)
+            }
         }
     }
 }

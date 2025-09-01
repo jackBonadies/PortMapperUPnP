@@ -52,6 +52,7 @@ class PortViewModel @Inject constructor(
     private val upnpRepository: UpnpManager,
     private val preferencesRepository: PreferencesManager,
     private val savedStateHandle: SavedStateHandle,
+    private val ourLogger: ILogger,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -430,7 +431,7 @@ class PortViewModel @Inject constructor(
                     return@launch
                 }
             } catch (exception: Exception) {
-                PortForwardApplication.OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
@@ -483,7 +484,7 @@ class PortViewModel @Inject constructor(
                     _events.emit(UiEvent.SnackBarViewShortNoEvent("Success"))
                 }
             } catch (exception: Exception) {
-                PortForwardApplication.OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )

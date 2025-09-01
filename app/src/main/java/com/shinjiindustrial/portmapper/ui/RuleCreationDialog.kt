@@ -271,10 +271,11 @@ fun RuleCreationDialog(
 
                                 if (ruleToEdit != null) {
                                     if (ruleToEdit == portMappingRequestInput) {
-                                        PortForwardApplication.OurLogger.log(
-                                            Level.INFO,
-                                            "Rule has not changed. Nothing to do."
-                                        )
+                                        // TODO add this back. composition local?
+//                                        ourLogger.log(
+//                                            Level.INFO,
+//                                            "Rule has not changed. Nothing to do."
+//                                        )
                                         navController.popBackStack()
                                     } else {
                                         val oldRulesToDelete = ruleToEdit.splitIntoRules()

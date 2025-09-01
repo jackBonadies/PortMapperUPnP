@@ -1,8 +1,6 @@
 package com.shinjiindustrial.portmapper
 
 import android.os.SystemClock
-import android.util.Log
-import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
 import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
@@ -52,6 +50,7 @@ class UpnpManager @Inject constructor(
     private val upnpClient: IUpnpClient,
     private val portMappingDao: PortMappingDao,
     private val devicesDao: DevicesDao,
+    private val ourLogger: ILogger,
     @ApplicationScope private val applicationContext: CoroutineScope
 ) {
     private val renewMutex = Mutex()
@@ -78,7 +77,7 @@ class UpnpManager @Inject constructor(
         upnpClient.deviceFoundEvent += { device ->
             // this is on the cling thread
             if (_devices.value.any { it.getIpAddress() == device.deviceDetails.ipAddress }) {
-                OurLogger.log(
+                ourLogger.log(
                     Level.WARNING,
                     "device ${device.deviceDetails.udn} came in again at ${device.deviceDetails.ipAddress}. ignoring."
                 )
@@ -88,9 +87,9 @@ class UpnpManager @Inject constructor(
                     devicesDao.getByPrimaryKey(device.deviceDetails.ipAddress, device.deviceDetails.udn)
                 }
                 if (devicePreferencesNullable == null) {
-                    OurLogger.log(Level.INFO, "Preferences not found for device")
+                    ourLogger.log(Level.INFO, "Preferences not found for device")
                 } else {
-                    OurLogger.log(Level.INFO, "Preferences found for device")
+                    ourLogger.log(Level.INFO, "Preferences found for device")
                 }
                 val igdDevice =
                     IGDDevice(device.deviceDetails,
@@ -387,7 +386,7 @@ class UpnpManager @Inject constructor(
             return res
         } catch (exception: Exception) {
             val enableDisableString = if (enable) "Enable" else "Disable"
-            OurLogger.log(
+            ourLogger.log(
                 Level.SEVERE,
                 "$enableDisableString Port Mapping Failed: " + exception.message + exception.stackTraceToString()
             )
@@ -409,7 +408,7 @@ class UpnpManager @Inject constructor(
                 addOrUpdateForRenew(res, portMapping)
                 res
             } catch (exception: Exception) {
-                OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "Renew Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
@@ -432,7 +431,7 @@ class UpnpManager @Inject constructor(
             addOrUpdateForRenew(res, portMapping)
             return res
         } catch (exception: Exception) {
-            OurLogger.log(
+            ourLogger.log(
                 Level.SEVERE,
                 "Renew Port Mappings Failed: " + exception.message + exception.stackTraceToString()
             )
@@ -457,31 +456,28 @@ class UpnpManager @Inject constructor(
                 val portMappingFallback = portMapping.copy(RemoteHost = device.devicePreferences.getBackupWildcard())
                 val fallbackResult = upnpClient.deletePortMapping(device, portMappingFallback)
                 //TODO when()
-                if (fallbackResult is UPnPResult.Success)
-                {
-                    OurLogger.log(Level.INFO, "Fallback Delete Success")
-                    // set new default to be the opposite of the old
-                    device.devicePreferences = device.devicePreferences.copy(useWildcardForRemoteHostDelete = !device.devicePreferences.useWildcardForRemoteHostDelete)
-                    devicesDao.upsert(
-                        DevicesEntity(
-                            device.getIpAddress(),
-                            device.udn,
-                            device.devicePreferences.useWildcardForRemoteHostDelete
+                when(fallbackResult) {
+                    is UPnPResult.Success -> {
+                        ourLogger.log(Level.INFO, "Fallback Delete Success")
+                        // set new default to be the opposite of the old
+                        device.devicePreferences = device.devicePreferences.copy(useWildcardForRemoteHostDelete = !device.devicePreferences.useWildcardForRemoteHostDelete)
+                        devicesDao.upsert(
+                            DevicesEntity(
+                                device.getIpAddress(),
+                                device.udn,
+                                device.devicePreferences.useWildcardForRemoteHostDelete
+                            )
                         )
-                    )
-                    return fallbackResult
-                }
-                else if (fallbackResult is UPnPResult.Failure)
-                {
-                    // this means we maybe should not have retried
-                    // log both original and fallback errors to firebase
-                    OurLogger.log(Level.SEVERE, "Fallback Delete Failed")
-                    // log to firebase
-                    OurLogger.log(Level.SEVERE, "Fallback Original and Delete Failed")
-                    OurLogger.log(Level.SEVERE, result.details.toString())
-                    OurLogger.log(Level.SEVERE, fallbackResult.details.toString())
-                    //
-                    return fallbackResult
+                        return fallbackResult
+                    }
+                    is UPnPResult.Failure -> {
+                        // this means we maybe should not have retried
+                        // log both original and fallback errors to firebase
+                        // log to firebase
+                        ourLogger.log(Level.SEVERE, "Fallback Original and Delete Failed. Original: " +
+                                result.details.toString() + "\n Fallback: " + fallbackResult.details.toString())
+                        return fallbackResult
+                    }
                 }
             }
             else
@@ -506,20 +502,24 @@ class UpnpManager @Inject constructor(
             val result = deletePortMappingWithFallback(device, pm)
             if (result is UPnPResult.Success)
             {
+                ourLogger.log(
+                    Level.INFO,
+                    "Successfully deleted rule (${pm.shortName()})."
+                )
                 removeMapping(portMappingWithPref)
             }
             else if (result is UPnPResult.Failure)
             {
-                PortForwardApplication.Companion.OurLogger.log(
+               ourLogger.log(
                     Level.SEVERE,
                     "Failed to delete rule (${pm.shortName()})."
                 )
-                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+               ourLogger.log(Level.SEVERE,
                     result.details.toString())
             }
             return result
         } catch (exception: Exception) {
-            OurLogger.log(
+            ourLogger.log(
                 Level.SEVERE,
                 "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
             )
@@ -545,7 +545,7 @@ class UpnpManager @Inject constructor(
                 val result = deletePortMappingWithFallback(device, portMapping)
                 if (result is UPnPResult.Success)
                 {
-                    PortForwardApplication.Companion.OurLogger.log(
+                   ourLogger.log(
                         Level.INFO,
                         "Successfully deleted rule (${portMapping.shortName()})."
                     )
@@ -553,17 +553,17 @@ class UpnpManager @Inject constructor(
                 }
                 else if (result is UPnPResult.Failure)
                 {
-                    PortForwardApplication.Companion.OurLogger.log(
+                   ourLogger.log(
                         Level.SEVERE,
                         "Failed to delete rule (${portMapping.shortName()})."
                     )
-                    PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+                   ourLogger.log(Level.SEVERE,
                         result.details.toString())
                 }
                 result
 
             } catch (exception: Exception) {
-                OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
@@ -620,7 +620,7 @@ class UpnpManager @Inject constructor(
                 result
             }
         } catch (exception: Exception) {
-            OurLogger.log(
+            ourLogger.log(
                 Level.SEVERE,
                 "Create Rule Failed: " + exception.message + exception.stackTraceToString()
             )
@@ -647,7 +647,7 @@ class UpnpManager @Inject constructor(
             } catch (exception: Exception) {
 
                 val enableDisableString = if (enable) "Enable" else "Disable"
-                OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "$enableDisableString Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
@@ -702,7 +702,7 @@ class UpnpManager @Inject constructor(
         val createMappingResult = upnpClient.createPortMappingRule(device, portMappingRequest)
         when (createMappingResult) {
             is UPnPCreateMappingResult.Success -> {
-                OurLogger.log(
+                ourLogger.log(
                     Level.INFO,
                     "Successfully $createContext rule (${
                         portMappingRequest.realize().shortName()
@@ -724,7 +724,7 @@ class UpnpManager @Inject constructor(
                         portMappingRequest.protocol,
                     )
                     if (result is UPnPGetSpecificMappingResult.Success) {
-                        PortForwardApplication.Companion.OurLogger.log(
+                       ourLogger.log(
                             Level.INFO,
                             "Successfully read back our new rule (${result.requestInfo.shortName()})"
                         )
@@ -733,11 +733,11 @@ class UpnpManager @Inject constructor(
                         val rule = formatShortName(portMappingRequest.protocol,
                             portMappingRequest.externalIp,
                             portMappingRequest.externalPort)
-                        PortForwardApplication.Companion.OurLogger.log(
+                       ourLogger.log(
                             Level.SEVERE,
                             "Failed to read back our new rule ($rule). Remote Host: ${portMappingRequest.remoteHost}"
                         )
-                        PortForwardApplication.Companion.OurLogger.log(Level.SEVERE, result.details.toString())
+                       ourLogger.log(Level.SEVERE, result.details.toString())
                     }
 
                     return result.toCreatePortMappingResult()
@@ -745,11 +745,11 @@ class UpnpManager @Inject constructor(
             }
 
             is UPnPCreateMappingResult.Failure -> {
-                PortForwardApplication.Companion.OurLogger.log(
+               ourLogger.log(
                     Level.SEVERE,
                     "Failed to $createContext rule (${portMappingRequest.realize().shortName()})."
                 )
-                PortForwardApplication.Companion.OurLogger.log(Level.SEVERE,
+               ourLogger.log(Level.SEVERE,
                     createMappingResult.details.toString())
 
                 val result = UPnPCreateMappingWrapperResult.Failure(
@@ -765,17 +765,17 @@ class UpnpManager @Inject constructor(
         val device: IIGDDevice = getIGDDevice(externalIp)
         val timeTakenMillis = measureTimeMillis {
             if (device.supportsAction(ACTION_NAMES.GetGenericPortMappingEntry)) {
-                OurLogger.log(
+                ourLogger.log(
                     Level.INFO,
                     "Enumerating Port Listings using GetGenericPortMappingEntry"
                 )
                 getAllPortMappingsUsingGenericPortMappingEntry(device)
             } else {
                 //TODO firebase integration
-                OurLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
+                ourLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
             }
         }
-        OurLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
+        ourLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
     }
 
     private fun isRuleOurs(
@@ -806,7 +806,7 @@ class UpnpManager @Inject constructor(
                 val result = upnpClient.getGenericPortMappingRule(device, slotIndex)
                 when (result) {
                     is UPnPGetGenericMappingResult.Success -> {
-                        PortForwardApplication.Companion.OurLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
+                       ourLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
                         val portMapping = result.resultingMapping
                         val entity = portMappingDao.getByPrimaryKey(
                             device.getIpAddress(),
@@ -816,26 +816,26 @@ class UpnpManager @Inject constructor(
                         )
                         var pref: PortMappingPref? = null
                         if (isRuleOurs(entity, device, portMapping)) {
-                            OurLogger.log(
+                            ourLogger.log(
                                 Level.INFO,
                                 "The rule is ours: ${portMapping.shortName()}"
                             )
                             pref = entity!!.getPrefs()
                         } else {
-                            OurLogger.log(
+                            ourLogger.log(
                                 Level.INFO,
                                 "The rule is not ours: ${portMapping.shortName()}"
                             )
                         }
                         addOrUpdateMapping(PortMappingWithPref(portMapping, pref)) //!!
                         success = true
-                        OurLogger.log(Level.INFO, portMapping.toStringFull())
+                        ourLogger.log(Level.INFO, portMapping.toStringFull())
                         retryCount = 0
 
                     }
 
                     is UPnPGetGenericMappingResult.Failure -> {
-                        OurLogger.log(
+                        ourLogger.log(
                             Level.INFO,
                             "GetGenericPortMapping failed for entry $slotIndex: ${result.details}.  NOTE: This is normal."
                         )
@@ -847,11 +847,11 @@ class UpnpManager @Inject constructor(
                     shouldRetry = true // network issue.. retrying does work.
                     retryCount++
                 }
-                OurLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
+                ourLogger.log(Level.SEVERE, "GetGenericPortMapping threw ${e.message}")
             }
 
             if (shouldRetry) {
-                OurLogger.log(Level.INFO, "Retrying for entry $slotIndex")
+                ourLogger.log(Level.INFO, "Retrying for entry $slotIndex")
                 continue
             }
 
@@ -863,7 +863,7 @@ class UpnpManager @Inject constructor(
             slotIndex++
 
             if (slotIndex > 65535) {
-                OurLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
+                ourLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
             }
         }
     }
@@ -891,7 +891,7 @@ class UpnpManager @Inject constructor(
         // get dao
         portMappingDao
         add(igdDevice)
-        OurLogger.log(
+        ourLogger.log(
             Level.INFO,
             "Added Device ${igdDevice.getDisplayName()} at ${igdDevice.getIpAddress()}."
         )
@@ -905,7 +905,7 @@ class UpnpManager @Inject constructor(
             if (portMappings.value.containsKey(id)) {
                 portMappingWithPrefList.add(portMappings.value[id]!!)
             } else {
-                OurLogger.log(Level.SEVERE, "Cannot find port mapping with key $id")
+                ourLogger.log(Level.SEVERE, "Cannot find port mapping with key $id")
             }
         }
 

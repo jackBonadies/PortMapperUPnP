@@ -5,9 +5,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import dagger.hilt.android.HiltAndroidApp
@@ -37,9 +35,6 @@ class PortForwardApplication : Application() {
         instance = this
         appContext = applicationContext
 
-        val logger = Logger.getLogger("")
-        logger.addHandler(StringBuilderHandler(Logs))
-
         println("PortForwardApplication onCreate Finished")
     }
 
@@ -54,8 +49,9 @@ class PortForwardApplication : Application() {
         lateinit var currentSingleSelectedObject: MutableState<PortMappingWithPref?>
         var showContextMenu: MutableState<Boolean> = mutableStateOf(false)
         var PaddingBetweenCreateNewRuleRows = 4.dp
-        var Logs: SnapshotStateList<String> = mutableStateListOf<String>()
-        var OurLogger: Logger = Logger.getLogger("PortMapper")
+
+        // can create a singleton logs repo
+
         val ScrollToBottom = "ScrollToBottom"
         var crashlyticsEnabled: Boolean = false
 
