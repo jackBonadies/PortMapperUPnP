@@ -10,9 +10,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -28,8 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import com.shinjiindustrial.portmapper.CreateRuleContents
-import com.shinjiindustrial.portmapper.MainActivity
-import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
+import com.shinjiindustrial.portmapper.OurSnackbarHost
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.common.validateDescription
@@ -44,7 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import com.shinjiindustrial.portmapper.PortViewModel
-import java.util.logging.Level
+import com.shinjiindustrial.portmapper.UiSnackToastEvent
 
 
 @Composable
@@ -68,10 +64,6 @@ fun RuleCreationDialog(
     portViewModel: PortViewModel,
     ruleToEdit: PortMappingUserInput? = null
 ) {
-
-
-    // TODO vm.collect()
-
     val isPreview = false
 
     val hasSubmitted = remember { mutableStateOf(false) }
@@ -143,27 +135,7 @@ fun RuleCreationDialog(
     //
     //END
 
-    // this can be null as its possible to start at this navhost
-    if (OurSnackbarHostState == null) {
-        OurSnackbarHostState = remember { SnackbarHostState() }
-    }
-
     Scaffold(
-
-        snackbarHost = {
-            SnackbarHost(OurSnackbarHostState!!) { data ->
-                // custom snackbar with the custom colors
-                Snackbar(
-                    data,
-                    actionColor = AdditionalColors.PrimaryDarkerBlue
-                    // according to https://m2.material.io/design/color/dark-theme.html
-                    // light snackbar in darkmode is good.
-//                                    containerColor = AdditionalColors.CardContainerColor,
-//                                    contentColor = AdditionalColors.TextColor
-//                                    //contentColor = ...,
-                )
-            }
-        },
         topBar = {
             TopAppBar(
 //                                modifier = Modifier.height(40.dp),
@@ -231,7 +203,7 @@ fun RuleCreationDialog(
 
                                 val invalidFieldsStr = invalidFields.joinToString(", ")
 
-                                MainActivity.showSnackBarLongNoAction("Invalid Fields: $invalidFieldsStr")
+                                portViewModel.snackbarManager.show(UiSnackToastEvent.SnackBarLongNoAction("Invalid Fields: $invalidFieldsStr"))
                                 return@TextButton
                             }
 
@@ -254,18 +226,19 @@ fun RuleCreationDialog(
 
                             var errorString = portMappingRequestInput.validateAutoRenew()
                             if (errorString.isNotEmpty()) {
-                                MainActivity.showSnackBarLongNoAction(errorString)
+                                portViewModel.snackbarManager.show(UiSnackToastEvent.SnackBarLongNoAction(errorString))
                                 return@TextButton
                             }
 
                             errorString = portMappingRequestInput.validateRange()
                             if (errorString.isNotEmpty()) {
-                                MainActivity.showSnackBarLongNoAction(errorString)
+                                portViewModel.snackbarManager.show(UiSnackToastEvent.SnackBarLongNoAction(errorString))
                                 return@TextButton
                             }
 
                             //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
 
+                            // TODO can be any scope with DispatchersMain.
                             GlobalScope.launch(Dispatchers.Main) {
 
 
@@ -304,6 +277,7 @@ fun RuleCreationDialog(
                 }
             )
         },
+        snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
         content = { it ->
 
             Column(
