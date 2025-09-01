@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -75,13 +76,14 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val contextMenuUiState by portViewModel.contextMenuUiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    PortForwardApplication.currentSingleSelectedObject =
-        remember { mutableStateOf(null) }
-
-    if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
+    if (contextMenuUiState.isOpen()) {
         EnterContextMenu(
-            PortForwardApplication.currentSingleSelectedObject, // why is this not typed??
+            contextMenuUiState.selectedId,
+            portViewModel::getSelectedItem,
+            portViewModel::closeContextMenu,
             showMoreInfoDialogState,
             navController,
             portViewModel,
@@ -91,10 +93,12 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 
     if (showMoreInfoDialogState.value) {
         MoreInfoDialog(
-            portMappingWithPref = PortForwardApplication.currentSingleSelectedObject.value as PortMappingWithPref,
+            portMappingWithPref = portViewModel.getSelectedItem(contextMenuUiState.selectedId!!),
             showDialog = showMoreInfoDialogState
         )
     }
+
+
 
     if (showAboutDialog) {
         AlertDialog(
@@ -105,10 +109,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 Column()
                 {
                     var aboutString: String =
-                        PortForwardApplication.appContext.getString(R.string.about_body)
+                        context.getString(R.string.about_body)
                     val packageInfo =
-                        PortForwardApplication.appContext.packageManager.getPackageInfo(
-                            PortForwardApplication.appContext.packageName,
+                        context.packageManager.getPackageInfo(
+                            context.packageName,
                             0
                         )
 
@@ -397,6 +401,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             uiState,
                             isInMultiSelectMode,
                             portViewModel::toggle,
+                            portViewModel::openContextMenu,
                             selectedIds
                         )
                     }

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -48,9 +49,18 @@ data class PortUiState(
     val userMessage: Int? = null
 )
 
+data class ContextMenuUiState(
+    val selectedId: PortMappingKey? = null)
+{
+    fun isOpen() : Boolean
+    {
+        return selectedId != null
+    }
+}
+
 @HiltViewModel
 class PortViewModel @Inject constructor(
-    private val upnpRepository: UpnpManager,
+    private val upnpRepository: UpnpRepository,
     private val preferencesRepository: PreferencesManager,
     private val savedStateHandle: SavedStateHandle,
     private val ourLogger: ILogger,
@@ -62,6 +72,17 @@ class PortViewModel @Inject constructor(
     val events: SharedFlow<UiSnackToastEvent> = _events
 
     val searchStartedRecently: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+    private val _contextMenuUiState = MutableStateFlow(ContextMenuUiState())
+    val contextMenuUiState = _contextMenuUiState.asStateFlow()
+
+    fun openContextMenu(id: PortMappingKey) {
+        _contextMenuUiState.update { cur -> ContextMenuUiState(id) }
+    }
+
+    fun closeContextMenu() {
+        _contextMenuUiState.update { cur -> ContextMenuUiState(null) }
+    }
 
     // we want to use key for selections.  so if a rule renews while the user is in multi select
     //   mode, don't deselect that rule.  but if we lose a rule (i.e. it gets deleted) then
@@ -81,6 +102,11 @@ class PortViewModel @Inject constructor(
 
     fun getSelectedItems(selectedIds: Set<PortMappingKey>): List<PortMappingWithPref> {
         return upnpRepository.portMappingsFromIds(selectedIds)
+    }
+
+    fun getSelectedItem(selectedId: PortMappingKey): PortMappingWithPref {
+        val listOfMappings = upnpRepository.portMappingsFromIds(setOf(selectedId))
+        return listOfMappings[0]
     }
 
     fun clearSelection() {
@@ -333,13 +359,6 @@ class PortViewModel @Inject constructor(
 
     init {
         upnpRepository.SearchStarted += onSearchStarted
-        GlobalScope.launch {
-            while(true)
-            {
-                delay(10000)
-                snackbarManager.show(UiSnackToastEvent.SnackBarViewShortNoEvent("Initializing..."))
-            }
-        }
         combine(_selectedIds, upnpRepository.portMappings) { selectedIds, currentMappings ->
             val cur = currentMappings.keys
             val sel = selectedIds

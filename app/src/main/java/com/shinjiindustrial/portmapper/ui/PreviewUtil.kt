@@ -13,5 +13,4 @@ import com.shinjiindustrial.portmapper.SharedPrefValues
 fun SetupPreview() {
     SharedPrefValues.DayNightPref = DayNightMode.FORCE_NIGHT
     SharedPrefValues.MaterialYouTheme = false
-    PortForwardApplication.appContext = LocalContext.current
 }

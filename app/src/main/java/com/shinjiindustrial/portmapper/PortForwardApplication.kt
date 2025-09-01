@@ -32,22 +32,13 @@ class PortForwardApplication : Application() {
 
         FirebaseConditional.Initialize(this)
 
-        instance = this
-        appContext = applicationContext
-
         println("PortForwardApplication onCreate Finished")
     }
 
 
     companion object {
 
-        lateinit var appContext: Context
-        lateinit var instance: PortForwardApplication
-        var CurrentActivity: ComponentActivity? = null
-
         //        lateinit var showPopup : MutableState<Boolean>
-        lateinit var currentSingleSelectedObject: MutableState<PortMappingWithPref?>
-        var showContextMenu: MutableState<Boolean> = mutableStateOf(false)
         var PaddingBetweenCreateNewRuleRows = 4.dp
 
         // can create a singleton logs repo
@@ -57,18 +48,6 @@ class PortForwardApplication : Application() {
 
         val RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING = 30L
         val RENEW_BATCH_WITHIN_X_SECONDS = 5L
-
-        fun ShowToast(msg: String, toastLength: Int) {
-            GlobalScope.launch(Dispatchers.Main) {
-                CurrentActivity?.runOnUiThread {
-                    Toast.makeText(
-                        appContext,
-                        msg,
-                        toastLength
-                    ).show()
-                }
-            }
-        }
     }
 
 
