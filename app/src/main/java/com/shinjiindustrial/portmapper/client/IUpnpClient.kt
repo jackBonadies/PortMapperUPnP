@@ -88,9 +88,13 @@ sealed class UPnPResult {
     data class Failure(val details: FailureDetails) : UPnPResult()
 }
 
-class FailureDetails(val reason: String, val response: UpnpResponse)
+class FailureDetails(val reason: String, val response: UpnpResponse?)
 {
     override fun toString() : String{
+        if (response == null)
+        {
+            return "\t${reason}. No response from router."
+        }
         return "\t${reason}\t${response}"
     }
 }

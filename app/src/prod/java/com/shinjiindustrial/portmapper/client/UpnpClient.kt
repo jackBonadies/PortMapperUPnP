@@ -39,7 +39,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
     sealed class ClingExecutionResult {
         data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()
-        data class Failure(val invocation: ActionInvocation<*>, val operation : UpnpResponse, val defaultMsg : String) :
+        data class Failure(val invocation: ActionInvocation<*>, val operation : UpnpResponse?, val defaultMsg : String) :
             ClingExecutionResult()
     }
 
@@ -114,7 +114,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
                 override fun failure(
                     invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
+                    operation: UpnpResponse?,
                     defaultMsg: String
                 ) {
                     val result = ClingExecutionResult.Failure(invocation!!, operation, defaultMsg)
