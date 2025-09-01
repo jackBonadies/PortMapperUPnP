@@ -103,13 +103,14 @@ class OurNetworkInfo {
         }
 
         fun GetTypeFromInterfaceName(
+            context : Context,
             _mappings: MutableMap<String, NetworkType>?,
             interfaceName: String
         ): NetworkType {
             var mappings = _mappings
             if (mappings == null) {
                 mappings =
-                    GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
+                    GetNameTypeMappings(context) //TODO: dont call this expensive call everytime
             }
             mappings
             if (mappings.containsKey(interfaceName)) {

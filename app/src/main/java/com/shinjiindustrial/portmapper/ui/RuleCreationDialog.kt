@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
@@ -97,13 +98,14 @@ fun RuleCreationDialog(
             ).hasError
         )
     }
+    val context = LocalContext.current
     val autoRenew = remember { mutableStateOf(ruleToEdit?.autoRenew ?: false) }
     val (ourIp, ourGatewayIp) = remember {
         if (isPreview) Pair<String, String>(
             "192.168.0.1",
             ""
         ) else OurNetworkInfo.GetLocalAndGatewayIpAddrWifi(
-            PortForwardApplication.appContext,
+            context,
             false
         )
     }

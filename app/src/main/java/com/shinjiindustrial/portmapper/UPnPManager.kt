@@ -46,7 +46,7 @@ import javax.inject.Singleton
 import kotlin.system.measureTimeMillis
 
 @Singleton
-class UpnpManager @Inject constructor(
+class UpnpRepository @Inject constructor(
     private val upnpClient: IUpnpClient,
     private val portMappingDao: PortMappingDao,
     private val devicesDao: DevicesDao,

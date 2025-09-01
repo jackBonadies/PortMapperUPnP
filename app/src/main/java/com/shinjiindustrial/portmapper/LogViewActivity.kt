@@ -56,8 +56,6 @@ class LogViewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        PortForwardApplication.CurrentActivity = this
-
         setContent {
             LogViewContent()
         }

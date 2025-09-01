@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper
 
 import android.content.Intent
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Scaffold
@@ -41,11 +42,11 @@ suspend fun showSnackBar(
     }
 }
 
-fun viewLogCallback() {
+fun viewLogCallback(context : Context) {
     val intent =
-        Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
+        Intent(context, LogViewActivity::class.java)
     intent.putExtra(PortForwardApplication.ScrollToBottom, true)
-    PortForwardApplication.CurrentActivity?.startActivity(intent)
+    context.startActivity(intent)
 }
 
 
@@ -57,8 +58,12 @@ suspend fun showSnackBarLongNoAction(snackbarHostState : SnackbarHostState, mess
     showSnackBar(snackbarHostState, message, null, SnackbarDuration.Long)
 }
 
-suspend fun showSnackBarViewLog(snackbarHostState : SnackbarHostState, message: String) {
-    showSnackBar(snackbarHostState, message, "View Log", SnackbarDuration.Long, ::viewLogCallback)
+suspend fun showSnackBarViewLog(snackbarHostState : SnackbarHostState, context : Context, message: String) {
+    showSnackBar(snackbarHostState, message, "View Log", SnackbarDuration.Long) {
+        viewLogCallback(
+            context
+        )
+    }
 }
 
 suspend fun subscribeToSnackbarEvents(snackbarManager: SnackbarManager, snackbarHostState: SnackbarHostState)
@@ -89,7 +94,7 @@ fun SubscribeToSnackbarManager(hostState: SnackbarHostState, snackbarManager: Sn
                     showSnackBarLongNoAction(hostState, e.msg)
                 }
                 is UiSnackToastEvent.SnackBarViewLogEvent -> {
-                    showSnackBarViewLog(hostState, e.msg)
+                    showSnackBarViewLog(hostState, context, e.msg)
                 }
             }
         }

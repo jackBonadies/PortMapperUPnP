@@ -13,13 +13,7 @@ import org.fourthline.cling.transport.impl.jetty.StreamClientImpl
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
 import org.fourthline.cling.transport.spi.StreamClient
 
-class AndroidUpnpServiceConfigurationImpl(context: Context) : AndroidUpnpServiceConfiguration() {
-
-    var Context: Context
-
-    init {
-        Context = context
-    }
+class AndroidUpnpServiceConfigurationImpl(private val context: Context) : AndroidUpnpServiceConfiguration() {
 
     // we override this in order to set timeout
     override fun createStreamClient(): StreamClient<*>? {
@@ -59,14 +53,14 @@ class AndroidUpnpServiceConfigurationImpl(context: Context) : AndroidUpnpService
             networkInterfaces.add(iterator.next())
         }
         NetworkInterfacesUsed = networkInterfaces
-        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(Context)
+        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(context)
 
         NetworkInterfacesUsedInfos = mutableListOf()
         for (netInterface in networkInterfaces) {
             NetworkInterfacesUsedInfos.add(
                 NetworkInterfaceInfo(
                     netInterface,
-                    OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)
+                    OurNetworkInfo.GetTypeFromInterfaceName(context, NetworkMappings, netInterface.name)
                 )
             )
         }
