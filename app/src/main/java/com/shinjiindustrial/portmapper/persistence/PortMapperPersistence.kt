@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper.persistence
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
@@ -16,7 +17,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Entity(tableName = "port_mappings", primaryKeys = ["deviceIp", "deviceSignature", "protocol", "externalPort"])
+@Entity(
+    tableName = "port_mappings",
+    primaryKeys = ["deviceIp", "deviceSignature", "protocol", "externalPort"]
+)
 data class PortMappingEntity(
 
     // uniquely identifies a rule
@@ -31,27 +35,77 @@ data class PortMappingEntity(
     @ColumnInfo(name = "internalIp") val internalIp: String,
     @ColumnInfo(name = "internalPort") val internalPort: Int,
 
-    // these are the preferences that we cannot store on the device
+    // these are the preferences that we cannot store on the router
     @ColumnInfo(name = "autorenew") val autoRenew: Boolean,
     @ColumnInfo(name = "desiredLeaseDuration") val desiredLeaseDuration: Int,
 
-    // this is a preference we can sometimes store on the device
+    // this is a preference we can sometimes store on the router
     @ColumnInfo(name = "desiredEnabled") val desiredEnabled: Boolean,
 )
+
+@Entity(
+    tableName = "devices",
+    primaryKeys = ["deviceIp", "deviceSignature"]
+)
+data class DevicesEntity(
+
+    // uniquely identifies a device
+    @ColumnInfo(name = "deviceIp") val deviceIp: String,
+    @ColumnInfo(name = "deviceSignature") val deviceSignature: String,
+
+    // these are the preferences that we cannot store on the router
+    @ColumnInfo(name = "useWildcardForRemoteHostDelete") val useWildcardForRemoteHostDelete: Boolean,
+)
+
+@Dao
+interface DevicesDao {
+    @Query("SELECT * FROM devices")
+    suspend fun getAll(): List<DevicesEntity>
+
+    @Query(
+        """
+        SELECT * FROM devices
+        WHERE deviceIp = :deviceIp
+          AND deviceSignature = :deviceSignature
+        LIMIT 2
+    """
+    )
+    suspend fun getByPrimaryKey(
+        deviceIp: String,
+        deviceSignature: String,
+    ): DevicesEntity?
+
+    @Upsert
+    suspend fun upsert(entity: DevicesEntity)
+
+    @Query(
+        """
+          DELETE FROM devices
+          WHERE deviceIp = :deviceIp
+            AND deviceSignature = :deviceSignature
+        """
+    )
+    suspend fun deleteByKey(
+        deviceIp: String,
+        deviceSignature: String,
+    ): Int
+}
 
 @Dao
 interface PortMappingDao {
     @Query("SELECT * FROM port_mappings")
     suspend fun getAll(): List<PortMappingEntity>
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM port_mappings
         WHERE deviceIp = :deviceIp
           AND deviceSignature = :deviceSignature
           AND protocol = :protocol
           AND externalPort = :externalPort
         LIMIT 1
-    """)
+    """
+    )
     suspend fun getByPrimaryKey(
         deviceIp: String,
         deviceSignature: String,
@@ -62,19 +116,30 @@ interface PortMappingDao {
     @Upsert
     suspend fun upsert(entity: PortMappingEntity)
 
-    @Query("""
+    @Query(
+        """
           DELETE FROM port_mappings
           WHERE deviceIp = :deviceIp
             AND deviceSignature = :deviceSignature
             AND externalPort = :externalPort
             AND protocol = :protocol
-        """)
-    suspend fun deleteByKey(deviceIp: String, deviceSignature: String, protocol: String, externalPort: Int): Int
+        """
+    )
+    suspend fun deleteByKey(
+        deviceIp: String,
+        deviceSignature: String,
+        protocol: String,
+        externalPort: Int
+    ): Int
 }
 
-@Database(entities = [PortMappingEntity::class], version = 1, exportSchema = true)
+@Database(entities = [PortMappingEntity::class, DevicesEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)])
 abstract class AppDatabase : RoomDatabase() {
     abstract fun portMappingDao(): PortMappingDao
+    abstract fun devicesDao(): DevicesDao
 }
 
 @Module
@@ -85,9 +150,11 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
-            // .addMigrations(MIGRATION_1_2, ...)
             .build()
 
     @Provides
     fun providePortMappingDao(db: AppDatabase): PortMappingDao = db.portMappingDao()
+
+    @Provides
+    fun provideDevicesDao(db: AppDatabase): DevicesDao = db.devicesDao()
 }

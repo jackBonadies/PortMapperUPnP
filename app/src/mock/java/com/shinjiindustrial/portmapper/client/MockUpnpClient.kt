@@ -205,7 +205,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     }
 
     override suspend fun getGenericPortMappingRule(device : IIGDDevice,
-                                                   slotIndex : Int) : UPnPGetSpecificMappingResult
+                                                   slotIndex : Int) : UPnPGetGenericMappingResult
     {
         tick()
         return UPnPGetSpecificMappingResult.Success(store[device]!!.values.elementAt(slotIndex),store[device]!!.values.elementAt(slotIndex))

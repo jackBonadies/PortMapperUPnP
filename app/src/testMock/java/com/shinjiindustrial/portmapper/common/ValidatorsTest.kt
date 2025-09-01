@@ -1,66 +1,55 @@
 package com.shinjiindustrial.portmapper.common
 
-import android.os.SystemClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 
 import android.util.Log
-import androidx.compose.runtime.LaunchedEffect
 import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.client.MockUpnpClient
 import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
 import com.shinjiindustrial.portmapper.client.Speed
-import com.shinjiindustrial.portmapper.domain.IGDDevice
 import io.mockk.every
 import io.mockk.mockkStatic
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.Test
-import kotlin.test.assertEquals
 
 class ValidatorsTest {
     @Test
     fun `test description validation`() {
-        assertFalse(validateDescription("Description is required").hasError);
-        assertTrue(validateDescription("").hasError);
+        assertFalse(validateDescription("Description is required").hasError)
+        assertTrue(validateDescription("").hasError)
     }
 
     @Test
     fun `test start port validation`() {
-        assertTrue(validateStartPort("").hasError);
-        assertTrue(validateStartPort("70000").hasError);
-        assertTrue(validateStartPort("-100").hasError);
-        assertFalse(validateDescription("4000").hasError);
+        assertTrue(validateStartPort("").hasError)
+        assertTrue(validateStartPort("70000").hasError)
+        assertTrue(validateStartPort("-100").hasError)
+        assertFalse(validateDescription("4000").hasError)
     }
 
     @Test
     fun `test end port validation`() {
-        assertFalse(validateEndPort("", "").hasError);
-        assertFalse(validateEndPort("1000", "").hasError);
-        assertFalse(validateEndPort("1000", "").hasError);
-        assertTrue(validateEndPort("1000", "70000").hasError);
-        assertTrue(validateEndPort("1000", "-100").hasError);
-        assertTrue(validateEndPort("1000", "100").hasError);
-        assertFalse(validateEndPort("4000", "4040").hasError);
+        assertFalse(validateEndPort("", "").hasError)
+        assertFalse(validateEndPort("1000", "").hasError)
+        assertFalse(validateEndPort("1000", "").hasError)
+        assertTrue(validateEndPort("1000", "70000").hasError)
+        assertTrue(validateEndPort("1000", "-100").hasError)
+        assertTrue(validateEndPort("1000", "100").hasError)
+        assertFalse(validateEndPort("4000", "4040").hasError)
     }
 
     @Test
@@ -74,8 +63,7 @@ class ValidatorsTest {
     fun `flow map and collect`() = runBlocking  {
 
         val _devices = MutableStateFlow(listOf<Int>())  // TreeSet<PortMapping>
-        val devices: StateFlow<List<Int>> =
-            _devices//.map { it..sortedBy { d -> d.name } }
+        _devices//.map { it..sortedBy { d -> d.name } }
         _devices.update { it + 0 }
         val size_flow = _devices.map { it.size }.onEach { println("size is " + it) }
             //.also { println("size is " + it) }
@@ -133,7 +121,7 @@ class ValidatorsTest {
         val job = launch {
             intermediateFlow.collect() //{ it -> println("final " + it) }
         }
-        val job2 = launch {
+        launch {
             intermediateFlow.collect() //{ it -> println("final " + it) }
         }
 
@@ -182,10 +170,10 @@ class ValidatorsTest {
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest))
         val repo = UpnpManager(client)
         GlobalScope.launch {
-            repo.Search(false)
+            repo.search(false)
         }
         delay(60000)
-        val allRules = repo.GetAllRules()
+        repo.getAllRules()
 
     }
 

@@ -14,11 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.SharedPrefValues
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
-import java.com.shinjiindustrial.portmapper.PortViewModel
+import com.shinjiindustrial.portmapper.PortViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,7 +24,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(12.dp)
+            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
     ) {
         Text(
             text = "Sort By",
@@ -73,7 +71,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
                     val ascendingButton = j == 0
                     SortSelectButton(
                         modifier = Modifier.weight(1.0f),
-                        text = if(ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
+                        text = if (ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
                         isSelected = ascendingButton == !desc,
                         onClick = {
                             portViewModel.updateSortingDesc(!ascendingButton)

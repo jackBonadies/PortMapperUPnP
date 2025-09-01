@@ -1,7 +1,8 @@
 package com.shinjiindustrial.portmapper.domain
 
-import com.shinjiindustrial.portmapper.PortForwardApplication.Companion.OurLogger
+import com.shinjiindustrial.portmapper.ILogger
 import org.fourthline.cling.model.meta.RemoteDevice
+import org.fourthline.cling.model.meta.RemoteService
 import java.util.logging.Level
 
 object UPnPNames {
@@ -44,11 +45,13 @@ val ActionNames: List<String> = listOf(
     ACTION_NAMES.GetListOfPortMappings,
 )
 
-fun RemoteDevice.getIGDDevice(): IGDDevice? {
+data class ClingIGDDevice(val deviceDetails: DeviceDetails, val remoteService: RemoteService)
+
+fun RemoteDevice.getIGDDevice(ourLogger : ILogger): ClingIGDDevice? {
 
     if (this.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
     {
-        OurLogger.log(
+        ourLogger.log(
             Level.INFO,
             "Device ${this.displayString} is of interest, type is ${this.type}"
         )
@@ -67,29 +70,29 @@ fun RemoteDevice.getIGDDevice(): IGDDevice? {
                 if (wanIPService != null) {
                     //get relevant actions here...
                     //TODO add relevant service (and cause event)
-                    val igdDevice = IGDDevice(this, wanIPService)
+                    val igdDevice = ClingIGDDevice(DeviceDetails.fromRemoteDevice(this), wanIPService)
                     return igdDevice
 
                 } else {
-                    OurLogger.log(
+                    ourLogger.log(
                         Level.SEVERE,
                         "WanConnectionDevice does not have WanIPConnection service"
                     )
                 }
             } else {
-                OurLogger.log(
+                ourLogger.log(
                     Level.SEVERE,
                     "WanConnectionDevice not found under WanDevice"
                 )
             }
         } else {
-            OurLogger.log(
+            ourLogger.log(
                 Level.SEVERE,
                 "WanDevice not found under InternetGatewayDevice"
             )
         }
     } else {
-        OurLogger.log(
+        ourLogger.log(
             Level.INFO,
             "Device ${this.displayString} is NOT of interest, type is ${this.type}"
         )

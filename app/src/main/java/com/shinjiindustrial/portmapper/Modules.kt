@@ -1,22 +1,37 @@
-package java.com.shinjiindustrial.portmapper
+package com.shinjiindustrial.portmapper
 
-import android.content.Context
-import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import org.fourthline.cling.UpnpService
-import org.fourthline.cling.UpnpServiceImpl
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ApplicationScope
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class IODispatcher
 
 @Module
 @InstallIn(SingletonComponent::class)
-object ClingModule {
-//    @Singleton
-//    @Provides
-//    fun providesUpnpService(@ApplicationContext context: Context): UpnpService {
-//        return UpnpServiceImpl(AndroidUpnpServiceConfigurationImpl(context))
-//    }
+object CoroutinesModule {
+
+    @Provides
+    @Singleton
+    @IODispatcher
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+
+    @Provides @Singleton @ApplicationScope
+    fun provideApplicationScope(
+        @IODispatcher io: CoroutineDispatcher
+    ): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + io)
+    }
 }

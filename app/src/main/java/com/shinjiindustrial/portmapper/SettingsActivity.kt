@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -46,19 +45,16 @@ import com.shinjiindustrial.portmapper.ui.SetupPreview
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
-import java.com.shinjiindustrial.portmapper.ThemeUiState
-import java.com.shinjiindustrial.portmapper.SettingsViewModel
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
 
-    val settingsViewModel : SettingsViewModel by viewModels()
+    val settingsViewModel: SettingsViewModel by viewModels()
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState)
 
         PortForwardApplication.CurrentActivity = this
         setContent {
@@ -249,7 +245,7 @@ class SettingsActivity : ComponentActivity() {
     fun RadioGroupPreviewTheme() {
         val themeState = ThemeUiState(DayNightMode.FORCE_NIGHT, false)
         MyApplicationTheme(themeState) {
-            ThemeRadioGroup(themeState, {_ -> Unit})
+            ThemeRadioGroup(themeState, { _ -> })
         }
     }
 
@@ -258,7 +254,7 @@ class SettingsActivity : ComponentActivity() {
     val dark = "Dark"
 
     @Composable
-    fun ThemeRadioGroup(themeState : ThemeUiState, setDayNightMode : (DayNightMode) -> Unit) {
+    fun ThemeRadioGroup(themeState: ThemeUiState, setDayNightMode: (DayNightMode) -> Unit) {
         val options = listOf(followSystem, light, dark)
         val selectedOption = options[themeState.dayNightMode.intVal]
 
@@ -288,7 +284,7 @@ class SettingsActivity : ComponentActivity() {
     fun RadioGroupPreview() {
         val themeState = ThemeUiState(DayNightMode.FORCE_NIGHT, false)
         SetupPreview()
-        ThemeRadioGroup(themeState,{_->Unit})
+        ThemeRadioGroup(themeState, { _ -> })
     }
 
     @Composable

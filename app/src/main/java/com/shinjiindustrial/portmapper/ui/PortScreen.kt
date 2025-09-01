@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -35,10 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -55,61 +54,64 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper.DayNightMode
-import com.shinjiindustrial.portmapper.IsMultiSelectMode
-import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.ToggleSelection
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
-import java.com.shinjiindustrial.portmapper.PortUiState
-import java.com.shinjiindustrial.portmapper.ThemeUiState
+import com.shinjiindustrial.portmapper.PortUiState
+import com.shinjiindustrial.portmapper.ThemeUiState
 
 @OptIn(
     ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class
 )
 @Composable
-fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, additionalModifier : Modifier = Modifier.Companion)
-{
+fun PortMappingCard(
+    portMappingWithPref: PortMappingWithPref,
+    now: Long = -1,
+    isInMultiSelectMode: Boolean = false,
+    toggleSelection: (PortMappingKey) -> Unit = {},
+    selectedIds: Set<PortMappingKey>,
+    additionalModifier: Modifier = Modifier.Companion
+) {
     val portMapping = portMappingWithPref.portMapping
-    println("external ip test ${portMapping.DeviceIP}")
 
-        Card(
+    Card(
 //        onClick = {
 //            if(PortForwardApplication.showPopup != null)
 //            {
 //                PortForwardApplication.showPopup.value = true
 //            }
 //                  },
-            modifier = additionalModifier
-                .fillMaxWidth()
-                //.clip(RoundedCornerShape(borderRadius))
-                .padding(4.dp, 4.dp)
+        modifier = additionalModifier
+            .fillMaxWidth()
+            //.clip(RoundedCornerShape(borderRadius))
+            .padding(4.dp, 4.dp)
 //            .background(MaterialTheme.colorScheme.secondaryContainer)
-                .combinedClickable(
-                    onClick = {
+            .combinedClickable(
+                onClick = {
 
-                        if (IsMultiSelectMode()) {
-                            ToggleSelection(portMappingWithPref)
-                        } else {
-                            // TODO cleanup
-                            PortForwardApplication.Companion.showContextMenu.value = true
-                            PortForwardApplication.Companion.currentSingleSelectedObject.value =
-                                portMappingWithPref
-                        }
-
-                    },
-                    onLongClick = {
-                        ToggleSelection(portMappingWithPref)
+                    if (isInMultiSelectMode) {
+                        toggleSelection(portMappingWithPref.getKey())
+                    } else {
+                        // TODO cleanup
+                        PortForwardApplication.Companion.showContextMenu.value = true
+                        PortForwardApplication.Companion.currentSingleSelectedObject.value =
+                            portMappingWithPref
                     }
-                ),
+
+                },
+                onLongClick = {
+                    toggleSelection(portMappingWithPref.getKey())
+                }
+            ),
 
 
 //                Snackbar
@@ -119,31 +121,30 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 //                    })
 //                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
 //                    .show()
-            //isRound = !isRound
+        //isRound = !isRound
 
 
-            elevation = CardDefaults.cardElevation(),
-            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
-            colors = CardDefaults.cardColors(
-                containerColor = AdditionalColors.CardContainerColor,
-            ),
+        elevation = CardDefaults.cardElevation(),
+        border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
+        colors = CardDefaults.cardColors(
+            containerColor = AdditionalColors.CardContainerColor,
+        ),
+    ) {
+
+        Row(
+            modifier = Modifier.Companion
+                .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
+            //.background(MaterialTheme.colorScheme.secondaryContainer),
+            verticalAlignment = Alignment.Companion.CenterVertically
+
         ) {
 
-            Row(
-                modifier = Modifier.Companion
-                    .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
-                //.background(MaterialTheme.colorScheme.secondaryContainer),
-                verticalAlignment = Alignment.Companion.CenterVertically
+            //var padLeft = if(multiSelectMode) 5.dp else 13.dp
 
-            ) {
+            //TODO need to do existing content slide to right and fade new element in
 
-                val multiSelectMode = IsMultiSelectMode()
-                //var padLeft = if(multiSelectMode) 5.dp else 13.dp
-
-                //TODO need to do existing content slide to right and fade new element in
-
-                val padLeft = 13.dp
-                //val transition = updateTransition(multiSelectMode, label = "transition")
+            val padLeft = 13.dp
+            //val transition = updateTransition(multiSelectMode, label = "transition")
 
 //            val offsetState = remember { MutableTransitionState(initialState = false) }
 //            val visState = remember { MutableTransitionState(initialState = false) }
@@ -171,61 +172,72 @@ fun PortMappingCard(portMappingWithPref: PortMappingWithPref, now: Long = -1, ad
 //
 //            offsetState.targetState = multiSelectMode
 
-                AnimatedVisibility(
-                    visible = multiSelectMode,
+            AnimatedVisibility(
+                visible = isInMultiSelectMode,
+            ) {
+
+
+                CircleCheckbox(
+                    selectedIds.contains(portMappingWithPref.getKey()),
+                    true,
+                    Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
                 ) {
-
-
-                    CircleCheckbox(
-                        MainActivity.Companion.MultiSelectItems!!.contains(portMappingWithPref),
-                        true,
-                        Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
-                    ) {
-
-                        ToggleSelection(portMappingWithPref)
-
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.Companion.weight(1f).padding(padLeft, 0.dp, 0.dp, 0.dp)
-                ) {
-                    Text(
-                        portMapping.Description,
-                        fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
-                        fontWeight = FontWeight.Companion.SemiBold,
-                        color = AdditionalColors.TextColor
-                    )
-                    Text(portMapping.InternalIP, color = AdditionalColors.TextColor)
-
-                    val text = buildAnnotatedString {
-                        withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
-                            append("⬤")
-                        }
-                        withStyle(style = SpanStyle()) {
-                            append(if (portMapping.Enabled) " Enabled" else " Disabled")
-                        }
-                    }
-
-
-                    Text(text, color = AdditionalColors.TextColor)
-                    val urgency = portMapping.getUrgency(portMappingWithPref.getAutoRenewOrDefault(), now)
-                    val color by urgencyColor(urgency, AdditionalColors.TextColor, AdditionalColors.LogWarningText, AdditionalColors.LogErrorText)
-                    Text(portMapping.getRemainingLeaseTimeRoughString(portMappingWithPref.getAutoRenewOrDefault(), now), color = color)
-                }
-
-                Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
-                    Text(
-                        "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
-                        fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
-                        fontWeight = FontWeight.Companion.SemiBold,
-                        color = AdditionalColors.TextColor
-                    )
-                    Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
-
+                    toggleSelection(portMappingWithPref.getKey())
                 }
             }
+
+            Column(
+                modifier = Modifier.Companion
+                    .weight(1f)
+                    .padding(padLeft, 0.dp, 0.dp, 0.dp)
+            ) {
+                Text(
+                    portMapping.Description,
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold,
+                    color = AdditionalColors.TextColor
+                )
+                Text(portMapping.InternalIP, color = AdditionalColors.TextColor)
+
+                val text = buildAnnotatedString {
+                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
+                        append("⬤")
+                    }
+                    withStyle(style = SpanStyle()) {
+                        append(if (portMapping.Enabled) " Enabled" else " Disabled")
+                    }
+                }
+
+
+                Text(text, color = AdditionalColors.TextColor)
+                val urgency =
+                    portMapping.getUrgency(portMappingWithPref.getAutoRenewOrDefault(), now)
+                val color by urgencyColor(
+                    urgency,
+                    AdditionalColors.TextColor,
+                    AdditionalColors.LogWarningText,
+                    AdditionalColors.LogErrorText
+                )
+                Text(
+                    portMapping.getRemainingLeaseTimeRoughString(
+                        portMappingWithPref.getAutoRenewOrDefault(),
+                        now
+                    ), color = color
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
+                Text(
+                    "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold,
+                    color = AdditionalColors.TextColor
+                )
+                Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
+
+            }
         }
+    }
 }
 
 @Composable
@@ -237,9 +249,9 @@ fun urgencyColor(
     expired: Color = Color.Gray
 ) = animateColorAsState(
     when (urgency) {
-        Urgency.Normal  -> normal
-        Urgency.Warn    -> warn
-        Urgency.Error   -> error
+        Urgency.Normal -> normal
+        Urgency.Warn -> warn
+        Urgency.Error -> error
     }
 )
 
@@ -294,8 +306,7 @@ fun PortMappingCardAltPreview() // TODO: rename?
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun PortMappingCardAlt(portMapping: PortMapping)
-{
+fun PortMappingCardAlt(portMapping: PortMapping) {
     Card(
         modifier = Modifier.Companion
             .fillMaxWidth()
@@ -351,16 +362,14 @@ fun PortMappingCardAlt(portMapping: PortMapping)
 
 @Preview
 @Composable
-fun PreviewDeviceHeader()
-{
+fun PreviewDeviceHeader() {
     //TODO
     //DeviceHeader(IGDDevice(null, null))
 }
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun DeviceHeader(device : IIGDDevice)
-{
+fun DeviceHeader(device: IIGDDevice) {
     Spacer(modifier = Modifier.Companion.padding(2.dp))
     Column(
         modifier = Modifier.Companion
@@ -387,14 +396,12 @@ fun DeviceHeader(device : IIGDDevice)
 
 @Preview
 @Composable
-fun LoadingIcon()
-{
+fun LoadingIcon() {
     LoadingIcon("Searching for devices", Modifier.Companion)
 }
 
 @Composable
-fun LoadingIcon(label : String, modifier : Modifier)
-{
+fun LoadingIcon(label: String, modifier: Modifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         CircularProgressIndicator(
             modifier = Modifier.Companion
@@ -411,14 +418,13 @@ fun LoadingIcon(label : String, modifier : Modifier)
 }
 
 @Composable
-fun NoMappingsCard(remoteDevice : IIGDDevice) {
+fun NoMappingsCard(remoteDevice: IIGDDevice) {
     NoMappingsCard()
 }
 
 @Preview
 @Composable
-fun NoMappingsCard()
-{
+fun NoMappingsCard() {
     MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         Card(
 //        onClick = {
@@ -528,6 +534,7 @@ fun ScaffoldDemo() {
         },
     )
 }
+
 @Preview
 @Composable
 fun PreviewConversation() {
@@ -536,24 +543,26 @@ fun PreviewConversation() {
         val msgs = mutableListOf<UpnpViewRow>()
         val pm = _getDefaultPortMapping()
         val upnpViewEl = UpnpViewRow.PortViewRow(pm)
-        for (i in 0..20)
-        {
+        for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
-        Conversation(msgs)
+        PortMappingsListContent(msgs, false, {}, emptySet())
     }
 }
 
 @Composable
-fun PortMappingContent(uiState : PortUiState)
-{
-    Conversation(uiState.items)
+fun PortMappingContent(
+    uiState: PortUiState,
+    isInMultiSelectMode: Boolean,
+    onToggle: (PortMappingKey) -> Unit,
+    selectedIds: Set<PortMappingKey>
+) {
+    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, selectedIds)
 }
 
 @Composable
 fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
-    Log.i("rememberTicker", "called")
-    val now = remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    val now = remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(periodMillis)
@@ -564,9 +573,14 @@ fun rememberTicker(periodMillis: Long): androidx.compose.runtime.State<Long> {
 }
 
 //lazy column IS recycler view basically. both recycle.
-@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalUnitApi::class)
 @Composable
-fun Conversation(messages: List<UpnpViewRow>) {
+fun PortMappingsListContent(
+    messages: List<UpnpViewRow>,
+    isInMultiSelectMode: Boolean,
+    onToggle: (PortMappingKey) -> Unit,
+    selectedIds: Set<PortMappingKey>
+) {
 
     val now by rememberTicker(8_000)
 
@@ -581,17 +595,28 @@ fun Conversation(messages: List<UpnpViewRow>) {
 
         ) {
 
-        itemsIndexed(messages, key = { index, message -> message.key }) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
+        itemsIndexed(
+            messages,
+            key = { index, message -> message.key }) { index, message -> //, key = {indexIt, keyIt -> keyIt.hashCode() }
 
-            when(message) {
+            when (message) {
                 is UpnpViewRow.DeviceHeaderViewRow -> {
                     DeviceHeader(message.device)
                 }
+
                 is UpnpViewRow.DeviceEmptyViewRow -> {
                     NoMappingsCard(message.device)
                 }
+
                 is UpnpViewRow.PortViewRow -> {
-                    PortMappingCard(message.portMapping, now, Modifier.animateItem())
+                    PortMappingCard(
+                        message.portMapping,
+                        now,
+                        isInMultiSelectMode,
+                        onToggle,
+                        selectedIds,
+                        Modifier.animateItem()
+                    )
                 }
             }
         }

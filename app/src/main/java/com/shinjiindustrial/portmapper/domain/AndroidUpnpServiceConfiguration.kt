@@ -8,9 +8,10 @@ import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
 import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
 
-class AndroidUpnpServiceConfigurationImpl(context : Context) : AndroidUpnpServiceConfiguration() {
+class AndroidUpnpServiceConfigurationImpl(context: Context) : AndroidUpnpServiceConfiguration() {
 
-    var Context : Context
+    var Context: Context
+
     init {
         Context = context
     }
@@ -40,17 +41,24 @@ class AndroidUpnpServiceConfigurationImpl(context : Context) : AndroidUpnpServic
         NetworkMappings = OurNetworkInfo.GetNameTypeMappings(Context)
 
         NetworkInterfacesUsedInfos = mutableListOf()
-        for (netInterface in networkInterfaces)
-        {
-            NetworkInterfacesUsedInfos.add(NetworkInterfaceInfo(netInterface, OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)))
+        for (netInterface in networkInterfaces) {
+            NetworkInterfacesUsedInfos.add(
+                NetworkInterfaceInfo(
+                    netInterface,
+                    OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)
+                )
+            )
         }
 
         return addressFactory
     }
 
-    private var NetworkInterfacesUsed : MutableList<java.net.NetworkInterface>? = null
-    private var NetworkMappings : MutableMap<String, NetworkType>? = null
-    var NetworkInterfacesUsedInfos : MutableList<NetworkInterfaceInfo> = mutableListOf()
+    private var NetworkInterfacesUsed: MutableList<java.net.NetworkInterface>? = null
+    private var NetworkMappings: MutableMap<String, NetworkType>? = null
+    var NetworkInterfacesUsedInfos: MutableList<NetworkInterfaceInfo> = mutableListOf()
 }
 
-data class NetworkInterfaceInfo(val networkInterface : java.net.NetworkInterface, val networkType : NetworkType)
+data class NetworkInterfaceInfo(
+    val networkInterface: java.net.NetworkInterface,
+    val networkType: NetworkType
+)

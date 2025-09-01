@@ -54,7 +54,6 @@ class UPnPManagerTests {
     fun groupRules()
     {
         // if compare returns equals then they are considered the same and will be replaced in the TreeSet
-        val groupByProtocol = false
         var groupByRange = true
 
         val portMappingsToAdd : MutableList<PortMapping> = mutableListOf()

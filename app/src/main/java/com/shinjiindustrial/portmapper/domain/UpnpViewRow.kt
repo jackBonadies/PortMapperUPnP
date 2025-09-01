@@ -7,22 +7,32 @@ import kotlinx.parcelize.Parcelize
 sealed class ViewKey : Parcelable {
     // TODO include slot? what does it mean for 2 ports to be the same since we can edit them?
     @Parcelize
-    data class PortViewKey(val externalPort: Int, val protocol: String, val deviceIp : String) : ViewKey()
+    data class PortViewKey(val externalPort: Int, val protocol: String, val deviceIp: String) :
+        ViewKey()
+
     @Parcelize
-    data class DeviceHeaderKey(val deviceIp : String) : ViewKey()
+    data class DeviceHeaderKey(val deviceIp: String) : ViewKey()
+
     @Parcelize
-    data class DeviceEmptyKey(val deviceIp : String) : ViewKey()
+    data class DeviceEmptyKey(val deviceIp: String) : ViewKey()
 }
 
 sealed class UpnpViewRow {
-    abstract val key : ViewKey
-    data class PortViewRow constructor(val portMapping: PortMappingWithPref) : UpnpViewRow() {
-        override val key = ViewKey.PortViewKey(portMapping.portMapping.ExternalPort, portMapping.portMapping.Protocol, portMapping.portMapping.DeviceIP)
+    abstract val key: ViewKey
+
+    data class PortViewRow(val portMapping: PortMappingWithPref) : UpnpViewRow() {
+        override val key = ViewKey.PortViewKey(
+            portMapping.portMapping.ExternalPort,
+            portMapping.portMapping.Protocol,
+            portMapping.portMapping.DeviceIP
+        )
     }
-    data class DeviceHeaderViewRow constructor(val device: IIGDDevice) : UpnpViewRow() {
+
+    data class DeviceHeaderViewRow(val device: IIGDDevice) : UpnpViewRow() {
         override val key = ViewKey.DeviceHeaderKey(device.getIpAddress())
     }
-    data class DeviceEmptyViewRow constructor(val device: IIGDDevice) : UpnpViewRow() {
+
+    data class DeviceEmptyViewRow(val device: IIGDDevice) : UpnpViewRow() {
         override val key = ViewKey.DeviceEmptyKey(device.getIpAddress())
     }
 }

@@ -26,15 +26,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
 import com.shinjiindustrial.portmapper.CreateRuleContents
 import com.shinjiindustrial.portmapper.MainActivity
 import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.Protocol
-import com.shinjiindustrial.portmapper.UpnpManager
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
@@ -46,14 +43,13 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import java.com.shinjiindustrial.portmapper.PortViewModel
+import com.shinjiindustrial.portmapper.PortViewModel
 import java.util.logging.Level
 
 
 @Composable
 @Preview
-fun RadioGroupPreview2()
-{
+fun RadioGroupPreview2() {
     SetupPreview()
     Text("test")
 }
@@ -67,7 +63,11 @@ fun PreviewRuleCreationDialog() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RuleCreationDialog(navController : NavHostController, portViewModel : PortViewModel, ruleToEdit : PortMappingUserInput? = null)  {
+fun RuleCreationDialog(
+    navController: NavHostController,
+    portViewModel: PortViewModel,
+    ruleToEdit: PortMappingUserInput? = null
+) {
 
 
     // TODO vm.collect()
@@ -75,18 +75,36 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
     val isPreview = false
 
     val hasSubmitted = remember { mutableStateOf(false) }
-    val internalPortText = rememberSaveable  { mutableStateOf(ruleToEdit?.internalRange ?: "") }
-    val internalPortTextEnd = rememberSaveable  { mutableStateOf("") }
-    val externalPortText = rememberSaveable  { mutableStateOf(ruleToEdit?.externalRange ?: "") }
-    val externalPortTextEnd = rememberSaveable  { mutableStateOf("") }
+    val internalPortText = rememberSaveable { mutableStateOf(ruleToEdit?.internalRange ?: "") }
+    val internalPortTextEnd = rememberSaveable { mutableStateOf("") }
+    val externalPortText = rememberSaveable { mutableStateOf(ruleToEdit?.externalRange ?: "") }
+    val externalPortTextEnd = rememberSaveable { mutableStateOf("") }
     val leaseDuration = rememberSaveable { mutableStateOf(ruleToEdit?.leaseDuration ?: "0 (max)") }
     val description = rememberSaveable { mutableStateOf(ruleToEdit?.description ?: "") }
-    val descriptionHasError = remember { mutableStateOf(validateDescription(description.value).hasError) }
-    val startInternalHasError = remember { mutableStateOf(validateStartPort(internalPortText.value).hasError) }
-    val endInternalHasError = remember { mutableStateOf(validateEndPort(internalPortText.value,internalPortTextEnd.value).hasError) }
-    val selectedProtocolMutable = remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
-    val startExternalHasError = remember { mutableStateOf(validateStartPort(externalPortText.value).hasError) }
-    val endExternalHasError = remember { mutableStateOf(validateEndPort(externalPortText.value,externalPortTextEnd.value).hasError) }
+    val descriptionHasError =
+        remember { mutableStateOf(validateDescription(description.value).hasError) }
+    val startInternalHasError =
+        remember { mutableStateOf(validateStartPort(internalPortText.value).hasError) }
+    val endInternalHasError = remember {
+        mutableStateOf(
+            validateEndPort(
+                internalPortText.value,
+                internalPortTextEnd.value
+            ).hasError
+        )
+    }
+    val selectedProtocolMutable =
+        remember { mutableStateOf(ruleToEdit?.protocol ?: Protocol.TCP.str()) }
+    val startExternalHasError =
+        remember { mutableStateOf(validateStartPort(externalPortText.value).hasError) }
+    val endExternalHasError = remember {
+        mutableStateOf(
+            validateEndPort(
+                externalPortText.value,
+                externalPortTextEnd.value
+            ).hasError
+        )
+    }
     val autoRenew = remember { mutableStateOf(ruleToEdit?.autoRenew ?: false) }
     val (ourIp, ourGatewayIp) = remember {
         if (isPreview) Pair<String, String>(
@@ -98,15 +116,22 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
         )
     }
     val internalIp = remember { mutableStateOf(ruleToEdit?.internalIp ?: ourIp!!) }
-    val internalIpHasError = remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
-    val (gatewayIps, defaultGatewayIp) = remember { portViewModel.GetGatewayIpsWithDefault(ourGatewayIp!!) }
+    val internalIpHasError =
+        remember { mutableStateOf(validateInternalIp(internalIp.value).hasError) }
+    val (gatewayIps, defaultGatewayIp) = remember {
+        portViewModel.getGatewayIpsWithDefault(
+            ourGatewayIp!!
+        )
+    }
     val externalDeviceText = remember { mutableStateOf(defaultGatewayIp) }
     val expandedInternal = remember { mutableStateOf(false) }
     val expandedExternal = remember { mutableStateOf(false) }
-    val wanIpVersionOfGatewayIsVersion1 = remember { derivedStateOf {
-        val version = portViewModel.getIGDDevice(defaultGatewayIp).getUpnpVersion()
-        version == 1
-    } }
+    val wanIpVersionOfGatewayIsVersion1 = remember {
+        derivedStateOf {
+            val version = portViewModel.getIGDDevice(defaultGatewayIp).getUpnpVersion()
+            version == 1
+        }
+    }
 
 
     // TODO
@@ -119,15 +144,14 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
     //END
 
     // this can be null as its possible to start at this navhost
-    if(OurSnackbarHostState == null)
-    {
-        MainActivity.OurSnackbarHostState = remember { SnackbarHostState() }
+    if (OurSnackbarHostState == null) {
+        OurSnackbarHostState = remember { SnackbarHostState() }
     }
 
     Scaffold(
 
         snackbarHost = {
-            SnackbarHost(MainActivity.OurSnackbarHostState!!) { data ->
+            SnackbarHost(OurSnackbarHostState!!) { data ->
                 // custom snackbar with the custom colors
                 Snackbar(
                     data,
@@ -156,7 +180,7 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                 //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                 title = {
                     Text(
-                        text = if(ruleToEdit == null) "New Rule" else "Edit Rule",
+                        text = if (ruleToEdit == null) "New Rule" else "Edit Rule",
                         color = AdditionalColors.TextColorStrong,
                         fontWeight = FontWeight.Normal
                     )
@@ -165,11 +189,15 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                     TextButton(
                         onClick = {
 
-                            val actualEndInternalError = expandedInternal.value && endInternalHasError.value
-                            val actualEndExternalError = expandedExternal.value && endExternalHasError.value
+                            val actualEndInternalError =
+                                expandedInternal.value && endInternalHasError.value
+                            val actualEndExternalError =
+                                expandedExternal.value && endExternalHasError.value
 
-                            val usingInternalRange = expandedInternal.value && internalPortTextEnd.value.isNotEmpty()
-                            val usingExternalRange = expandedExternal.value && externalPortTextEnd.value.isNotEmpty()
+                            val usingInternalRange =
+                                expandedInternal.value && internalPortTextEnd.value.isNotEmpty()
+                            val usingExternalRange =
+                                expandedExternal.value && externalPortTextEnd.value.isNotEmpty()
 
                             hasSubmitted.value = true
                             if (descriptionHasError.value ||
@@ -182,28 +210,22 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 // show toast and return
                                 // Invalid Description, ExternalPort.
                                 val invalidFields = mutableListOf<String>()
-                                if(descriptionHasError.value)
-                                {
+                                if (descriptionHasError.value) {
                                     invalidFields.add("Description")
                                 }
-                                if(startInternalHasError.value)
-                                {
-                                    invalidFields.add(if(usingInternalRange) "Internal Port Start" else "Internal Port")
+                                if (startInternalHasError.value) {
+                                    invalidFields.add(if (usingInternalRange) "Internal Port Start" else "Internal Port")
                                 }
-                                if(startExternalHasError.value)
-                                {
-                                    invalidFields.add(if(usingExternalRange) "External Port Start" else "External Port")
+                                if (startExternalHasError.value) {
+                                    invalidFields.add(if (usingExternalRange) "External Port Start" else "External Port")
                                 }
-                                if(actualEndInternalError)
-                                {
+                                if (actualEndInternalError) {
                                     invalidFields.add("Internal Port End")
                                 }
-                                if(actualEndExternalError)
-                                {
+                                if (actualEndExternalError) {
                                     invalidFields.add("External Port End")
                                 }
-                                if(internalIpHasError.value)
-                                {
+                                if (internalIpHasError.value) {
                                     invalidFields.add("Internal IP")
                                 }
 
@@ -213,8 +235,10 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 return@TextButton
                             }
 
-                            val internalRangeStr = if(usingInternalRange) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
-                            val externalRangeStr = if(usingExternalRange) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
+                            val internalRangeStr =
+                                if (usingInternalRange) internalPortText.value + "-" + internalPortTextEnd.value else internalPortText.value
+                            val externalRangeStr =
+                                if (usingExternalRange) externalPortText.value + "-" + externalPortTextEnd.value else externalPortText.value
 
                             val portMappingRequestInput = PortMappingUserInput(
                                 description.value,
@@ -223,21 +247,19 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                                 externalDeviceText.value,
                                 externalRangeStr,
                                 selectedProtocolMutable.value,
-                                leaseDuration.value.replace(" (max)",""),
+                                leaseDuration.value.replace(" (max)", ""),
                                 true,
                                 autoRenew.value
                             )
 
                             var errorString = portMappingRequestInput.validateAutoRenew()
-                            if(errorString.isNotEmpty())
-                            {
+                            if (errorString.isNotEmpty()) {
                                 MainActivity.showSnackBarLongNoAction(errorString)
                                 return@TextButton
                             }
 
                             errorString = portMappingRequestInput.validateRange()
-                            if(errorString.isNotEmpty())
-                            {
+                            if (errorString.isNotEmpty()) {
                                 MainActivity.showSnackBarLongNoAction(errorString)
                                 return@TextButton
                             }
@@ -247,36 +269,34 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
                             GlobalScope.launch(Dispatchers.Main) {
 
 
-                            if(ruleToEdit != null)
-                            {
-                                if(ruleToEdit == portMappingRequestInput)
-                                {
-                                    PortForwardApplication.OurLogger.log(
-                                        Level.INFO,
-                                        "Rule has not changed. Nothing to do."
-                                    )
-                                    navController.popBackStack()
-                                }
-                                else
-                                {
-                                    val oldRulesToDelete = ruleToEdit.splitIntoRules()
-                                    portViewModel.editRule(
-                                        PortMappingWithPref( oldRulesToDelete[0].realize(), null),
+                                if (ruleToEdit != null) {
+                                    if (ruleToEdit == portMappingRequestInput) {
+                                        // TODO add this back. composition local?
+//                                        ourLogger.log(
+//                                            Level.INFO,
+//                                            "Rule has not changed. Nothing to do."
+//                                        )
+                                        navController.popBackStack()
+                                    } else {
+                                        val oldRulesToDelete = ruleToEdit.splitIntoRules()
+                                        portViewModel.editRule(
+                                            PortMappingWithPref(
+                                                oldRulesToDelete[0].realize(),
+                                                null
+                                            ),
                                             portMappingRequestInput
                                         )
+                                        navController.popBackStack()
+                                    }
+                                } else {
+                                    portViewModel.createRules(portMappingRequestInput)
                                     navController.popBackStack()
                                 }
-                            }
-                            else
-                            {
-                                portViewModel.createRules(portMappingRequestInput)
-                                navController.popBackStack()
-                            }
                             }
                         }
                     ) {
                         Text(
-                            text = if(ruleToEdit == null) "CREATE" else "APPLY",
+                            text = if (ruleToEdit == null) "CREATE" else "APPLY",
                             color = AdditionalColors.TextColorStrong,
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                         )
@@ -286,9 +306,11 @@ fun RuleCreationDialog(navController : NavHostController, portViewModel : PortVi
         },
         content = { it ->
 
-            Column(modifier = Modifier
-                .padding(it)
-                .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally)
+            Column(
+                modifier = Modifier
+                    .padding(it)
+                    .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally
+            )
             {
                 CreateRuleContents(
                     hasSubmitted,

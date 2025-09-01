@@ -5,15 +5,36 @@ import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.toIntOrMaxValue
 
 // this is the information the user gives us to create a rule. i.e. what the router needs + any preference info (autorenew)
-data class PortMappingUserInput(val description : String, val internalIp : String, val internalRange : String, val externalIp : String, val externalRange : String, val protocol : String, val leaseDuration : String, val enabled : Boolean, val autoRenew : Boolean)
-{
-    fun requestWith(internalPortSpecified : String, externalPortSpecified : String, portocolSpecified : String) : PortMappingRequest
-    {
-        return PortMappingRequest(description, internalIp, internalPortSpecified, externalIp, externalPortSpecified, portocolSpecified, leaseDuration, enabled, "")
+data class PortMappingUserInput(
+    val description: String,
+    val internalIp: String,
+    val internalRange: String,
+    val externalIp: String,
+    val externalRange: String,
+    val protocol: String,
+    val leaseDuration: String,
+    val enabled: Boolean,
+    val autoRenew: Boolean
+) {
+    fun requestWith(
+        internalPortSpecified: String,
+        externalPortSpecified: String,
+        portocolSpecified: String
+    ): PortMappingRequest {
+        return PortMappingRequest(
+            description,
+            internalIp,
+            internalPortSpecified,
+            externalIp,
+            externalPortSpecified,
+            portocolSpecified,
+            leaseDuration,
+            enabled,
+            ""
+        )
     }
 
-    fun validateRange() : String
-    {
+    fun validateRange(): String {
         // many 1 to 1 makes sense
         // many different external to 1 internal
         // 1 external to many internal - this isnt a thing and it causes a contradiction with upnp port retrieval api
@@ -24,32 +45,24 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
         val inSize = inEnd - inStart + 1 // inclusive
         val outSize = outEnd - outStart + 1
         val manyToOne = (inSize == 1) // many out to 1 in
-        if (inSize != outSize && !manyToOne)
-        {
+        if (inSize != outSize && !manyToOne) {
             return "Internal and External Ranges do not match up."
-        }
-        else
-        {
+        } else {
             return ""
         }
     }
 
-    fun getRange(internal : Boolean) : Pair<Int, Int>
-    {
-        val rangeInQuestion = if(internal) internalRange else externalRange
-        if(rangeInQuestion.contains('-'))
-        {
+    fun getRange(internal: Boolean): Pair<Int, Int> {
+        val rangeInQuestion = if (internal) internalRange else externalRange
+        if (rangeInQuestion.contains('-')) {
             val inRange = rangeInQuestion.split('-')
             return Pair(inRange[0].toInt(), inRange[1].toInt())
-        }
-        else
-        {
+        } else {
             return Pair(rangeInQuestion.toInt(), rangeInQuestion.toInt())
         }
     }
 
-    fun getProtocols() : List<String>
-    {
+    fun getProtocols(): List<String> {
         return when (protocol) {
             Protocol.BOTH.str() -> listOf("TCP", "UDP")
             else -> listOf(protocol)
@@ -87,9 +100,8 @@ data class PortMappingUserInput(val description : String, val internalIp : Strin
         return portMappingRequests
     }
 
-    fun validateAutoRenew() : String {
-        if (this.autoRenew && this.leaseDuration.toIntOrMaxValue() != 0 && this.leaseDuration.toIntOrMaxValue() < 90)
-        {
+    fun validateAutoRenew(): String {
+        if (this.autoRenew && this.leaseDuration.toIntOrMaxValue() != 0 && this.leaseDuration.toIntOrMaxValue() < 90) {
             return "If auto renew is enabled, lease duration must at least be 90 seconds"
         }
         return ""

@@ -5,21 +5,13 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.shinjiindustrial.portmapper.DayNightMode
-import com.shinjiindustrial.portmapper.SharedPrefKeys
-import com.shinjiindustrial.portmapper.SharedPrefValues
+import com.shinjiindustrial.portmapper.PreferencesManager.Keys.SORT_DESC_KEY
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.common.SortInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import com.shinjiindustrial.portmapper.PreferencesManager.Keys.SORT_DESC_KEY
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,10 +44,11 @@ class PreferencesManager @Inject constructor(
         .map { preferences ->
             SortInfo(
                 SortBy.from(preferences[Keys.SORT_BY_KEY] ?: SortBy.ExternalPort.sortByValue),
-                preferences[SORT_DESC_KEY] ?: false)
+                preferences[SORT_DESC_KEY] ?: false
+            )
         }
         .distinctUntilChanged()
-    
+
     suspend fun updateDayNight(dayNightMode: DayNightMode) {
         context.dataStore.edit { preferences ->
             preferences[Keys.DAY_NIGHT_KEY] = dayNightMode.intVal
@@ -76,7 +69,7 @@ class PreferencesManager @Inject constructor(
 
     suspend fun updateSortDesc(sortDesc: Boolean) {
         context.dataStore.edit { preferences ->
-            preferences[Keys.SORT_DESC_KEY] = sortDesc
+            preferences[SORT_DESC_KEY] = sortDesc
         }
     }
 }

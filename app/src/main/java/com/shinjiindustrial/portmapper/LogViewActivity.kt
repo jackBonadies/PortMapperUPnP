@@ -1,10 +1,8 @@
 package com.shinjiindustrial.portmapper
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -19,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -35,7 +32,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -45,22 +41,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.com.shinjiindustrial.portmapper.SettingsViewModel
-import java.com.shinjiindustrial.portmapper.ThemeUiState
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class LogViewActivity : ComponentActivity() {
 
-    val settingsViewModel : SettingsViewModel by viewModels()
+    val settingsViewModel: SettingsViewModel by viewModels()
+
+    @Inject
+    lateinit var logStoreRepository : LogStoreRepository
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState)
 
         PortForwardApplication.CurrentActivity = this
 
@@ -71,8 +65,7 @@ class LogViewActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun LogViewInner(themeUiState: ThemeUiState, logLines : List<String>, scrollToBottom : Boolean)
-    {
+    fun LogViewInner(themeUiState: ThemeUiState, logLines: List<String>, scrollToBottom: Boolean) {
         MyApplicationTheme(themeUiState) {
             Scaffold(
                 topBar = {
@@ -96,13 +89,22 @@ class LogViewActivity : ComponentActivity() {
                         actions = {
 
                             IconButton(onClick = {
-                                PortForwardApplication.Logs.clear()
+                                logStoreRepository.logs.clear()
                             }) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
                             }
 
-                            IconButton(onClick = { CopyTextToClipboard(PortForwardApplication.Logs.joinToString("\n")) }) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy to Clipboard")
+                            IconButton(onClick = {
+                                CopyTextToClipboard(
+                                    logStoreRepository.logs.joinToString(
+                                        "\n"
+                                    )
+                                )
+                            }) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy to Clipboard"
+                                )
                             }
 
                             IconButton(onClick = { logsSaveAs() }) {
@@ -114,10 +116,9 @@ class LogViewActivity : ComponentActivity() {
                 content = { it ->
 
                     val listState = rememberLazyListState()
-                    val coroutineScope = rememberCoroutineScope()
+                    rememberCoroutineScope()
 
-                    if(scrollToBottom)
-                    {
+                    if (scrollToBottom) {
                         //scrollToBottom = true // not necessary?
                         // launched effect - action to take when composable is first launched / relaunched
                         //   passing in Unit ensures its only done the first time.
@@ -127,7 +128,8 @@ class LogViewActivity : ComponentActivity() {
                     }
 
 
-                    LazyColumn( state = listState,
+                    LazyColumn(
+                        state = listState,
                         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
                         modifier = Modifier
                             .background(MaterialTheme.colorScheme.background)
@@ -139,8 +141,7 @@ class LogViewActivity : ComponentActivity() {
                     ) {
 
                         itemsIndexed(logLines) { index, message ->
-                            val color = when
-                            {
+                            val color = when {
                                 message.startsWith("W: ") -> AdditionalColors.LogWarningText
                                 message.startsWith("E: ") -> AdditionalColors.LogErrorText
                                 else -> AdditionalColors.TextColor
@@ -157,10 +158,10 @@ class LogViewActivity : ComponentActivity() {
     }
 
     @Composable
-    fun LogViewContent()
-    {
-        val scrollToBottom = this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false);
-        val logLines = PortForwardApplication.Logs
+    fun LogViewContent() {
+        val scrollToBottom =
+            this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false)
+        val logLines = logStoreRepository.logs
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         LogViewInner(themeState, logLines, scrollToBottom)
     }
@@ -178,23 +179,21 @@ class LogViewActivity : ComponentActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
-        if (requestCode == CREATE_LOG_FILE && resultCode == Activity.RESULT_OK)
-        {
+        if (requestCode == CREATE_LOG_FILE && resultCode == RESULT_OK) {
             resultData?.data?.also { uri ->
                 val contentResolver = applicationContext.contentResolver
                 contentResolver.openOutputStream(uri)?.bufferedWriter().use { out ->
-                    out?.write(PortForwardApplication.Logs.toString())
+                    out?.write(logStoreRepository.logs.toString())
                 }
             }
         }
     }
 
 
-    fun CopyTextToClipboard(txt : String)
-    {
-        var clipboardManager = this.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager;
-        var clipData = ClipData.newPlainText("simple text", txt);
-        clipboardManager.setPrimaryClip(clipData);
+    fun CopyTextToClipboard(txt: String) {
+        var clipboardManager = this.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        var clipData = ClipData.newPlainText("simple text", txt)
+        clipboardManager.setPrimaryClip(clipData)
     }
 }
 
