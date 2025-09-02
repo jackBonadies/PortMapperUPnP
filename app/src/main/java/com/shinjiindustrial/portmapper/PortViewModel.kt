@@ -8,6 +8,7 @@ import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.common.SortInfo
+import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
@@ -156,7 +157,7 @@ class PortViewModel @Inject constructor(
                         anyFound = true
                     }
                 }
-                if (!anyFound)
+                if (!anyFound && curDevice.status == DeviceStatus.FinishedEnumeratingMappings)
                 {
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
                 }
@@ -205,10 +206,6 @@ class PortViewModel @Inject constructor(
 
     fun fullRefresh() {
         upnpRepository.fullRefresh()
-    }
-
-    fun devices(): StateFlow<List<IIGDDevice>> {
-        return upnpRepository.devices
     }
 
     fun renew(portMapping: PortMappingWithPref) = applicationScope.launch {

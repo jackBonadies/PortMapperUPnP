@@ -3,6 +3,10 @@ package com.shinjiindustrial.portmapper.client
 import android.os.SystemClock
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
+import com.shinjiindustrial.portmapper.domain.IClingIGDDevice
+import com.shinjiindustrial.portmapper.domain.DeviceDetails
+import com.shinjiindustrial.portmapper.domain.DevicePreferences
+import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -14,8 +18,16 @@ import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.RemoteService
 
-class MockIGDDevice(private val displayName : String, private val ipAddress : String, override val udn : String, private val upnpTypeVersion : Int = 2) : IIGDDevice
+data class MockIGDDevice(val deviceDetails : DeviceDetails,
+                         override val status: DeviceStatus,
+                         override var devicePreferences: DevicePreferences
+) : IIGDDevice()
 {
+    private val displayName : String = deviceDetails.displayName
+    override val udn : String = deviceDetails.udn
+    private val ipAddress : String = deviceDetails.ipAddress
+    private val upnpTypeVersion : Int = deviceDetails.upnpVersion
+
     override fun getDisplayName(): String {
         return displayName
     }
@@ -33,14 +45,22 @@ class MockIGDDevice(private val displayName : String, private val ipAddress : St
         return ActionInvocation<RemoteService>(ActionException(0, ""))
     }
 
-    override fun getDeviceSignature(): String {
-        return udn
+    override fun withStatus(status: DeviceStatus): IIGDDevice {
+        return this.copy(status = status)
     }
 
     override fun getUpnpVersion() : Int {
         return upnpTypeVersion
     }
 
+}
+
+data class MockClingIGDDevice(override val deviceDetails: DeviceDetails) : IClingIGDDevice()
+{
+    override fun createClingDevice(preferences : DevicePreferences) : IIGDDevice
+    {
+        return MockIGDDevice(deviceDetails, DeviceStatus.Discovered, preferences)
+    }
 }
 
 enum class Speed(val latency : Long) {
@@ -72,7 +92,8 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     // remoteHost is literally remoteHost (since that's what get specific key mapping uses)
     data class Key(val remoteHost: String, val remotePort: String, val protocol: String)
 
-    private val store = mutableMapOf<IIGDDevice, LinkedHashMap<Key, PortMapping>>()
+    private val store = mutableMapOf<String, LinkedHashMap<Key, PortMapping>>()
+    private val deviceStore = mutableMapOf<String, MockIGDDevice>()
     private val interfacesUsed = false
     private var initialized = false
 
@@ -117,10 +138,13 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         )
 
     init {
-        var igdDevice = MockIGDDevice("IGD Other", "192.168.1.255", "UUID-1")
-        store.put(igdDevice, linkedMapOf())
+        var details = DeviceDetails("IGD Other", "192.168.1.255", 2, "UUID-1")
+        var igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
+        store.put(igdDevice.getKey(), linkedMapOf())
+        deviceStore.put(igdDevice.getKey(), igdDevice)
 
-        igdDevice = MockIGDDevice("IGD Main", "192.168.1.1", "UUID-2")
+        details = DeviceDetails("IGD Main", "192.168.1.1", 2, "UUID-2")
+        igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
         var mappings: List<PortMapping> =
             (1..200).map { i ->
                 makePortMapping(
@@ -136,9 +160,11 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
                 )
             }
 
-        store.put(igdDevice, linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+        store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+        deviceStore.put(igdDevice.getKey(), igdDevice)
 
-        igdDevice = MockIGDDevice("IGD Other2", "192.168.1.244", "UUID-3")
+        details = DeviceDetails("IGD Other2", "192.168.1.244", 2, "UUID-3")
+        igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
         mappings =
             (1..2).map { i ->
                 makePortMapping(
@@ -153,7 +179,8 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
                     pseudoSlot = i
                 )
             }
-        store.put(igdDevice, linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+        store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+        deviceStore.put(igdDevice.getKey(), igdDevice)
     }
 
     override suspend fun createPortMappingRule(
@@ -164,11 +191,11 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         return when{
             shouldThrow(portMappingRequest.description, NoCreate) -> throw IllegalStateException("Action blocked by $NoDelete $Exception")
             shouldFail(portMappingRequest.description, NoCreate) -> UPnPCreateMappingResult.Failure(
-                "test",
-                UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR)
+                FailureDetails("test",
+                UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
             )
             else -> {
-                store[device]!!.put(getKey(portMappingRequest.realize()), portMappingRequest.realize())
+                store[device.getKey()]!!.put(getKey(portMappingRequest.realize()), portMappingRequest.realize())
                 UPnPCreateMappingResult.Success(portMappingRequest.realize())
             }
         }
@@ -182,11 +209,11 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         return when{
             shouldThrow(portMapping.Description, NoDelete) -> throw IllegalStateException("Action blocked by $NoDelete $Exception")
             shouldFail(portMapping.Description, NoDelete) -> UPnPResult.Failure(
-                "test",
-                UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR)
+                FailureDetails("test",
+                UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
             )
             else -> {
-                store[device]!!.remove(getKey(portMapping))
+                store[device.getKey()]!!.remove(getKey(portMapping))
                 UPnPResult.Success(portMapping)
             }
         }
@@ -197,29 +224,29 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         remoteHost: String,
         remotePort: String,
         protocol: String,
-    ): UPnPCreateMappingWrapperResult {
+    ): UPnPGetSpecificMappingResult {
         tick()
-        val pm = store[device]!!.get(Key(remoteHost, remotePort, protocol))
+        val pm = store[device.getKey()]!!.get(Key(remoteHost, remotePort, protocol))
         pm!!
-        return UPnPCreateMappingWrapperResult.Success(pm, pm, true)
+        return UPnPGetSpecificMappingResult.Success(pm, pm)
     }
 
     override suspend fun getGenericPortMappingRule(device : IIGDDevice,
                                                    slotIndex : Int) : UPnPGetGenericMappingResult
     {
         tick()
-        return UPnPGetSpecificMappingResult.Success(store[device]!!.values.elementAt(slotIndex),store[device]!!.values.elementAt(slotIndex))
+        return UPnPGetGenericMappingResult.Success(store[device.getKey()]!!.values.elementAt(slotIndex),store[device.getKey()]!!.values.elementAt(slotIndex))
     }
 
     override fun search(maxSeconds : Int)
     {
         GlobalScope.launch {
             tick()
-            deviceFoundEvent.invoke(store.keys.elementAt(0))
+            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(0).deviceDetails))
             tick()
-            deviceFoundEvent.invoke(store.keys.elementAt(1))
+            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(1).deviceDetails))
             tick()
-            deviceFoundEvent.invoke(store.keys.elementAt(2))
+            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(2).deviceDetails))
         }
     }
 
@@ -241,7 +268,7 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
     }
 
-    override val deviceFoundEvent = Event<IIGDDevice>()
+    override val deviceFoundEvent: Event<IClingIGDDevice> = Event<IClingIGDDevice>()
 //    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
 //        replay = 0, extraBufferCapacity = 1
 //    )

@@ -73,7 +73,7 @@ suspend fun subscribeToSnackbarEvents(snackbarManager: SnackbarManager, snackbar
 
 @Composable
 fun SubscribeToSnackbarManager(hostState: SnackbarHostState, snackbarManager: SnackbarManager) {
-    val context = LocalContext.current.applicationContext
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         snackbarManager.events.collect { e ->
             when(e) {

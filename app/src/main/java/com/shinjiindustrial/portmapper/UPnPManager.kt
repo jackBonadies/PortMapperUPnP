@@ -10,6 +10,7 @@ import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.DevicePreferences
+import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -91,11 +92,9 @@ class UpnpRepository @Inject constructor(
                 } else {
                     ourLogger.log(Level.INFO, "Preferences found for device")
                 }
-                val igdDevice =
-                    IGDDevice(device.deviceDetails,
-                        devicePreferencesNullable?.getPrefs() ?: DevicePreferences(),
-                        device.remoteService)
-                addDevice(igdDevice)//TODO test with suspend
+                val igdDevice = device.createClingDevice(
+                        devicePreferencesNullable?.getPrefs() ?: DevicePreferences())
+                addDevice(igdDevice)
                 runBlocking {
                     enumeratePortMappings(igdDevice.getIpAddress())
                 }
@@ -225,14 +224,8 @@ class UpnpRepository @Inject constructor(
         _devices.update { curList ->
             buildList {
                 addAll(curList)
-                var index = 0
-                for (i in 0..size - 1) {
-                    if (curList[i].getIpAddress() > device.getIpAddress()) {
-                        break
-                    }
-                    index++
-                }
-                add(index, device)
+                add(device)
+                sortWith { o1, o2 -> o1.getIpAddress().compareTo(o2.getIpAddress()) }
             }
         }
     }
@@ -776,6 +769,7 @@ class UpnpRepository @Inject constructor(
             }
         }
         ourLogger.log(Level.INFO, "Time to enumerate ports: $timeTakenMillis ms")
+        updateDeviceState(device, DeviceStatus.FinishedEnumeratingMappings)
     }
 
     private fun isRuleOurs(
@@ -831,7 +825,6 @@ class UpnpRepository @Inject constructor(
                         success = true
                         ourLogger.log(Level.INFO, portMapping.toStringFull())
                         retryCount = 0
-
                     }
 
                     is UPnPGetGenericMappingResult.Failure -> {
@@ -887,9 +880,22 @@ class UpnpRepository @Inject constructor(
         _portMappings.update { mapOf() }
     }
 
+    private fun updateDeviceState(deviceToUpdate: IIGDDevice, newStatus : DeviceStatus) {
+        _devices.update { list ->
+            list.map { device ->
+                if (device.getKey() == deviceToUpdate.getKey())
+                {
+                    device.withStatus(newStatus)
+                }
+                else
+                {
+                    device
+                }
+            }
+        }
+    }
+
     private fun addDevice(igdDevice: IIGDDevice) {
-        // get dao
-        portMappingDao
         add(igdDevice)
         ourLogger.log(
             Level.INFO,
