@@ -45,9 +45,21 @@ val ActionNames: List<String> = listOf(
     ACTION_NAMES.GetListOfPortMappings,
 )
 
-data class ClingIGDDevice(val deviceDetails: DeviceDetails, val remoteService: RemoteService)
+abstract class IClingIGDDevice()
+{
+    abstract val deviceDetails : DeviceDetails
+    abstract fun createClingDevice(preferences : DevicePreferences) : IIGDDevice
+}
 
-fun RemoteDevice.getIGDDevice(ourLogger : ILogger): ClingIGDDevice? {
+data class ClingIGDDevice(override val deviceDetails: DeviceDetails, val remoteService: RemoteService) : IClingIGDDevice()
+{
+    override fun createClingDevice(preferences : DevicePreferences) : IIGDDevice
+    {
+        return IGDDevice(deviceDetails, preferences, remoteService)
+    }
+}
+
+fun RemoteDevice.getIGDDevice(ourLogger : ILogger): IClingIGDDevice? {
 
     if (this.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
     {
