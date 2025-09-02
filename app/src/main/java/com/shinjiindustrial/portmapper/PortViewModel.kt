@@ -64,7 +64,7 @@ class PortViewModel @Inject constructor(
     private val upnpRepository: UpnpRepository,
     private val preferencesRepository: PreferencesManager,
     private val savedStateHandle: SavedStateHandle,
-    private val ourLogger: ILogger,
+    val ourLogger: ILogger,
     val snackbarManager : SnackbarManager,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {

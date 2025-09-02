@@ -42,6 +42,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import com.shinjiindustrial.portmapper.PortViewModel
 import com.shinjiindustrial.portmapper.UiSnackToastEvent
+import java.util.logging.Level
 
 
 @Composable
@@ -238,35 +239,27 @@ fun RuleCreationDialog(
                                 return@TextButton
                             }
 
-                            //Toast.makeText(PortForwardApplication.appContext, "Adding Rule", Toast.LENGTH_SHORT).show()
-
-                            // TODO can be any scope with DispatchersMain.
-                            GlobalScope.launch(Dispatchers.Main) {
-
-
-                                if (ruleToEdit != null) {
-                                    if (ruleToEdit == portMappingRequestInput) {
-                                        // TODO add this back. composition local?
-//                                        ourLogger.log(
-//                                            Level.INFO,
-//                                            "Rule has not changed. Nothing to do."
-//                                        )
-                                        navController.popBackStack()
-                                    } else {
-                                        val oldRulesToDelete = ruleToEdit.splitIntoRules()
-                                        portViewModel.editRule(
-                                            PortMappingWithPref(
-                                                oldRulesToDelete[0].realize(),
-                                                null
-                                            ),
-                                            portMappingRequestInput
-                                        )
-                                        navController.popBackStack()
-                                    }
+                            if (ruleToEdit != null) {
+                                if (ruleToEdit == portMappingRequestInput) {
+                                    portViewModel.ourLogger.log(
+                                        Level.INFO,
+                                        "Rule has not changed. Nothing to do."
+                                    )
+                                    navController.popBackStack()
                                 } else {
-                                    portViewModel.createRules(portMappingRequestInput)
+                                    val oldRulesToDelete = ruleToEdit.splitIntoRules()
+                                    portViewModel.editRule(
+                                        PortMappingWithPref(
+                                            oldRulesToDelete[0].realize(),
+                                            null
+                                        ),
+                                        portMappingRequestInput
+                                    )
                                     navController.popBackStack()
                                 }
+                            } else {
+                                portViewModel.createRules(portMappingRequestInput)
+                                navController.popBackStack()
                             }
                         }
                     ) {
