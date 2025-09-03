@@ -35,6 +35,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -180,9 +181,9 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 //            }
     }
 
-    Scaffold(
-        snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
-        floatingActionButton = {
+    val ctrl = LocalScaffoldController.current
+    DisposableEffect(Unit) {
+        ctrl.fab = {
 
             if (anyDevices) {
                 FloatingActionButton(
@@ -202,8 +203,8 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     )
                 }
             }
-        },
-        topBar = {
+       }
+        ctrl.topBar = {
             TopAppBar(
                 navigationIcon = {
                     if (inMultiSelectMode) {
@@ -257,11 +258,11 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     OverflowMenu(
                         showAboutDialogState, portViewModel
                     )
-                }
-            )
-        },
-        content = { it ->
+                })
+            }
+        onDispose {}
 
+    }
             // TODO can revisit this - if we already know we have some kind of device
             //   then we can forget the main loading circle and show this until we
             //   finish enumerating our first device (or have a flow which is like
@@ -281,7 +282,6 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             PullToRefreshBox(
                 isRefreshing = isRefreshing.value,
                 onRefresh = ::refresh,
-                modifier = Modifier.padding(it),
                 state = state,
                 indicator = {
                     // dont show after initially pulling down
@@ -410,5 +410,3 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             }
 
         }
-    )
-}

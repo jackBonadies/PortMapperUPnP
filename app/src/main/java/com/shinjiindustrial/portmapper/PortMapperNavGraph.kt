@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -31,11 +32,11 @@ import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState) {
+fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState, modifier : Modifier = Modifier) {
 
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "main_screen") {
+    NavHost(navController = navController, startDestination = "main_screen", modifier = modifier) {
         composable(
             "main_screen",
             exitTransition = {
