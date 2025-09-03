@@ -25,6 +25,7 @@ class OurNetworkInfo {
         var gatewayIp: String? = null
         var networkType: NetworkType? = null
 
+        // TODO remove these 
         fun GetNetworkInfo(context: Context, forceRefresh: Boolean): OurNetworkInfoBundle {
             GetConnectionType(context, forceRefresh)
             if (networkType == NetworkType.WIFI) {

@@ -15,6 +15,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import com.shinjiindustrial.portmapper.CreateRuleContents
+import com.shinjiindustrial.portmapper.LocalScaffoldController
 import com.shinjiindustrial.portmapper.OurSnackbarHost
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.Protocol
@@ -137,9 +139,10 @@ fun RuleCreationDialog(
 
     //
     //END
-
-    Scaffold(
-        topBar = {
+    val ctrl = LocalScaffoldController.current
+    DisposableEffect(Unit) {
+        ctrl.fab = { }
+        ctrl.topBar = {
             TopAppBar(
 //                                modifier = Modifier.height(40.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -271,13 +274,11 @@ fun RuleCreationDialog(
                     }
                 }
             )
-        },
-        snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
-        content = { it ->
-
+        }
+        onDispose { }
+    }
             Column(
                 modifier = Modifier
-                    .padding(it)
                     .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally
             )
             {
@@ -305,6 +306,4 @@ fun RuleCreationDialog(
                     autoRenew
                 )
             }
-
-        })
 }

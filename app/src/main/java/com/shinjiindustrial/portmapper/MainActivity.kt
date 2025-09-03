@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -55,18 +56,22 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -92,6 +97,7 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
+import com.shinjiindustrial.portmapper.MainActivity.ScaffoldController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.common.ValidationError
 import com.shinjiindustrial.portmapper.common.capLeaseDur
@@ -167,14 +173,38 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                PortMapperNavGraph(portViewModel, themeState)
+                RootScaffold()
+                {
+                    it -> PortMapperNavGraph(portViewModel, themeState, Modifier.padding(it))
+                }
             }
         }
     }
 
+    @Stable
+    class ScaffoldController {
+        var fab: (@Composable () -> Unit)? by mutableStateOf(null)
+        var topBar: (@Composable () -> Unit)? by mutableStateOf(null)
+        var bottomBar: (@Composable () -> Unit)? by mutableStateOf(null)
+    }
 
-
+    @Composable
+    fun RootScaffold(content: @Composable (PaddingValues) -> Unit)
+    {
+        val ctrl = remember { ScaffoldController() }
+        CompositionLocalProvider(LocalScaffoldController provides ctrl) {
+            Scaffold(
+                snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
+                topBar = { ctrl.topBar?.invoke() },
+                bottomBar = { ctrl.bottomBar?.invoke() },
+                floatingActionButton = { ctrl.fab?.invoke() })
+            { innerPadding ->
+                content(innerPadding)
+            }
+        }
+    }
 }
+val LocalScaffoldController = staticCompositionLocalOf { ScaffoldController() }
 
 fun fallbackRecursiveSearch(rootDevice: RemoteDevice) {
     // recursively look through devices
