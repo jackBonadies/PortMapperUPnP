@@ -25,7 +25,11 @@ object LoggingModule {
 
     class CrashlyticsSink(
         private val crashlytics: FirebaseCrashlytics,
-    ) : ILogSink {
+    ) : ILogSink() {
+        override fun isFirebaseLogger() : Boolean {
+            return true
+        }
+
         override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
             var firebaseLevel = opts.firebase
             if (firebaseLevel == FirebaseRoute.SILENT) return

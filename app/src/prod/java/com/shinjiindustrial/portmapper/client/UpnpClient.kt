@@ -16,6 +16,7 @@ import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.AndroidUpnpServiceConfigurationImpl
 import com.shinjiindustrial.portmapper.domain.ClingIGDDevice
+import com.shinjiindustrial.portmapper.domain.IClingIGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -39,7 +40,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
     sealed class ClingExecutionResult {
         data class Success(val invocation: ActionInvocation<*>) : ClingExecutionResult()
-        data class Failure(val invocation: ActionInvocation<*>, val operation : UpnpResponse, val defaultMsg : String) :
+        data class Failure(val invocation: ActionInvocation<*>, val operation : UpnpResponse?, val defaultMsg : String) :
             ClingExecutionResult()
     }
 
@@ -114,7 +115,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
                 override fun failure(
                     invocation: ActionInvocation<*>?,
-                    operation: UpnpResponse,
+                    operation: UpnpResponse?,
                     defaultMsg: String
                 ) {
                     val result = ClingExecutionResult.Failure(invocation!!, operation, defaultMsg)
@@ -285,7 +286,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
         return (upnpService.configuration as AndroidUpnpServiceConfigurationImpl).NetworkInterfacesUsedInfos
     }
 
-    override val deviceFoundEvent = Event<ClingIGDDevice>()
+    override val deviceFoundEvent = Event<IClingIGDDevice>()
 //    private val _deviceFoundEvent = MutableSharedFlow<DeviceFoundEvent>(
 //        replay = 0, extraBufferCapacity = 1
 //    )

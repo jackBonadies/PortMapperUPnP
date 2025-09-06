@@ -14,7 +14,7 @@ import kotlin.system.measureTimeMillis
  *
  * See [testing documentation](http://d.android.com/tools/testing).
  */
-class UPnPManagerTests {
+class UpnpRepositoryTests {
 
     @Test
     fun addingAndReplaceRules()

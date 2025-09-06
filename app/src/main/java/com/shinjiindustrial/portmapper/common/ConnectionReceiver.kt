@@ -20,12 +20,12 @@ class ConnectionReceiver : BroadcastReceiver() {
             //TODO: multiple transports
             val isWifi = cm.activeNetworkInfo!!.type == ConnectivityManager.TYPE_WIFI
             if (isWifi) {
-                PortForwardApplication.ShowToast("Is Connected Wifi", Toast.LENGTH_LONG)
+                //PortForwardApplication.ShowToast("Is Connected Wifi", Toast.LENGTH_LONG)
             }
 
             val isData = cm.activeNetworkInfo!!.type == ConnectivityManager.TYPE_MOBILE
             if (isData) {
-                PortForwardApplication.ShowToast("Is Connected Data", Toast.LENGTH_LONG)
+                //PortForwardApplication.ShowToast("Is Connected Data", Toast.LENGTH_LONG)
             }
         }
     }

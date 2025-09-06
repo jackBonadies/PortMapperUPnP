@@ -78,6 +78,7 @@ fun PortMappingCard(
     now: Long = -1,
     isInMultiSelectMode: Boolean = false,
     toggleSelection: (PortMappingKey) -> Unit = {},
+    onClick: (PortMappingKey) -> Unit = {},
     selectedIds: Set<PortMappingKey>,
     additionalModifier: Modifier = Modifier.Companion
 ) {
@@ -101,10 +102,7 @@ fun PortMappingCard(
                     if (isInMultiSelectMode) {
                         toggleSelection(portMappingWithPref.getKey())
                     } else {
-                        // TODO cleanup
-                        PortForwardApplication.Companion.showContextMenu.value = true
-                        PortForwardApplication.Companion.currentSingleSelectedObject.value =
-                            portMappingWithPref
+                        onClick(portMappingWithPref.getKey())
                     }
 
                 },
@@ -546,7 +544,7 @@ fun PreviewConversation() {
         for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
-        PortMappingsListContent(msgs, false, {}, emptySet())
+        PortMappingsListContent(msgs, false, {}, {},emptySet())
     }
 }
 
@@ -555,9 +553,10 @@ fun PortMappingContent(
     uiState: PortUiState,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onClick: (PortMappingKey) -> Unit,
     selectedIds: Set<PortMappingKey>
 ) {
-    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, selectedIds)
+    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, onClick, selectedIds)
 }
 
 @Composable
@@ -579,6 +578,7 @@ fun PortMappingsListContent(
     messages: List<UpnpViewRow>,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onClick: (PortMappingKey) -> Unit,
     selectedIds: Set<PortMappingKey>
 ) {
 
@@ -614,6 +614,7 @@ fun PortMappingsListContent(
                         now,
                         isInMultiSelectMode,
                         onToggle,
+                        onClick,
                         selectedIds,
                         Modifier.animateItem()
                     )

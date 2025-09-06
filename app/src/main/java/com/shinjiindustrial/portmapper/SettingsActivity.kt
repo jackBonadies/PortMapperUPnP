@@ -56,7 +56,6 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        PortForwardApplication.CurrentActivity = this
         setContent {
             Settings()
         }
