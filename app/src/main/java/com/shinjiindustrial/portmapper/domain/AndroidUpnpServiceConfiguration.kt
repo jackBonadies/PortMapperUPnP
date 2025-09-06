@@ -1,19 +1,34 @@
 package com.shinjiindustrial.portmapper.domain
 
 import android.content.Context
+import android.os.Build
 import com.shinjiindustrial.portmapper.common.NetworkType
 import org.fourthline.cling.android.AndroidNetworkAddressFactory
 import org.fourthline.cling.android.AndroidUpnpServiceConfiguration
 import org.fourthline.cling.binding.xml.ServiceDescriptorBinder
 import org.fourthline.cling.binding.xml.UDA10ServiceDescriptorBinderImpl
+import org.fourthline.cling.model.ServerClientTokens
+import org.fourthline.cling.transport.impl.jetty.StreamClientConfigurationImpl
+import org.fourthline.cling.transport.impl.jetty.StreamClientImpl
 import org.fourthline.cling.transport.spi.NetworkAddressFactory
+import org.fourthline.cling.transport.spi.StreamClient
 
-class AndroidUpnpServiceConfigurationImpl(context: Context) : AndroidUpnpServiceConfiguration() {
+class AndroidUpnpServiceConfigurationImpl(private val context: Context) : AndroidUpnpServiceConfiguration() {
 
-    var Context: Context
-
-    init {
-        Context = context
+    // we override this in order to set timeout
+    override fun createStreamClient(): StreamClient<*>? {
+        // Use Jetty
+        return StreamClientImpl(
+            object : StreamClientConfigurationImpl(getSyncProtocolExecutorService(), 10) {
+                override fun getUserAgentValue(majorVersion: Int, minorVersion: Int): String {
+                    // UPNP VIOLATION: Some devices (e.g., Synology NAS) expect "Android" in User-Agent
+                    val tokens = ServerClientTokens(majorVersion, minorVersion)
+                    tokens.setOsName("Android")
+                    tokens.setOsVersion(Build.VERSION.RELEASE)
+                    return tokens.toString()
+                }
+            }
+        )
     }
 
     override fun getServiceDescriptorBinderUDA10(): ServiceDescriptorBinder {
@@ -38,14 +53,14 @@ class AndroidUpnpServiceConfigurationImpl(context: Context) : AndroidUpnpService
             networkInterfaces.add(iterator.next())
         }
         NetworkInterfacesUsed = networkInterfaces
-        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(Context)
+        NetworkMappings = OurNetworkInfo.GetNameTypeMappings(context)
 
         NetworkInterfacesUsedInfos = mutableListOf()
         for (netInterface in networkInterfaces) {
             NetworkInterfacesUsedInfos.add(
                 NetworkInterfaceInfo(
                     netInterface,
-                    OurNetworkInfo.GetTypeFromInterfaceName(NetworkMappings, netInterface.name)
+                    OurNetworkInfo.GetTypeFromInterfaceName(context, NetworkMappings, netInterface.name)
                 )
             )
         }

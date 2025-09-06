@@ -29,10 +29,10 @@ sealed class UpnpViewRow {
     }
 
     data class DeviceHeaderViewRow(val device: IIGDDevice) : UpnpViewRow() {
-        override val key = ViewKey.DeviceHeaderKey(device.getIpAddress())
+        override val key = ViewKey.DeviceHeaderKey(device.getKey())
     }
 
     data class DeviceEmptyViewRow(val device: IIGDDevice) : UpnpViewRow() {
-        override val key = ViewKey.DeviceEmptyKey(device.getIpAddress())
+        override val key = ViewKey.DeviceEmptyKey(device.getKey())
     }
 }

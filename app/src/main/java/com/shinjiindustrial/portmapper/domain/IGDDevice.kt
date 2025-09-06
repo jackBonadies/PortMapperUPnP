@@ -21,14 +21,25 @@ data class DevicePreferences(val useWildcardForRemoteHostDelete: Boolean = false
     }
 }
 
-interface IIGDDevice {
-    fun getDisplayName(): String
-    fun getIpAddress(): String
-    fun getUpnpVersion(): Int
-    fun supportsAction(actionName: String): Boolean
-    fun getActionInvocation(actionName: String): ActionInvocation<*>
-    val udn: String
-    var devicePreferences: DevicePreferences
+enum class DeviceStatus {
+    Discovered,
+    FinishedEnumeratingMappings
+}
+
+abstract class IIGDDevice {
+    abstract fun getDisplayName(): String
+    abstract fun getIpAddress(): String
+    abstract fun getUpnpVersion(): Int
+    abstract fun supportsAction(actionName: String): Boolean
+    abstract fun getActionInvocation(actionName: String): ActionInvocation<*>
+    abstract fun withStatus(status: DeviceStatus): IIGDDevice
+    abstract val udn: String
+    abstract val status: DeviceStatus
+    abstract var devicePreferences: DevicePreferences
+
+    fun getKey() : String {
+        return "${getIpAddress()}:${udn}"
+    }
 }
 
 data class DeviceDetails(val displayName: String, val ipAddress: String, val upnpVersion: Int, val udn : String)
@@ -46,8 +57,11 @@ data class DeviceDetails(val displayName: String, val ipAddress: String, val upn
 }
 
 // has state including rules. add update those rules. and do a upnp action. and sort.
-class IGDDevice(val deviceDetails: DeviceDetails, override var devicePreferences : DevicePreferences, private val wanIPService: RemoteService) :
-    IIGDDevice {
+data class IGDDevice(val deviceDetails: DeviceDetails,
+                     override var devicePreferences : DevicePreferences,
+                     private val wanIPService: RemoteService,
+                     override val status: DeviceStatus = DeviceStatus.Discovered) :
+    IIGDDevice() {
     // nullrefs warning: this is SSDP response, very possible for some fields to be null, DeviceDetails constructor allows it.
     // the best bet on ip is (rootDevice!!.identity.descriptorURL.host) imo.  since that is what we use in RetreiveRemoteDescriptors class
     // which then calls remoteDeviceAdded (us). presentationURI can be and is null sometimes.
@@ -85,6 +99,10 @@ class IGDDevice(val deviceDetails: DeviceDetails, override var devicePreferences
     override fun getActionInvocation(actionName: String): ActionInvocation<*> {
         val action = this.actionsMap[actionName]
         return ActionInvocation(action)
+    }
+
+    override fun withStatus(status: DeviceStatus): IIGDDevice {
+        return this.copy(status = status)
     }
 
     init {

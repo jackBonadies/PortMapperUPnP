@@ -5,7 +5,7 @@ import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 
 import android.util.Log
-import com.shinjiindustrial.portmapper.UpnpManager
+import com.shinjiindustrial.portmapper.UpnpRepository
 import com.shinjiindustrial.portmapper.client.MockUpnpClient
 import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
 import com.shinjiindustrial.portmapper.client.Speed
@@ -168,7 +168,7 @@ class ValidatorsTest {
         every { Log.e(any(), any()) } returns 0
 
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest))
-        val repo = UpnpManager(client)
+        val repo = UpnpRepository(client)
         GlobalScope.launch {
             repo.search(false)
         }

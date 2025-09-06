@@ -2,7 +2,7 @@ package com.shinjiindustrial.portmapper.client
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.common.Event
-import com.shinjiindustrial.portmapper.domain.ClingIGDDevice
+import com.shinjiindustrial.portmapper.domain.IClingIGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMapping
@@ -46,7 +46,7 @@ interface IUpnpClient {
 
     fun instantiateAndBindUpnpService()
 
-    val deviceFoundEvent: Event<ClingIGDDevice>
+    val deviceFoundEvent: Event<IClingIGDDevice>
 }
 
 sealed class UPnPCreateMappingWrapperResult {
@@ -88,9 +88,13 @@ sealed class UPnPResult {
     data class Failure(val details: FailureDetails) : UPnPResult()
 }
 
-class FailureDetails(val reason: String, val response: UpnpResponse)
+class FailureDetails(val reason: String, val response: UpnpResponse?)
 {
     override fun toString() : String{
+        if (response == null)
+        {
+            return "\t${reason}. No response from router."
+        }
         return "\t${reason}\t${response}"
     }
 }

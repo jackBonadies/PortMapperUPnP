@@ -14,27 +14,40 @@ import java.util.logging.Logger
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class FirebaseRoute { NO_OPINION, SILENT, BREADCRUMB, NON_FATAL }
+enum class FirebaseRoute
+{
+    // all loggers should log as normally, firebase should log SEVERE as exception
+    NO_OPINION,
+    // all loggers should log as normally, but firebase should not log
+    SILENT,
+    // all loggers should log as normally, but firebase should log breadcrumb
+    BREADCRUMB,
+    // all loggers should log as normally, firebase should log as exception
+    NON_FATAL
+}
 
 data class LogOptions(
-    // logs everything "SEVERE" by default
     val firebase: FirebaseRoute = FirebaseRoute.NO_OPINION,
 )
 
 interface ILogger {
     fun log(
         level: Level,
-        event: String,
+        msg: String,
         t: Throwable? = null,
         opts: LogOptions = LogOptions()
     )
+    fun logBreadcrumb(obj : Any)
 }
 
-interface ILogSink {
-    fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions)
+abstract class ILogSink {
+    abstract fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions)
+    open fun isFirebaseLogger() : Boolean {
+        return false
+    }
 }
 
-class LogcatSink : ILogSink {
+class LogcatSink : ILogSink() {
     val logger: Logger = Logger.getLogger("PortMapper")
     override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
         logger.log(level, msg)
@@ -43,7 +56,7 @@ class LogcatSink : ILogSink {
 
 class LogStringBuilderSink(
     private val logStoreRepository: LogStoreRepository,
-) : ILogSink {
+) : ILogSink() {
     private val main = Handler(Looper.getMainLooper())
     override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
         main.post {
@@ -62,13 +75,22 @@ class LogStringBuilderSink(
 class LogStoreRepository @Inject constructor(
 ) {
     var logs: SnapshotStateList<String> = mutableStateListOf<String>()
+
+    fun getLogsAsText(): String
+    {
+        return logs.joinToString("\n")
+    }
 }
 
 class CompositeLogger(
     private val sinks: Set<ILogSink>
 ) : ILogger {
-    override fun log(level: Level, event: String, t: Throwable?, opts: LogOptions) {
-        sinks.forEach { it.log(level, event, t, opts) }
+    override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
+        sinks.forEach { it.log(level, msg, t, opts) }
+    }
+
+    override fun logBreadcrumb(obj: Any) {
+        sinks.filter { it.isFirebaseLogger() }.forEach { it.log(Level.INFO, obj.toString(), null, LogOptions(FirebaseRoute.BREADCRUMB)) }
     }
 }
 

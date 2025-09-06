@@ -25,6 +25,7 @@ class OurNetworkInfo {
         var gatewayIp: String? = null
         var networkType: NetworkType? = null
 
+        // TODO remove these 
         fun GetNetworkInfo(context: Context, forceRefresh: Boolean): OurNetworkInfoBundle {
             GetConnectionType(context, forceRefresh)
             if (networkType == NetworkType.WIFI) {
@@ -103,13 +104,14 @@ class OurNetworkInfo {
         }
 
         fun GetTypeFromInterfaceName(
+            context : Context,
             _mappings: MutableMap<String, NetworkType>?,
             interfaceName: String
         ): NetworkType {
             var mappings = _mappings
             if (mappings == null) {
                 mappings =
-                    GetNameTypeMappings(PortForwardApplication.appContext) //TODO: dont call this expensive call everytime
+                    GetNameTypeMappings(context) //TODO: dont call this expensive call everytime
             }
             mappings
             if (mappings.containsKey(interfaceName)) {

@@ -5,7 +5,6 @@ import android.text.Html
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
-import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,9 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -39,7 +35,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,8 +55,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
-import com.shinjiindustrial.portmapper.MainActivity.Companion.OurSnackbarHostState
-import com.shinjiindustrial.portmapper.MainActivity.Companion.showSnackBarViewLog
 import com.shinjiindustrial.portmapper.common.NetworkType
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
@@ -82,27 +77,14 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val contextMenuUiState by portViewModel.contextMenuUiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    LaunchedEffect(Unit) {
-        portViewModel.events.collect { ev ->
-            if (ev is PortViewModel.UiEvent.ToastEvent) {
-                Toast.makeText(
-                    PortForwardApplication.appContext,
-                    ev.msg,
-                    ev.duration
-                ).show()
-            } else if (ev is PortViewModel.UiEvent.SnackBarViewLogEvent) {
-                showSnackBarViewLog(ev.msg) // emit these
-            }
-        }
-    }
-
-    PortForwardApplication.currentSingleSelectedObject =
-        remember { mutableStateOf(null) }
-
-    if (PortForwardApplication.showContextMenu.value && PortForwardApplication.currentSingleSelectedObject.value != null) {
+    if (contextMenuUiState.isOpen()) {
         EnterContextMenu(
-            PortForwardApplication.currentSingleSelectedObject, // why is this not typed??
+            contextMenuUiState.selectedId,
+            portViewModel::getSelectedItem,
+            portViewModel::closeContextMenu,
             showMoreInfoDialogState,
             navController,
             portViewModel,
@@ -112,10 +94,12 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 
     if (showMoreInfoDialogState.value) {
         MoreInfoDialog(
-            portMappingWithPref = PortForwardApplication.currentSingleSelectedObject.value as PortMappingWithPref,
+            portMappingWithPref = portViewModel.getSelectedItem(contextMenuUiState.selectedId!!),
             showDialog = showMoreInfoDialogState
         )
     }
+
+
 
     if (showAboutDialog) {
         AlertDialog(
@@ -126,10 +110,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 Column()
                 {
                     var aboutString: String =
-                        PortForwardApplication.appContext.getString(R.string.about_body)
+                        context.getString(R.string.about_body)
                     val packageInfo =
-                        PortForwardApplication.appContext.packageManager.getPackageInfo(
-                            PortForwardApplication.appContext.packageName,
+                        context.packageManager.getPackageInfo(
+                            context.packageName,
                             0
                         )
 
@@ -166,7 +150,6 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     }
 
 
-    OurSnackbarHostState = remember { SnackbarHostState() }
     rememberCoroutineScope()
     val coroutineScope: CoroutineScope = rememberCoroutineScope()
 
@@ -198,23 +181,9 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 //            }
     }
 
-    Scaffold(
-
-        snackbarHost = {
-            SnackbarHost(OurSnackbarHostState!!) { data ->
-                // custom snackbar with the custom colors
-                Snackbar(
-                    data,
-                    actionColor = AdditionalColors.PrimaryDarkerBlue
-                    // according to https://m2.material.io/design/color/dark-theme.html
-                    // light snackbar in darkmode is good.
-//                                    containerColor = AdditionalColors.CardContainerColor,
-//                                    contentColor = AdditionalColors.TextColor
-//                                    //contentColor = ...,
-                )
-            }
-        },
-        floatingActionButton = {
+    val ctrl = LocalScaffoldController.current
+    DisposableEffect(Unit) {
+        ctrl.fab = {
 
             if (anyDevices) {
                 FloatingActionButton(
@@ -234,8 +203,8 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     )
                 }
             }
-        },
-        topBar = {
+       }
+        ctrl.topBar = {
             TopAppBar(
                 navigationIcon = {
                     if (inMultiSelectMode) {
@@ -289,11 +258,11 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     OverflowMenu(
                         showAboutDialogState, portViewModel
                     )
-                }
-            )
-        },
-        content = { it ->
+                })
+            }
+        onDispose {}
 
+    }
             // TODO can revisit this - if we already know we have some kind of device
             //   then we can forget the main loading circle and show this until we
             //   finish enumerating our first device (or have a flow which is like
@@ -313,7 +282,6 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             PullToRefreshBox(
                 isRefreshing = isRefreshing.value,
                 onRefresh = ::refresh,
-                modifier = Modifier.padding(it),
                 state = state,
                 indicator = {
                     // dont show after initially pulling down
@@ -433,6 +401,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             uiState,
                             isInMultiSelectMode,
                             portViewModel::toggle,
+                            portViewModel::openContextMenu,
                             selectedIds
                         )
                     }
@@ -441,5 +410,3 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             }
 
         }
-    )
-}

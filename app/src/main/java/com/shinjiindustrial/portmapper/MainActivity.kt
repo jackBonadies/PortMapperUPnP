@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.DisplayMetrics
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -56,22 +56,22 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -81,6 +81,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -96,6 +97,7 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
+import com.shinjiindustrial.portmapper.MainActivity.ScaffoldController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.common.ValidationError
 import com.shinjiindustrial.portmapper.common.capLeaseDur
@@ -106,20 +108,16 @@ import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.ActionNames
 import com.shinjiindustrial.portmapper.domain.PortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import org.fourthline.cling.model.meta.RemoteDevice
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.logging.Level
-import java.util.logging.LogRecord
 
 var PseudoSlotCounter: Int = MAX_PORT // as starting slot
 fun GetPsuedoSlot(): Int {
@@ -144,64 +142,10 @@ class MainActivity : ComponentActivity() {
     private val portViewModel: PortViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
 
-    companion object {
-
-        fun viewLogCallback() {
-            val intent =
-                Intent(PortForwardApplication.CurrentActivity, LogViewActivity::class.java)
-            intent.putExtra(PortForwardApplication.ScrollToBottom, true)
-            PortForwardApplication.CurrentActivity?.startActivity(intent)
-        }
-
-        fun showSnackBarViewLog(message: String) {
-            showSnackBar(message, "View Log", SnackbarDuration.Long, ::viewLogCallback)
-        }
-
-        fun showSnackBarShortNoAction(message: String) {
-            showSnackBar(message, null, SnackbarDuration.Short)
-        }
-
-        fun showSnackBarLongNoAction(message: String) {
-            showSnackBar(message, null, SnackbarDuration.Long)
-        }
-
-        fun showSnackBar(
-            message: String,
-            action: String?,
-            duration: SnackbarDuration,
-            onAction: () -> Unit = { }
-        ) {
-            if (OurSnackbarHostState == null) {
-                PortForwardApplication.ShowToast(
-                    message,
-                    if ((duration == SnackbarDuration.Long || duration == SnackbarDuration.Indefinite)) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
-                )
-            } else {
-                GlobalScope.launch(Dispatchers.Main) {
-
-                    val snackbarResult = OurSnackbarHostState!!.showSnackbar(
-                        message,
-                        action,
-                        (duration == SnackbarDuration.Indefinite),
-                        duration
-                    )
-                    when (snackbarResult) {
-                        SnackbarResult.Dismissed -> {}
-                        SnackbarResult.ActionPerformed -> onAction()
-                    }
-                }
-            }
-        }
-
-        var OurSnackbarHostState: SnackbarHostState? = null
-    }
-
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        PortForwardApplication.CurrentActivity = this
 
         onBackPressedDispatcher.addCallback(this)
         {
@@ -229,14 +173,38 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                PortMapperNavGraph(portViewModel, themeState)
+                RootScaffold()
+                {
+                    it -> PortMapperNavGraph(portViewModel, themeState, Modifier.padding(it))
+                }
             }
         }
     }
 
+    @Stable
+    class ScaffoldController {
+        var fab: (@Composable () -> Unit)? by mutableStateOf(null)
+        var topBar: (@Composable () -> Unit)? by mutableStateOf(null)
+        var bottomBar: (@Composable () -> Unit)? by mutableStateOf(null)
+    }
 
-
+    @Composable
+    fun RootScaffold(content: @Composable (PaddingValues) -> Unit)
+    {
+        val ctrl = remember { ScaffoldController() }
+        CompositionLocalProvider(LocalScaffoldController provides ctrl) {
+            Scaffold(
+                snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
+                topBar = { ctrl.topBar?.invoke() },
+                bottomBar = { ctrl.bottomBar?.invoke() },
+                floatingActionButton = { ctrl.fab?.invoke() })
+            { innerPadding ->
+                content(innerPadding)
+            }
+        }
+    }
 }
+val LocalScaffoldController = staticCompositionLocalOf { ScaffoldController() }
 
 fun fallbackRecursiveSearch(rootDevice: RemoteDevice) {
     // recursively look through devices
@@ -258,13 +226,15 @@ fun fallbackRecursiveSearch(rootDevice: RemoteDevice) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnterContextMenu(
-    singleSelectedItem: MutableState<PortMappingWithPref?>,
+    selectedKey: PortMappingKey?,
+    getSelectedItem: (PortMappingKey) -> PortMappingWithPref,
+    closeContextMenu: () -> Unit,
     showMoreInfoDialog: MutableState<Boolean>,
     navController: NavHostController,
     portViewModel: PortViewModel,
     themeState: ThemeUiState
 ) {
-    if (singleSelectedItem.value == null) {
+    if (selectedKey == null) {
         return
     }
 
@@ -277,7 +247,7 @@ fun EnterContextMenu(
     )
     MyApplicationTheme(themeState) {
         Dialog(
-            onDismissRequest = { PortForwardApplication.showContextMenu.value = false },
+            onDismissRequest = { closeContextMenu() },
             properties = prop,
         ) {
             Surface(
@@ -290,12 +260,12 @@ fun EnterContextMenu(
 
                 ) {
                     // it redraws starting at this inner context...
-                    if (singleSelectedItem.value != null) {
+                    if (selectedKey != null) {
 
 
                         val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
-                        val portMappingWithPref =
-                            singleSelectedItem.value as PortMappingWithPref // TODO remove cast
+                        //TODO
+                        val portMappingWithPref = getSelectedItem(selectedKey)
                         val portMapping = portMappingWithPref.portMapping
                         menuItems.add(
                             Pair<String, () -> Unit>(
@@ -372,7 +342,7 @@ fun EnterContextMenu(
                                     .fillMaxWidth()
                                     .clickable {
                                         menuItem.second()
-                                        PortForwardApplication.showContextMenu.value = false
+                                        closeContextMenu()
                                     }
                                     .padding(vertical = 14.dp)
                             ) {
@@ -1197,6 +1167,7 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
             items.add(R.string.about)
         }
 
+        val context = LocalContext.current
         items.forEach { label ->
             DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = {
                 // handle item click
@@ -1242,19 +1213,19 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
                     R.string.view_log_action -> {
                         val intent =
                             Intent(
-                                PortForwardApplication.CurrentActivity,
+                                context,
                                 LogViewActivity::class.java
                             )
-                        PortForwardApplication.CurrentActivity?.startActivity(intent)
+                        context.startActivity(intent)
                     }
 
                     R.string.settings -> {
                         val intent =
                             Intent(
-                                PortForwardApplication.CurrentActivity,
+                                context,
                                 SettingsActivity::class.java
                             )
-                        PortForwardApplication.CurrentActivity?.startActivity(intent)
+                        context.startActivity(intent)
                     }
 
                     R.string.about -> {
