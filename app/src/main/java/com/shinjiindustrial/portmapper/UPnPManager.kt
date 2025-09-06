@@ -379,6 +379,7 @@ class UpnpRepository @Inject constructor(
             return res
         } catch (exception: Exception) {
             val enableDisableString = if (enable) "Enable" else "Disable"
+            ourLogger.logBreadcrumb(portMapping)
             ourLogger.log(
                 Level.SEVERE,
                 "$enableDisableString Port Mapping Failed: " + exception.message + exception.stackTraceToString()
@@ -391,8 +392,8 @@ class UpnpRepository @Inject constructor(
             : List<UPnPCreateMappingWrapperResult> {
         return portMappings.map { portMapping ->
 
+            val portMappingRequest = PortMappingRequest.from(portMapping)
             try {
-                val portMappingRequest = PortMappingRequest.from(portMapping)
                 val res = createPortMappingRuleWrapper(
                     portMappingRequest,
                     false,
@@ -401,6 +402,7 @@ class UpnpRepository @Inject constructor(
                 addOrUpdateForRenew(res, portMapping)
                 res
             } catch (exception: Exception) {
+                ourLogger.logBreadcrumb(portMapping)
                 ourLogger.log(
                     Level.SEVERE,
                     "Renew Port Mappings Failed: " + exception.message + exception.stackTraceToString()
@@ -424,6 +426,7 @@ class UpnpRepository @Inject constructor(
             addOrUpdateForRenew(res, portMapping)
             return res
         } catch (exception: Exception) {
+            ourLogger.logBreadcrumb(portMapping)
             ourLogger.log(
                 Level.SEVERE,
                 "Renew Port Mappings Failed: " + exception.message + exception.stackTraceToString()
@@ -443,6 +446,7 @@ class UpnpRepository @Inject constructor(
             portMapping.copy(RemoteHost = device.devicePreferences.getDefaultWildcard()))
         if (result is UPnPResult.Failure)
         {
+            // 500 can also occur with generic "500 Internal Server Error" it doesnt help to retry these fwiw
             if (result.details.response != null && result.details.response.statusCode == 500)
             {
                 // add breadcrumb? no only on another failure
@@ -467,6 +471,7 @@ class UpnpRepository @Inject constructor(
                         // this means we maybe should not have retried
                         // log both original and fallback errors to firebase
                         // log to firebase
+                        ourLogger.logBreadcrumb(portMapping)
                         ourLogger.log(Level.SEVERE, "Fallback Original and Delete Failed. Original: " +
                                 result.details.toString() + "\n Fallback: " + fallbackResult.details.toString())
                         return fallbackResult
@@ -503,15 +508,19 @@ class UpnpRepository @Inject constructor(
             }
             else if (result is UPnPResult.Failure)
             {
-               ourLogger.log(
-                    Level.SEVERE,
-                    "Failed to delete rule (${pm.shortName()})."
+                ourLogger.logBreadcrumb(portMappingWithPref)
+                ourLogger.log(
+                   Level.SEVERE,
+                   "Failed to delete rule (${pm.shortName()}).",
+                   null,
+                   LogOptions(FirebaseRoute.BREADCRUMB)
                 )
-               ourLogger.log(Level.SEVERE,
+                ourLogger.log(Level.SEVERE,
                     result.details.toString())
             }
             return result
         } catch (exception: Exception) {
+            ourLogger.logBreadcrumb(portMappingWithPref)
             ourLogger.log(
                 Level.SEVERE,
                 "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
@@ -546,9 +555,12 @@ class UpnpRepository @Inject constructor(
                 }
                 else if (result is UPnPResult.Failure)
                 {
+                    ourLogger.logBreadcrumb(portMapping)
                    ourLogger.log(
                         Level.SEVERE,
-                        "Failed to delete rule (${portMapping.shortName()})."
+                        "Failed to delete rule (${portMapping.shortName()}).",
+                       null,
+                       LogOptions(firebase = FirebaseRoute.BREADCRUMB)
                     )
                    ourLogger.log(Level.SEVERE,
                         result.details.toString())
@@ -556,6 +568,7 @@ class UpnpRepository @Inject constructor(
                 result
 
             } catch (exception: Exception) {
+                ourLogger.logBreadcrumb(portMappingWithPref)
                 ourLogger.log(
                     Level.SEVERE,
                     "Delete Port Mappings Failed: " + exception.message + exception.stackTraceToString()
@@ -613,6 +626,7 @@ class UpnpRepository @Inject constructor(
                 result
             }
         } catch (exception: Exception) {
+            ourLogger.logBreadcrumb(portMappingUserInput)
             ourLogger.log(
                 Level.SEVERE,
                 "Create Rule Failed: " + exception.message + exception.stackTraceToString()
@@ -628,8 +642,8 @@ class UpnpRepository @Inject constructor(
 
         return portMappings.map { portMapping ->
 
+            val portMappingRequest = PortMappingRequest.from(portMapping).copy(enabled = enable)
             try {
-                val portMappingRequest = PortMappingRequest.from(portMapping).copy(enabled = enable)
                 val res = createPortMappingRuleWrapper(
                     portMappingRequest,
                     false,
@@ -640,6 +654,7 @@ class UpnpRepository @Inject constructor(
             } catch (exception: Exception) {
 
                 val enableDisableString = if (enable) "Enable" else "Disable"
+                ourLogger.logBreadcrumb(portMappingRequest)
                 ourLogger.log(
                     Level.SEVERE,
                     "$enableDisableString Port Mappings Failed: " + exception.message + exception.stackTraceToString()
@@ -723,12 +738,11 @@ class UpnpRepository @Inject constructor(
                         )
                     }
                     else if (result is UPnPGetSpecificMappingResult.Failure) {
-                        val rule = formatShortName(portMappingRequest.protocol,
-                            portMappingRequest.externalIp,
-                            portMappingRequest.externalPort)
-                       ourLogger.log(
+                        val rule = portMappingRequest.realize()
+                        ourLogger.logBreadcrumb(rule)
+                        ourLogger.log(
                             Level.SEVERE,
-                            "Failed to read back our new rule ($rule). Remote Host: ${portMappingRequest.remoteHost}"
+                            "Failed to read back our new rule (${rule.shortName()}). Remote Host: ${portMappingRequest.remoteHost}"
                         )
                        ourLogger.log(Level.SEVERE, result.details.toString())
                     }
@@ -738,11 +752,16 @@ class UpnpRepository @Inject constructor(
             }
 
             is UPnPCreateMappingResult.Failure -> {
-               ourLogger.log(
+                // TODO past tense
+                val rule = portMappingRequest.realize()
+                ourLogger.logBreadcrumb(rule)
+                ourLogger.log(
                     Level.SEVERE,
-                    "Failed to $createContext rule (${portMappingRequest.realize().shortName()})."
+                    "Failed to $createContext rule (${rule.shortName()}).",
+                    null,
+                    LogOptions(FirebaseRoute.BREADCRUMB)
                 )
-               ourLogger.log(Level.SEVERE,
+                ourLogger.log(Level.SEVERE,
                     createMappingResult.details.toString())
 
                 val result = UPnPCreateMappingWrapperResult.Failure(
@@ -764,7 +783,6 @@ class UpnpRepository @Inject constructor(
                 )
                 getAllPortMappingsUsingGenericPortMappingEntry(device)
             } else {
-                //TODO firebase integration
                 ourLogger.log(Level.SEVERE, "device does not have GetGenericPortMappingEntry")
             }
         }
@@ -856,7 +874,7 @@ class UpnpRepository @Inject constructor(
             slotIndex++
 
             if (slotIndex > 65535) {
-                ourLogger.log(Level.SEVERE, "CRITICAL ERROR ENUMERATING PORTS, made it past 65535")
+                ourLogger.log(Level.SEVERE, "Critical Error Enumerating Ports, made it past 65535")
             }
         }
     }
