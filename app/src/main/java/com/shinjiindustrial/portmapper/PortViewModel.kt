@@ -125,7 +125,9 @@ class PortViewModel @Inject constructor(
             devices.isEmpty() && searchStartedRecently
         }.stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            // this is cheap to compute and SharingState.WhileSubscribed(5000) had bug where combine
+            //   did not get ran even after updating sharedStartedRecently for the first time.
+            started = SharingStarted.Eagerly,
             initialValue = false
         )
 
