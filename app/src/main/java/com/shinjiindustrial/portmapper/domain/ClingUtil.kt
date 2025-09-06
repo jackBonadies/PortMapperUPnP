@@ -59,7 +59,7 @@ data class ClingIGDDevice(override val deviceDetails: DeviceDetails, val remoteS
     }
 }
 
-fun RemoteDevice.getIGDDevice(ourLogger : ILogger): IClingIGDDevice? {
+fun RemoteDevice.getIGDDevice(ourLogger : ILogger): ClingIGDDevice? {
 
     if (this.type.type.equals(UPnPNames.InternetGatewayDevice)) // version agnostic
     {

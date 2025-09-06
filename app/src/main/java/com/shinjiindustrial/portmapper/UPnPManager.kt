@@ -247,8 +247,19 @@ class UpnpRepository @Inject constructor(
 
     // region datagetters
 
+    inline fun <T, E : Throwable> Iterable<T>.firstOrThrow(
+        predicate: (T) -> Boolean,
+        onMissing: () -> E
+    ): T = firstOrNull(predicate) ?: throw onMissing()
+
     fun getIGDDevice(ipAddr: String): IIGDDevice {
-        return devices.value.first { it.getIpAddress() == ipAddr }
+        return devices.value.firstOrThrow(
+            { it.getIpAddress() == ipAddr },
+           {
+               ourLogger.logBreadcrumb("devices: ${devices.value.joinToString("\n") }")
+               ourLogger.logBreadcrumb("ip address: $ipAddr")
+               RuntimeException("No Device Found at ip address $ipAddr")
+           })
     }
 
     // returns anyEnabled, anyDisabled
@@ -1010,6 +1021,9 @@ data class PortMappingRequest(
         }
     }
 }
+
+
+class DeviceNotFound(message: String) : RuntimeException(message);
 
 //CompletableFuture is api >=24
 //basic futures do not implement continuewith...
