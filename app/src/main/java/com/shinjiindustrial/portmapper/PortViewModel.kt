@@ -88,9 +88,7 @@ class PortViewModel @Inject constructor(
     // we want to use key for selections.  so if a rule renews while the user is in multi select
     //   mode, don't deselect that rule.  but if we lose a rule (i.e. it gets deleted) then
     //   we still want to deselect.
-    private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(
-        savedStateHandle["selected_ids"] ?: emptySet()
-    )
+    private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(savedStateHandle.get<List<PortMappingKey>>("selected_ids")?.toSet() ?: emptySet())
     val selectedIds: StateFlow<Set<PortMappingKey>> = _selectedIds
 
     val inMultiSelectMode: StateFlow<Boolean> =
@@ -368,7 +366,7 @@ class PortViewModel @Inject constructor(
             .onEach { filtered ->
                 println("filtered changed ...")
                 if (filtered != _selectedIds.value) _selectedIds.value = filtered
-                savedStateHandle["selected_ids"] = filtered
+                savedStateHandle["selected_ids"] = filtered.toList()
             }
             .launchIn(viewModelScope)
     }
