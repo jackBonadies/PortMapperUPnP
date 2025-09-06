@@ -355,13 +355,6 @@ class PortViewModel @Inject constructor(
     private val onSearchStarted: (Any?) -> Unit = { o -> searchStarted(o) }
 
     init {
-        GlobalScope.launch {
-            while(true)
-            {
-                delay(7000)
-                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("test"))
-            }
-        }
         upnpRepository.SearchStarted += onSearchStarted
         combine(_selectedIds, upnpRepository.portMappings) { selectedIds, currentMappings ->
             val cur = currentMappings.keys
