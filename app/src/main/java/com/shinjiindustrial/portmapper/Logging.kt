@@ -24,7 +24,7 @@ data class LogOptions(
 interface ILogger {
     fun log(
         level: Level,
-        event: String,
+        msg: String,
         t: Throwable? = null,
         opts: LogOptions = LogOptions()
     )
@@ -62,13 +62,18 @@ class LogStringBuilderSink(
 class LogStoreRepository @Inject constructor(
 ) {
     var logs: SnapshotStateList<String> = mutableStateListOf<String>()
+
+    fun getLogsAsText(): String
+    {
+        return logs.joinToString("\n")
+    }
 }
 
 class CompositeLogger(
     private val sinks: Set<ILogSink>
 ) : ILogger {
-    override fun log(level: Level, event: String, t: Throwable?, opts: LogOptions) {
-        sinks.forEach { it.log(level, event, t, opts) }
+    override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
+        sinks.forEach { it.log(level, msg, t, opts) }
     }
 }
 
