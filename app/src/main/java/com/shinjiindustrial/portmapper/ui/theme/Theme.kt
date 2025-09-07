@@ -135,12 +135,10 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
 
-    var dayNightMode = themeState.dayNightMode
+    val dayNightMode = themeState.dayNightMode
+    val useDark = dayNightMode == DayNightMode.FORCE_NIGHT || (dayNightMode == DayNightMode.FOLLOW_SYSTEM && darkTheme)
+    val useMaterialYou = themeState.materialYou
 
-    var useDark = darkTheme
-    useDark = dayNightMode != DayNightMode.FORCE_DAY
-
-    var useMaterialYou = themeState.materialYou
     key(useMaterialYou, dayNightMode)
     {
         val colorSchemeToUse = when {

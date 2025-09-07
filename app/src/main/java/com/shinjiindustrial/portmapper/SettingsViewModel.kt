@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -16,6 +17,7 @@ data class ThemeUiState(val dayNightMode: DayNightMode, val materialYou: Boolean
 class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesManager
 ) : ViewModel() {
+
     val uiState: StateFlow<ThemeUiState> = combine(
         preferencesRepository.dayNight,
         preferencesRepository.materialYou
@@ -23,7 +25,7 @@ class SettingsViewModel @Inject constructor(
         ThemeUiState(dayNight, materialYou)
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = ThemeUiState(DayNightMode.FOLLOW_SYSTEM, false)
     )
 

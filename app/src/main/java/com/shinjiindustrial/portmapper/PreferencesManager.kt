@@ -9,9 +9,12 @@ import com.shinjiindustrial.portmapper.PreferencesManager.Keys.SORT_DESC_KEY
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.common.SortInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +29,12 @@ class PreferencesManager @Inject constructor(
         val SORT_DESC_KEY = booleanPreferencesKey("descAscPref")
         val DAY_NIGHT_KEY = intPreferencesKey("dayNightPref")
         val MATERIAL_YOU_KEY = booleanPreferencesKey("materialYouPref")
+    }
+
+    init {
+        // this loads them before activity screen starts
+        //   otherwise we will load in the default values first and recompose later.
+        runBlocking(Dispatchers.IO) { context.dataStore.data.first() }
     }
 
     val materialYou: Flow<Boolean> = context.dataStore.data
