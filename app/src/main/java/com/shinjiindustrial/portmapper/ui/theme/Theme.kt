@@ -146,12 +146,11 @@ fun MyApplicationTheme(
                 val context = LocalContext.current
                 if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             }
-
             useDark -> DarkColorScheme
             else -> LightColorScheme
         }
 
-        var darkLightAdditionalColors: AdditionalColors.IAdditionalColors =
+        val darkLightAdditionalColors: AdditionalColors.IAdditionalColors =
             if (useDark) AdditionalColors.AdditionalColorsDark else AdditionalColors.AdditionalColorsLight
         AdditionalColors.Background = darkLightAdditionalColors.Background
         AdditionalColors.SubtleBorder = darkLightAdditionalColors.SubtleBorder

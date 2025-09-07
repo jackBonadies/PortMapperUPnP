@@ -423,7 +423,6 @@ fun NoMappingsCard(remoteDevice: IIGDDevice) {
 @Preview
 @Composable
 fun NoMappingsCard() {
-    MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         Card(
 //        onClick = {
 //            if(PortForwardApplication.showPopup != null)
@@ -500,7 +499,6 @@ fun NoMappingsCard() {
             }
         }
     }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview
