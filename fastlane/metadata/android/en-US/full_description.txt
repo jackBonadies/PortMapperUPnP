@@ -1,0 +1,14 @@
+A free open source UPnP Port Forwarding tool.
+
+Features:
+* Add port forwarding rules (including ranges)
+* View all current UPnP port forwarding rules
+* Delete, Enable/Disable rules
+* Easily view logs and diagnostics
+* Day/Night Theme
+
+Note: This app only works for UPnP enabled devices i.e. WiFi networks only
+
+Found a bug or want a new feature?  Please email me at jbonadies6@gmail.com.  I usually respond within a couple days and will try my best to fix the bug within a week.  Detailed bug reports are very helpful.
+
+This app is, and will always be, completely free, no ads, no "premium" features, etc.  It is also open source to view, learn, copy, modify, etc. here (https://github.com/jackBonadies/PortMapperUPnP).
