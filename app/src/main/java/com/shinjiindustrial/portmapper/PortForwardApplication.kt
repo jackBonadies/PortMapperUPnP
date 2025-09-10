@@ -26,16 +26,6 @@ class PortForwardApplication : Application() {
     @Inject
     lateinit var preferencesManager: PreferencesManager
 
-    override fun onCreate() {
-
-        super.onCreate()
-
-        FirebaseConditional.Initialize(this)
-
-        println("PortForwardApplication onCreate Finished")
-    }
-
-
     companion object {
 
         //        lateinit var showPopup : MutableState<Boolean>
