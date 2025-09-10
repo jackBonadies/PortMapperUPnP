@@ -84,6 +84,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -229,7 +231,7 @@ fun EnterContextMenu(
     selectedKey: PortMappingKey?,
     getSelectedItem: (PortMappingKey) -> PortMappingWithPref,
     closeContextMenu: () -> Unit,
-    showMoreInfoDialog: MutableState<Boolean>,
+    showMoreInfoDialog: MutableState<PortMappingKey?>,
     navController: NavHostController,
     portViewModel: PortViewModel,
     themeState: ThemeUiState
@@ -261,7 +263,6 @@ fun EnterContextMenu(
                 ) {
                     // it redraws starting at this inner context...
                     if (selectedKey != null) {
-
 
                         val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
                         //TODO
@@ -331,7 +332,7 @@ fun EnterContextMenu(
                             Pair<String, () -> Unit>(
                                 "More Info"
                             ) {
-                                showMoreInfoDialog.value = true
+                                showMoreInfoDialog.value = selectedKey
                             }
                         )
                         var index = 0
@@ -1124,7 +1125,7 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
     val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
 
-    IconButton(onClick = { expanded = true }) {
+    IconButton(onClick = { expanded = true }, modifier=Modifier.semantics { testTag = "moreActionsButton"}) {
         Icon(Icons.Default.MoreVert, contentDescription = "menu")
     }
 
