@@ -14,6 +14,6 @@ class UpnpClientModule {
     @Provides
     @Singleton
     fun provideMockUpnpClient(): IUpnpClient {
-        return MockUpnpClient(MockUpnpClientConfig(Speed.Medium))
+        return MockUpnpClient(MockUpnpClientConfig(Speed.Medium, RuleSet.Full))
     }
 }
