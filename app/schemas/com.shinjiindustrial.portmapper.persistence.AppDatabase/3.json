@@ -1,0 +1,131 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "1716b2692a3f0f7a052b96f0d236d611",
+    "entities": [
+      {
+        "tableName": "port_mappings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceIp` TEXT NOT NULL, `deviceSignature` TEXT NOT NULL, `externalPort` INTEGER NOT NULL, `protocol` TEXT NOT NULL, `description` TEXT NOT NULL, `internalIp` TEXT NOT NULL, `internalPort` INTEGER NOT NULL, `autorenew` INTEGER NOT NULL, `desiredLeaseDuration` INTEGER NOT NULL, `autorenewManualCadence` INTEGER NOT NULL DEFAULT -1, `desiredEnabled` INTEGER NOT NULL, PRIMARY KEY(`deviceIp`, `deviceSignature`, `protocol`, `externalPort`))",
+        "fields": [
+          {
+            "fieldPath": "deviceIp",
+            "columnName": "deviceIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceSignature",
+            "columnName": "deviceSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalPort",
+            "columnName": "externalPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocol",
+            "columnName": "protocol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "internalIp",
+            "columnName": "internalIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "internalPort",
+            "columnName": "internalPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoRenew",
+            "columnName": "autorenew",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desiredLeaseDuration",
+            "columnName": "desiredLeaseDuration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoRenewManualCadence",
+            "columnName": "autorenewManualCadence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "-1"
+          },
+          {
+            "fieldPath": "desiredEnabled",
+            "columnName": "desiredEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "deviceIp",
+            "deviceSignature",
+            "protocol",
+            "externalPort"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "devices",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceIp` TEXT NOT NULL, `deviceSignature` TEXT NOT NULL, `useWildcardForRemoteHostDelete` INTEGER NOT NULL, PRIMARY KEY(`deviceIp`, `deviceSignature`))",
+        "fields": [
+          {
+            "fieldPath": "deviceIp",
+            "columnName": "deviceIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceSignature",
+            "columnName": "deviceSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "useWildcardForRemoteHostDelete",
+            "columnName": "useWildcardForRemoteHostDelete",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "deviceIp",
+            "deviceSignature"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1716b2692a3f0f7a052b96f0d236d611')"
+    ]
+  }
+}

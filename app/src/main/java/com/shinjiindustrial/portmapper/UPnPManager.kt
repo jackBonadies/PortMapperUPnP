@@ -8,6 +8,7 @@ import com.shinjiindustrial.portmapper.client.UPnPGetGenericMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
+import com.shinjiindustrial.portmapper.common.toIntOrMaxValue
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.DevicePreferences
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
@@ -604,6 +605,7 @@ class UpnpRepository @Inject constructor(
             portMapping.InternalPort,
             pref.autoRenew,
             pref.desiredLeaseDuration,
+            pref.autoRenewalCadence,
             portMapping.Enabled
         ) // TODO enabled
     }
@@ -628,7 +630,9 @@ class UpnpRepository @Inject constructor(
                     val portMapping = result.resultingMapping
                     val pref = PortMappingPref(
                         portMappingUserInput.autoRenew,
-                        portMappingUserInput.leaseDuration.toIntOrMaxValue()
+                        portMappingUserInput.leaseDuration.toIntOrMaxValue(),
+                        portMappingUserInput.autoRenewManualCadence,
+                        SystemClock.elapsedRealtime()
                     )
                     val entity = createPortMappingDaoEntity(portMapping, pref)
                     portMappingDao.upsert(entity)
@@ -843,7 +847,7 @@ class UpnpRepository @Inject constructor(
                                 Level.INFO,
                                 "The rule is ours: ${portMapping.shortName()}"
                             )
-                            pref = entity!!.getPrefs()
+                            pref = entity!!.getPrefs(SystemClock.elapsedRealtime())
                         } else {
                             ourLogger.log(
                                 Level.INFO,

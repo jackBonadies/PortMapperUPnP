@@ -20,12 +20,22 @@ data class PortMappingWithPref(
         return portMappingPref?.autoRenew ?: false
     }
 
+    fun getAutoRenewCadenceOrDefault(): Int {
+        return portMappingPref?.autoRenewalCadence ?: -1
+    }
+
     fun getDesiredLeaseDurationOrDefault(): Int {
         return portMappingPref?.desiredLeaseDuration ?: portMapping.LeaseDuration
     }
 }
 
-data class PortMappingPref(val autoRenew: Boolean, val desiredLeaseDuration: Int)
+data class PortMappingPref(val autoRenew: Boolean, val desiredLeaseDuration: Int, val autoRenewalCadence: Int, val timeLastRenewedMs: Long)
+{
+    fun shouldAutoRenewOnCadence() : Boolean
+    {
+        return autoRenewalCadence != -1
+    }
+}
 
 @Parcelize
 data class PortMappingKey(val deviceIP: String, val externalPort: Int, val protocol: String) :
@@ -258,8 +268,8 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String):
     return "$protocol rule at $externalIp:$externalPort"
 }
 
-fun PortMappingEntity.getPrefs(): PortMappingPref =
-    PortMappingPref(this.autoRenew, this.desiredLeaseDuration)
+fun PortMappingEntity.getPrefs(lastRenewTimeMs: Long): PortMappingPref =
+    PortMappingPref(this.autoRenew, this.desiredLeaseDuration, this.autoRenewManualCadence, lastRenewTimeMs)
 
 fun DevicesEntity.getPrefs(): DevicePreferences =
     DevicePreferences(this.useWildcardForRemoteHostDelete)

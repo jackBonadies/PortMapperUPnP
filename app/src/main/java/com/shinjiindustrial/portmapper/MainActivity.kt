@@ -247,6 +247,10 @@ fun EnterContextMenu(
                                         "autorenew",
                                         portMappingWithPref.getAutoRenewOrDefault().toString()
                                     )
+                                    .appendQueryParameter(
+                                        "autorenewManualCadence",
+                                        portMappingWithPref.getAutoRenewCadenceOrDefault().toString()
+                                    )
                                 val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
                             }

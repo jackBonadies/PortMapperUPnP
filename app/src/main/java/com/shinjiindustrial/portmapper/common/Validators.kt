@@ -3,7 +3,6 @@ package com.shinjiindustrial.portmapper.common
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
-import com.shinjiindustrial.portmapper.toIntOrMaxValue
 
 data class ValidationResult(
     val hasError: Boolean,
@@ -26,6 +25,7 @@ fun ValidationError.toMessage(): String {
         ValidationError.END_BEFORE_START -> stringResource(R.string.error_end_before_start)
         ValidationError.NONE -> ""
         ValidationError.INVALID_INTERNAL_IP -> stringResource(R.string.error_invalid_ip_address)
+        ValidationError.MINIMUM_CADENCE -> stringResource(R.string.error_minimum_cadence)
     }
 }
 
@@ -35,7 +35,8 @@ enum class ValidationError {
     EMPTY_PORT,
     INVALID_PORT_RANGE,
     END_BEFORE_START,
-    INVALID_INTERNAL_IP
+    INVALID_INTERNAL_IP,
+    MINIMUM_CADENCE
 }
 
 fun validateDescription(description: String): ValidationResult {
@@ -88,3 +89,26 @@ fun validateInternalIp(ip: String): ValidationResult {
     )
 }
 
+data class AutoRenewalCadence(val autoRenewMode: AutoRenewMode, val cadence: Int)
+
+fun parseCadence(cadence: String): AutoRenewalCadence
+{
+    if (cadence.isEmpty())
+    {
+        return AutoRenewalCadence(AutoRenewMode.BEFORE_EXPIRY, -1)
+    }
+    val cadenceInt = cadence.toIntOrMaxValue()
+    if (cadenceInt < 0 || cadenceInt == Int.MAX_VALUE) {
+        return AutoRenewalCadence(AutoRenewMode.BEFORE_EXPIRY, -1)
+    }
+    return AutoRenewalCadence(AutoRenewMode.FIXED_CADENCE, cadenceInt)
+}
+
+fun validateCadence(cadence: String): ValidationResult
+{
+    val cadenceInt = cadence.toIntOrMaxValue()
+    if (cadenceInt < 180) {
+        return ValidationResult.error(ValidationError.MINIMUM_CADENCE)
+    }
+    return ValidationResult.ok
+}
