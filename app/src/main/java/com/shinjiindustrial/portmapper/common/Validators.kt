@@ -3,7 +3,6 @@ package com.shinjiindustrial.portmapper.common
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
-import com.shinjiindustrial.portmapper.toIntOrMaxValue
 
 data class ValidationResult(
     val hasError: Boolean,

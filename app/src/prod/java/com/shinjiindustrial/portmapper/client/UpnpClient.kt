@@ -294,34 +294,3 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
 
 //data class DeviceFoundEvent(val remoteDevice: RemoteDevice)
 }
-
-//TODO move
-@Preview(showBackground = true)
-@Composable
-fun CreateRuleContentsPreview() {
-    Column {
-        CreateRuleContents(
-            hasSubmitted = remember { mutableStateOf(false) },
-            internalPortText = remember { mutableStateOf("8080") },
-            internalPortTextEnd = remember { mutableStateOf("") },
-            externalPortText = remember { mutableStateOf("80") },
-            externalPortTextEnd = remember { mutableStateOf("") },
-            leaseDuration = remember { mutableStateOf("3600") },
-            description = remember { mutableStateOf("My test rule") },
-            descriptionHasError = remember { mutableStateOf(false) },
-            startInternalHasError = remember { mutableStateOf(false) },
-            endInternalHasError = remember { mutableStateOf(false) },
-            selectedProtocolMutable = remember { mutableStateOf("TCP") },
-            startExternalHasError = remember { mutableStateOf(false) },
-            endExternalHasError = remember { mutableStateOf(false) },
-            internalIp = remember { mutableStateOf("192.168.1.100") },
-            internalIpHasError = remember { mutableStateOf(false) },
-            gatewayIps = mutableListOf("192.168.1.1", "10.0.0.1"),
-            externalDeviceText = remember { mutableStateOf("WAN") },
-            expandedInternal = remember { mutableStateOf(false) },
-            expandedExternal = remember { mutableStateOf(false) },
-            wanIpIsV1 = remember { mutableStateOf(true) },
-            autoRenew = remember { mutableStateOf(true) } // just a State<Boolean>
-        )
-    }
-}

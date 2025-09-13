@@ -6,11 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -18,36 +14,28 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -60,15 +48,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -76,8 +63,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.navigation.NavHostController
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.LocalScaffoldController
-import com.shinjiindustrial.portmapper.OurSnackbarHost
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.common.validateDescription
@@ -88,11 +75,9 @@ import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import com.shinjiindustrial.portmapper.PortViewModel
 import com.shinjiindustrial.portmapper.UiSnackToastEvent
+import com.shinjiindustrial.portmapper.common.AutoRenewMode
 import com.shinjiindustrial.portmapper.common.ValidationError
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.common.toMessage
@@ -155,6 +140,8 @@ fun RuleCreationDialog(
     }
     val context = LocalContext.current
     val autoRenew = remember { mutableStateOf(ruleToEdit?.autoRenew ?: false) }
+    val autoRenewMode = remember { mutableStateOf(AutoRenewMode.BEFORE_EXPIRY) }
+    val renewCadence = remember { mutableStateOf("") }
     val (ourIp, ourGatewayIp) = remember {
         if (isPreview) Pair<String, String>(
             "192.168.0.1",
@@ -331,10 +318,10 @@ fun RuleCreationDialog(
     }
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally
             )
             {
-                CreateRuleContents(
+                RuleContents(
                     hasSubmitted,
                     internalPortText,
                     internalPortTextEnd,
@@ -355,7 +342,9 @@ fun RuleCreationDialog(
                     expandedInternal,
                     expandedExternal,
                     wanIpVersionOfGatewayIsVersion1,
-                    autoRenew
+                    autoRenew,
+                    autoRenewMode,
+                    renewCadence
                 )
             }
 }
@@ -368,7 +357,7 @@ fun RuleCreationDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ColumnScope.CreateRuleContents(
+fun ColumnScope.RuleContents(
     hasSubmitted: MutableState<Boolean>,
     internalPortText: MutableState<String>,
     internalPortTextEnd: MutableState<String>,
@@ -389,13 +378,21 @@ fun ColumnScope.CreateRuleContents(
     expandedInternal: MutableState<Boolean>,
     expandedExternal: MutableState<Boolean>,
     wanIpIsV1: State<Boolean>,
-    autoRenew: MutableState<Boolean>
+    autoRenew: MutableState<Boolean>,
+    autoRenewMode: MutableState<AutoRenewMode>,
+    renewCadence: MutableState<String>,
 ) {
 
     val showLeaseDialog = remember { mutableStateOf(false) }
 
     if (showLeaseDialog.value) {
         DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
+    }
+
+    val showRenewTimeDialog = remember { mutableStateOf(false) }
+
+    if (showRenewTimeDialog.value) {
+        DurationPickerDialog(showRenewTimeDialog, renewCadence, wanIpIsV1.value)
     }
 
     val descriptionErrorString =
@@ -549,7 +546,13 @@ fun ColumnScope.CreateRuleContents(
             .weight(0.5f, true)
 //            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
 //            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        DropDownOutline(defaultModifier, externalDeviceText, gatewayIps, "External Device")
+        DropDownOutline(
+            externalDeviceText.value,
+            {externalDeviceText.value = it },
+            gatewayIps,
+            stringResource(R.string.external_device),
+            defaultModifier,
+            {it})
         Spacer(modifier = Modifier.width(8.dp))
         val startHasErrorString =
             remember { mutableStateOf(validateStartPort(externalPortText.value).validationError) }
@@ -587,12 +590,12 @@ fun ColumnScope.CreateRuleContents(
             .weight(0.5f, true)
         //.height(60.dp)
         //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        DropDownOutline(
-            defaultModifier,//Size(500f, textfieldSize.height),
-            selectedText = selectedProtocolMutable,
-            suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
-            "Protocol"
-        )
+        DropDownOutline( selectedProtocolMutable.value,
+            {selectedProtocolMutable.value = it },
+            items = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
+            "Protocol",
+            defaultModifier,
+            { it })
 
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -601,7 +604,6 @@ fun ColumnScope.CreateRuleContents(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             value = leaseDuration.value,
             onValueChange = {
-
                 val digitsOnly = it.filter { charIt -> charIt.isDigit() }
                 if (digitsOnly.isBlank()) {
                     leaseDuration.value = digitsOnly
@@ -609,7 +611,6 @@ fun ColumnScope.CreateRuleContents(
                 } else {
                     leaseDuration.value = capLeaseDur(digitsOnly, wanIpIsV1.value)
                 }
-
             },
             label = { Text("Lease") },
             trailingIcon = {
@@ -644,52 +645,84 @@ fun ColumnScope.CreateRuleContents(
                     }
                 },//isFocused.value = it.isFocused },
         )
-
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth(createNewRuleRowWidth)
-            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
-    ) {
-        //PlainTooltipBox(
-        //androidx.compose.material3. TooltipBox(
-//            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-//            tooltip = {
-//                PlainTooltip {
-//                    Text("Add to favorites")
-//                }
-//            },
-//            state = rememberTooltipState()
-//        ) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-            tooltip = {
-                PlainTooltip { Text("When checked, port mapper will automatically renew rules before expiration.") }
-            },
-            state = rememberTooltipState()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                //MaterialTheme.colorScheme.outline
-                Checkbox(
-                    autoRenew.value,
-                    onCheckedChange = { autoRenew.value = it },
-                    // uncheckedColor == border color
-                    colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
+    AutoRenewSection(autoRenew.value,
+        { autoRenew.value = it },
+        autoRenewMode.value,
+        { autoRenewMode.value = it },
+        renewCadence.value,
+        { renewCadence.value = it },
+        { showRenewTimeDialog.value = true })
+}
 
+@Composable
+fun AutoRenewSection(
+    autoRenew: Boolean,
+    onAutoRenewChange: (Boolean) -> Unit,
+    autoRenewMode: AutoRenewMode,
+    onModeChange: (AutoRenewMode) -> Unit,
+    cadenceSeconds: String,
+    onCadenceChange: (String) -> Unit,
+    showCadenceDialog: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = autoRenew, onCheckedChange = onAutoRenewChange, modifier = Modifier.testTag("autoRenew"))
+            Text("Auto-renew")
+        }
 
-                )
-                Text("Auto Renew", color = AdditionalColors.TextColor)
-            }
+        AnimatedVisibility(visible = autoRenew) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(createNewRuleRowWidth)
+                ) {
+                    val defaultModifier = Modifier
+                        .weight(0.5f, true)
+                    DropDownOutline(
+                        autoRenewMode,
+                        onModeChange,
+                        AutoRenewMode.entries.toList(),
+                        stringResource(R.string.auto_renew_mode),
+                        defaultModifier,
+                        { stringResource(it.titleRes) })
+
+                        AnimatedVisibility(visible = autoRenewMode == AutoRenewMode.FIXED_CADENCE,
+                            defaultModifier.padding(start = 8.dp)) {
+
+                            OutlinedTextField(
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                value = cadenceSeconds,
+                                onValueChange = {
+                                    val digitsOnly = it.filter { charIt -> charIt.isDigit() }
+                                    onCadenceChange(digitsOnly)
+                                },
+                                label = { Text("Renewal Cadence") },
+                                trailingIcon = {
+                                    IconButton(onClick = { showCadenceDialog() })
+                                    {
+                                        Icon(
+                                            Icons.Filled.Schedule,
+                                            contentDescription = ""
+                                        ) //TODO set error on main theme if not already.
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(0.5f, true)
+                                    .onFocusChanged {
+                                        // one is allowed to temporarily leave blank.
+                                        // but on leaving it must be valid
+                                        if (!it.isFocused && cadenceSeconds.isBlank()) {
+                                            onCadenceChange("300")
+                                        }
+                                    },//isFocused.value = it.isFocused },
+                            )
+                        }
+                    }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartPortExpandable(
     portText: MutableState<String>,
@@ -749,14 +782,6 @@ fun StartPortExpandable(
 }
 
 val createNewRuleRowWidth = 1.0f
-
-fun String.toIntOrMaxValue(): Int {
-    return try {
-        this.toInt()
-    } catch (e: Exception) {
-        Int.MAX_VALUE
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -963,130 +988,51 @@ fun PortRangeRow(
                     null
                 }
         )
-
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropDownOutline(
-    defaultModifier: Modifier,
-    selectedText: MutableState<String>,
-    suggestions: List<String>,
-    outlineLabel: String
+fun <T> DropDownOutline(
+    selected: T,
+    onSelected: (T) -> Unit,
+    items: List<T>,
+    label: String,
+    modifier: Modifier = Modifier,
+    // How to render each item as text (works for enums & Strings)
+    itemText: @Composable (T) -> String
 ) {
-//    var defaultModifier = Modifier.then(Modifier)
-//    if(textfieldSize != null)
-//    {
-//        // bind size
-//        defaultModifier = Modifier
-//            .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-//    }
     var expanded by remember { mutableStateOf(false) }
-    val icon = if (expanded)
-        Icons.Filled.ArrowDropUp //it requires androidx.compose.material:material-icons-extended
-    else
-        Icons.Filled.ArrowDropDown
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val focusRequester = remember { FocusRequester() }
-
-
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
-
-    Box(
-        modifier = defaultModifier
-            .then(
-                Modifier.clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
-                        focusRequester.requestFocus()
-                    })
-            )
-            .onSizeChanged { boxSize = it }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
     ) {
-
         OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             readOnly = true,
-            value = selectedText.value,
-            onValueChange = { selectedText.value = it },
-            interactionSource = interactionSource,
-            modifier = defaultModifier
-                .onGloballyPositioned { coordinates ->
-
-                    println("OurExternalDevice: " + coordinates.size.toSize())
-                    //This value is used to assign to the DropDown the same width
-                    //textfieldSize = coordinates.size.toSize()
-                }
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
+            value = itemText(selected),
+            onValueChange = {},
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier
+                .menuAnchor()        // anchors the menu to the field and matches width
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(itemText(item)) },
                     onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
+                        onSelected(item)
+                        expanded = false
                     }
                 )
-                .focusRequester(focusRequester),
-            label = { Text(outlineLabel) },
-            trailingIcon = {
-                Icon(
-                    icon, "contentDescription",
-                    Modifier.clickable { expanded = !expanded })
-            }
-        )
-        //println(textfieldSize.toString())
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(with(LocalDensity.current) { boxSize.width.toDp() })
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("DropdownMenuItem clicked")
-                        expanded = !expanded
-                    }
-                ),
-        ) {
-            suggestions.forEach { label ->
-                DropdownMenuItem(
-                    text = {
-                        Text(text = label)
-                    },
-                    onClick = {
-                        selectedText.value = label
-                        expanded = false
-                    })
             }
         }
-        Box(
-//                            onClick = {
-//                                println("TextField clicked")
-//                                expanded = !expanded
-//                            },
-            modifier = Modifier
-                .width(with(LocalDensity.current) { boxSize.width.toDp() })
-                .background(Color.Blue)
-//                            .onGloballyPositioned { coordinates ->
-//                                //This value is used to assign to the DropDown the same width
-//                                //textfieldSize = coordinates.size.toSize()
-//                            }
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
-                        focusRequester.requestFocus()
-                    }
-                ),
-        )
     }
 }
 
@@ -1100,5 +1046,37 @@ fun DeviceRow(content: @Composable RowScope.() -> Unit) {
         verticalAlignment = Alignment.Top // for the error text
     ) {
         content(this)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun CreateRuleContentsPreview() {
+    Column {
+        RuleContents(
+            hasSubmitted = remember { mutableStateOf(false) },
+            internalPortText = remember { mutableStateOf("8080") },
+            internalPortTextEnd = remember { mutableStateOf("") },
+            externalPortText = remember { mutableStateOf("80") },
+            externalPortTextEnd = remember { mutableStateOf("") },
+            leaseDuration = remember { mutableStateOf("3600") },
+            description = remember { mutableStateOf("My test rule") },
+            descriptionHasError = remember { mutableStateOf(false) },
+            startInternalHasError = remember { mutableStateOf(false) },
+            endInternalHasError = remember { mutableStateOf(false) },
+            selectedProtocolMutable = remember { mutableStateOf("TCP") },
+            startExternalHasError = remember { mutableStateOf(false) },
+            endExternalHasError = remember { mutableStateOf(false) },
+            internalIp = remember { mutableStateOf("192.168.1.100") },
+            internalIpHasError = remember { mutableStateOf(false) },
+            gatewayIps = mutableListOf("192.168.1.1", "10.0.0.1"),
+            externalDeviceText = remember { mutableStateOf("WAN") },
+            expandedInternal = remember { mutableStateOf(false) },
+            expandedExternal = remember { mutableStateOf(false) },
+            wanIpIsV1 = remember { mutableStateOf(true) },
+            autoRenew = remember { mutableStateOf(true) },
+            autoRenewMode = remember { mutableStateOf(AutoRenewMode.BEFORE_EXPIRY) },
+            renewCadence = remember { mutableStateOf("3600") }
+        )
     }
 }

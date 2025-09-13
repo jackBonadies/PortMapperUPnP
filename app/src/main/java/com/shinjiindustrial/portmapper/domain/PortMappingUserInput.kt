@@ -2,7 +2,7 @@ package com.shinjiindustrial.portmapper.domain
 
 import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.Protocol
-import com.shinjiindustrial.portmapper.toIntOrMaxValue
+import com.shinjiindustrial.portmapper.common.toIntOrMaxValue
 
 // this is the information the user gives us to create a rule. i.e. what the router needs + any preference info (autorenew)
 data class PortMappingUserInput(

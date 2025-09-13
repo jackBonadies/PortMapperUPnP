@@ -13,6 +13,11 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="error_invalid_port_range">Port must be between %1$d and %2$d</string>
     <string name="error_end_before_start">End port must be after start port</string>
     <string name="error_invalid_ip_address">Invalid IP address</string>
+    <string name="auto_renew_mode">Auto-renew Mode</string>
+    <string name="external_device">External Device</string>
+    <string name="internal_device">Internal Device</string>
+    <string name="before_expiry_recommended">Before Expiry (Recommended)</string>
+    <string name="fixed_cadence">Fixed Cadence</string>
 
     <string name="refresh_action">Refresh</string>
     <string name="disable_all_action">Disable All</string>

@@ -8,6 +8,7 @@ import com.shinjiindustrial.portmapper.client.UPnPGetGenericMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPGetSpecificMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
+import com.shinjiindustrial.portmapper.common.toIntOrMaxValue
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
 import com.shinjiindustrial.portmapper.domain.DevicePreferences
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
