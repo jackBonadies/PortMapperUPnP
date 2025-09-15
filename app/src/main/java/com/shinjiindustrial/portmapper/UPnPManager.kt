@@ -19,7 +19,6 @@ import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
-import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
 import com.shinjiindustrial.portmapper.persistence.DevicesEntity
@@ -111,15 +110,14 @@ class UpnpRepository @Inject constructor(
         applicationContext.launch {
             portMappings.mapNotNull { it ->
                 it.filter { it.value.getAutoRenewOrDefault() }
-                    .minByOrNull { it.value.portMapping.getExpiresTimeMillis() }
+                    .minByOrNull { it.value.getRenewTimeMs() }
             }.onEach {
                 // null check
                     it ->
                 println("running with ${it.value.portMapping.shortName()}")
             }.collectLatest {
                 delayUntilExpiryBuffer(
-                    (it.value.portMapping.getExpiresTimeMillis()),
-                    PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING
+                    (it.value.getRenewTimeMs())
                 )
                 println("delay is over launching")
                 withContext(NonCancellable)
@@ -136,7 +134,7 @@ class UpnpRepository @Inject constructor(
 
         val now = SystemClock.elapsedRealtime()
         val expiring =
-            snapshot.filter { it.value.portMapping.getExpiresTimeMillis() - now <= 1000 * (PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + PortForwardApplication.RENEW_BATCH_WITHIN_X_SECONDS) }
+            snapshot.filter { it.value.getRenewTimeMs() - now <= 1000 * PortForwardApplication.RENEW_BATCH_WITHIN_X_SECONDS }
         if (expiring.isEmpty()) {
             println("batch is empty")
             return
@@ -160,11 +158,10 @@ class UpnpRepository @Inject constructor(
     }
 
     private suspend fun delayUntilExpiryBuffer(
-        expirationTime: Long,
-        renewWithinXSecondsOfExpiring: Long
+        renewTime: Long,
     ) {
         val delayMilliseconds =
-            (expirationTime - renewWithinXSecondsOfExpiring * 1000 - SystemClock.elapsedRealtime()).coerceAtLeast(
+            (renewTime - SystemClock.elapsedRealtime()).coerceAtLeast(
                 0L
             )
         println("wait for $delayMilliseconds ms")
@@ -605,7 +602,7 @@ class UpnpRepository @Inject constructor(
             portMapping.InternalPort,
             pref.autoRenew,
             pref.desiredLeaseDuration,
-            pref.autoRenewalCadence,
+            pref.autoRenewalCadenceSeconds,
             portMapping.Enabled
         ) // TODO enabled
     }
@@ -701,12 +698,15 @@ class UpnpRepository @Inject constructor(
     ) {
         // this is so it "refreshes"
         if (res is UPnPCreateMappingWrapperResult.Success) {
+            var portMappingPref = portMapping.portMappingPref
+            if (portMappingPref != null) {
+                portMappingPref = portMappingPref.copy(timeLastRenewedMs = SystemClock.elapsedRealtime())
+            }
             addOrUpdateMapping(
                 PortMappingWithPref(
                     res.resultingMapping,
-                    portMapping.portMappingPref
+                    portMappingPref)
                 )
-            )
         }
     }
 

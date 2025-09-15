@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
-import com.shinjiindustrial.portmapper.CreateRuleContents
 import com.shinjiindustrial.portmapper.GetPsuedoSlot
 import com.shinjiindustrial.portmapper.ILogger
 import com.shinjiindustrial.portmapper.PortForwardApplication
