@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.common.NetworkType
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
@@ -72,8 +76,8 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     val searchStartedRecentlyAndNothingFoundYet by portViewModel.searchStartedRecentlyAndNothingFoundYet.collectAsStateWithLifecycle()
     val anyDevices by portViewModel.anyDevices.collectAsStateWithLifecycle()
     rememberScrollState()
-    val showAboutDialogState = remember { mutableStateOf(false) }
-    val showMoreInfoDialogState = remember { mutableStateOf(false) }
+    val showAboutDialogState = rememberSaveable { mutableStateOf(false) }
+    val showMoreInfoDialogState = rememberSaveable { mutableStateOf<PortMappingKey?>(null) }
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
@@ -92,10 +96,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
         )
     }
 
-    if (showMoreInfoDialogState.value) {
+    if (showMoreInfoDialogState.value != null) {
         MoreInfoDialog(
-            portMappingWithPref = portViewModel.getSelectedItem(contextMenuUiState.selectedId!!),
-            showDialog = showMoreInfoDialogState
+            showMoreInfoDialogState,
+            portViewModel::getSelectedItem
         )
     }
 
@@ -188,7 +192,8 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             if (anyDevices) {
                 FloatingActionButton(
                     // uses MaterialTheme.colorScheme.secondaryContainer
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer, //todo revert to secondar
+                    modifier = Modifier.semantics { testTag = "createRuleFab" },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     onClick = {
                         //showAddRuleDialogState.value = true
                         navController.navigate("full_screen_dialog")

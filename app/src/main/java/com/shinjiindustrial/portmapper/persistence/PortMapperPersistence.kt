@@ -38,6 +38,7 @@ data class PortMappingEntity(
     // these are the preferences that we cannot store on the router
     @ColumnInfo(name = "autorenew") val autoRenew: Boolean,
     @ColumnInfo(name = "desiredLeaseDuration") val desiredLeaseDuration: Int,
+    @ColumnInfo(name = "autorenewManualCadence", defaultValue = "-1") val autoRenewManualCadence: Int,
 
     // this is a preference we can sometimes store on the router
     @ColumnInfo(name = "desiredEnabled") val desiredEnabled: Boolean,
@@ -67,7 +68,6 @@ interface DevicesDao {
         SELECT * FROM devices
         WHERE deviceIp = :deviceIp
           AND deviceSignature = :deviceSignature
-        LIMIT 2
     """
     )
     suspend fun getByPrimaryKey(
@@ -134,9 +134,9 @@ interface PortMappingDao {
 }
 
 @Database(entities = [PortMappingEntity::class, DevicesEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)])
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
 abstract class AppDatabase : RoomDatabase() {
     abstract fun portMappingDao(): PortMappingDao
     abstract fun devicesDao(): DevicesDao

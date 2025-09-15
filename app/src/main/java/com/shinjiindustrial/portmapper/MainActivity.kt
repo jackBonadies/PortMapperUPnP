@@ -2,51 +2,24 @@ package com.shinjiindustrial.portmapper
 
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
-import android.util.DisplayMetrics
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -54,19 +27,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,23 +41,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
@@ -99,19 +57,10 @@ import androidx.navigation.NavHostController
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.MainActivity.ScaffoldController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
-import com.shinjiindustrial.portmapper.common.ValidationError
-import com.shinjiindustrial.portmapper.common.capLeaseDur
-import com.shinjiindustrial.portmapper.common.toMessage
-import com.shinjiindustrial.portmapper.common.validateDescription
-import com.shinjiindustrial.portmapper.common.validateEndPort
-import com.shinjiindustrial.portmapper.common.validateInternalIp
-import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.ActionNames
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
-import com.shinjiindustrial.portmapper.ui.DurationPickerDialog
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
 import org.fourthline.cling.model.meta.RemoteDevice
@@ -166,7 +115,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun PortMapperMainContent(portViewModel : PortViewModel) {
+    fun PortMapperMainContent(portViewModel: PortViewModel) {
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         MyApplicationTheme(themeState) {
             Surface(
@@ -174,8 +123,8 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.background
             ) {
                 RootScaffold()
-                {
-                    it -> PortMapperNavGraph(portViewModel, themeState, Modifier.padding(it))
+                { it ->
+                    PortMapperNavGraph(portViewModel, themeState, Modifier.padding(it))
                 }
             }
         }
@@ -189,8 +138,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun RootScaffold(content: @Composable (PaddingValues) -> Unit)
-    {
+    fun RootScaffold(content: @Composable (PaddingValues) -> Unit) {
         val ctrl = remember { ScaffoldController() }
         CompositionLocalProvider(LocalScaffoldController provides ctrl) {
             Scaffold(
@@ -204,6 +152,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 val LocalScaffoldController = staticCompositionLocalOf { ScaffoldController() }
 
 fun fallbackRecursiveSearch(rootDevice: RemoteDevice) {
@@ -229,7 +178,7 @@ fun EnterContextMenu(
     selectedKey: PortMappingKey?,
     getSelectedItem: (PortMappingKey) -> PortMappingWithPref,
     closeContextMenu: () -> Unit,
-    showMoreInfoDialog: MutableState<Boolean>,
+    showMoreInfoDialog: MutableState<PortMappingKey?>,
     navController: NavHostController,
     portViewModel: PortViewModel,
     themeState: ThemeUiState
@@ -261,7 +210,6 @@ fun EnterContextMenu(
                 ) {
                     // it redraws starting at this inner context...
                     if (selectedKey != null) {
-
 
                         val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
                         //TODO
@@ -299,6 +247,10 @@ fun EnterContextMenu(
                                         "autorenew",
                                         portMappingWithPref.getAutoRenewOrDefault().toString()
                                     )
+                                    .appendQueryParameter(
+                                        "autorenewManualCadence",
+                                        portMappingWithPref.getAutoRenewCadenceOrDefault().toString()
+                                    )
                                 val uri = uriBuilder.build()
                                 navController.navigate(uri.toString())
                             }
@@ -331,7 +283,7 @@ fun EnterContextMenu(
                             Pair<String, () -> Unit>(
                                 "More Info"
                             ) {
-                                showMoreInfoDialog.value = true
+                                showMoreInfoDialog.value = selectedKey
                             }
                         )
                         var index = 0
@@ -366,756 +318,6 @@ fun EnterContextMenu(
     }
 }
 
-//In IGD release 1.0, a value of 0 was used to create a static port mapping. In version 2.0, it is no longer
-//possible to create static port mappings via UPnP actions. Instead, an out-of-band mechanism is REQUIRED
-//to do so (cf. WWW-administration, remote management or local management). In order to be backward
-//compatible with legacy control points, the value of 0 MUST be interpreted as the maximum value (e.g.
-//604800 seconds, which corresponds to one week).
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ColumnScope.CreateRuleContents(
-    hasSubmitted: MutableState<Boolean>,
-    internalPortText: MutableState<String>,
-    internalPortTextEnd: MutableState<String>,
-    externalPortText: MutableState<String>,
-    externalPortTextEnd: MutableState<String>,
-    leaseDuration: MutableState<String>,
-    description: MutableState<String>,
-    descriptionHasError: MutableState<Boolean>,
-    startInternalHasError: MutableState<Boolean>,
-    endInternalHasError: MutableState<Boolean>,
-    selectedProtocolMutable: MutableState<String>,
-    startExternalHasError: MutableState<Boolean>,
-    endExternalHasError: MutableState<Boolean>,
-    internalIp: MutableState<String>,
-    internalIpHasError: MutableState<Boolean>,
-    gatewayIps: MutableList<String>,
-    externalDeviceText: MutableState<String>,
-    expandedInternal: MutableState<Boolean>,
-    expandedExternal: MutableState<Boolean>,
-    wanIpIsV1: State<Boolean>,
-    autoRenew: MutableState<Boolean>
-) {
-
-    val showLeaseDialog = remember { mutableStateOf(false) }
-
-    if (showLeaseDialog.value) {
-        DurationPickerDialog(showLeaseDialog, leaseDuration, wanIpIsV1.value)
-    }
-
-    val descriptionErrorString =
-        remember { mutableStateOf(validateDescription(description.value).validationError) }
-    val interalIpErrorString =
-        remember { mutableStateOf(validateInternalIp(internalIp.value).validationError) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(createNewRuleRowWidth)
-            .padding(top = 4.dp),
-        horizontalArrangement = Arrangement.End
-    )
-    {
-        OutlinedTextField(
-            value = description.value,
-            onValueChange = {
-                description.value = it
-                descriptionHasError.value = validateDescription(description.value).hasError
-                descriptionErrorString.value =
-                    validateDescription(description.value).validationError
-            },
-            label = { Text("Description") },
-            singleLine = true,
-            modifier = Modifier
-                .weight(0.4f, true),//.height(60.dp),
-            isError = hasSubmitted.value && descriptionHasError.value,
-            trailingIcon = {
-                if (hasSubmitted.value && descriptionHasError.value) {
-                    Icon(
-                        Icons.Filled.Error,
-                        descriptionErrorString.value.toMessage(),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            supportingText = {
-                if (hasSubmitted.value && descriptionHasError.value) {
-                    Text(
-                        descriptionErrorString.value.toMessage(),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-//                                if (triedToSubmit.value && descriptionError.value) {
-//                                    Text("Description is empty", color = MaterialTheme.colorScheme.error)
-//                                }
-            },
-
-
-            )
-    }
-
-    var textfieldSize by remember { mutableStateOf(Size.Zero) }
-
-    val portStartSize = remember { mutableStateOf(IntSize.Zero) }
-
-    DeviceRow()
-    {
-        OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = internalIp.value,
-            onValueChange = {
-                internalIp.value = it.filter { charIt -> charIt.isDigit() || charIt == '.' }
-                internalIpHasError.value = validateInternalIp(internalIp.value).hasError
-                interalIpErrorString.value = validateInternalIp(internalIp.value).validationError
-            },
-            isError = hasSubmitted.value && internalIpHasError.value,
-            supportingText = {
-                if (hasSubmitted.value && internalIpHasError.value) {
-                    Text(
-                        interalIpErrorString.value.toMessage(),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            trailingIcon = {
-                if (hasSubmitted.value && internalIpHasError.value) {
-                    Icon(
-                        Icons.Filled.Error,
-                        interalIpErrorString.value.toMessage(),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            singleLine = true,
-            label = { Text("Internal Device") },
-            modifier = Modifier
-                .weight(0.5f, true)
-                //.height(60.dp)
-                .onGloballyPositioned { coordinates ->
-                    //This value is used to assign to the DropDown the same width
-                    println("OurInternalDevice: " + coordinates.size.toSize())
-                    // Get density.
-
-
-                    fun pxToDp(context: Context, px: Float): Float {
-                        return px / (context.resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
-                    }
-
-//                                    val density = pxToDp(
-//                                        PortForwardApplication.appContext,
-//                                        (coordinates.size.height.toFloat())
-//                                    )
-                    textfieldSize = coordinates.size.toSize()
-                }
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-
-        //pass in expanded, pass in startHasErrorString, pass in internalPortText, pass in StartExternalHasError
-        // port start
-        val startHasErrorString =
-            remember { mutableStateOf(validateStartPort(internalPortText.value).validationError) }
-        StartPortExpandable(
-            internalPortText,
-            startInternalHasError,
-            startHasErrorString,
-            hasSubmitted,
-            expandedInternal,
-            portStartSize
-        )
-    }
-
-    AnimatedVisibility(
-        visible = expandedInternal.value
-    ) {
-        //if(expandedInternal.value) {
-        PortRangeRow(
-            internalPortText,
-            internalPortTextEnd,
-            startInternalHasError,
-            endInternalHasError,
-            hasSubmitted,
-            Modifier.weight(0.2f, true),
-            portStartSize.value
-        )
-    }
-
-
-//                    val options = listOf("Option 1", "Option 2", "Option 3", "Option 4", "Option 5")
-//                    var expanded by remember { mutableStateOf(false) }
-//                    var selectedOptionText by remember { mutableStateOf(options[0]) }
-
-
-    DeviceRow()
-    {
-//        var defaultModifier = Modifier
-//            .weight(0.5f, true)
-//            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        val defaultModifier = Modifier
-            .weight(0.5f, true)
-//            //.width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        DropDownOutline(defaultModifier, externalDeviceText, gatewayIps, "External Device")
-        Spacer(modifier = Modifier.width(8.dp))
-        val startHasErrorString =
-            remember { mutableStateOf(validateStartPort(externalPortText.value).validationError) }
-        StartPortExpandable(
-            externalPortText,
-            startExternalHasError,
-            startHasErrorString,
-            hasSubmitted,
-            expandedExternal,
-            portStartSize
-        )
-
-    }
-
-    AnimatedVisibility(
-        visible = expandedExternal.value
-    ) {
-        PortRangeRow(
-            externalPortText,
-            externalPortTextEnd,
-            startExternalHasError,
-            endExternalHasError,
-            hasSubmitted,
-            Modifier.weight(0.2f, true),
-            portStartSize.value
-        )
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(createNewRuleRowWidth)
-            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
-    ) {
-        val defaultModifier = Modifier
-            .weight(0.5f, true)
-        //.height(60.dp)
-        //.height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-        DropDownOutline(
-            defaultModifier,//Size(500f, textfieldSize.height),
-            selectedText = selectedProtocolMutable,
-            suggestions = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
-            "Protocol"
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        remember { mutableStateOf(false) }
-        OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = leaseDuration.value,
-            onValueChange = {
-
-                val digitsOnly = it.filter { charIt -> charIt.isDigit() }
-                if (digitsOnly.isBlank()) {
-                    leaseDuration.value = digitsOnly
-
-                } else {
-                    leaseDuration.value = capLeaseDur(digitsOnly, wanIpIsV1.value)
-                }
-
-            },
-            label = { Text("Lease") },
-            trailingIcon = {
-                IconButton(onClick = { showLeaseDialog.value = true })
-                {
-                    Icon(
-                        Icons.Filled.Schedule,
-                        contentDescription = ""
-                    ) //TODO set error on main theme if not already.
-                }
-            },
-            modifier = Modifier
-                .weight(0.5f, true)
-                .onFocusChanged {
-
-                    // one is allowed to temporarily leave blank.
-                    // but on leaving it must be valid
-                    if (!it.isFocused && leaseDuration.value.isBlank()) {
-                        leaseDuration.value = "0"
-                    }
-
-                    if (it.isFocused) {
-                        if (leaseDuration.value == "0 (max)") {
-                            leaseDuration.value = "0"
-                        }
-
-                    } else {
-
-                        if (leaseDuration.value == "0") {
-                            leaseDuration.value = "0 (max)"
-                        }
-                    }
-                },//isFocused.value = it.isFocused },
-        )
-
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth(createNewRuleRowWidth)
-            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
-    ) {
-        //PlainTooltipBox(
-        //androidx.compose.material3. TooltipBox(
-//            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-//            tooltip = {
-//                PlainTooltip {
-//                    Text("Add to favorites")
-//                }
-//            },
-//            state = rememberTooltipState()
-//        ) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-            tooltip = {
-                PlainTooltip { Text("When checked, port mapper will automatically renew rules before expiration.") }
-            },
-            state = rememberTooltipState()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                //MaterialTheme.colorScheme.outline
-                Checkbox(
-                    autoRenew.value,
-                    onCheckedChange = { autoRenew.value = it },
-                    // uncheckedColor == border color
-                    colors = CheckboxDefaults.colors(uncheckedColor = AdditionalColors.TextColorWeak)
-
-
-                )
-                Text("Auto Renew", color = AdditionalColors.TextColor)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun StartPortExpandable(
-    portText: MutableState<String>,
-    hasError: MutableState<Boolean>,
-    errorString: MutableState<ValidationError>,
-    hasSubmitted: MutableState<Boolean>,
-    expanded: MutableState<Boolean>,
-    startPortSize: MutableState<IntSize>
-) {
-    OutlinedTextField(
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        value = portText.value,
-        modifier = Modifier
-            .fillMaxWidth(.4f)
-            .onSizeChanged { startPortSize.value = it },
-        //.weight(0.4f, true),
-        singleLine = true,
-        onValueChange = {
-            portText.value = it.filter { charIt -> charIt.isDigit() }
-            hasError.value = validateStartPort(portText.value).hasError
-            errorString.value = validateStartPort(portText.value).validationError
-        },
-        label = { if (expanded.value) Text("Port Start") else Text("Port") },
-        //modifier = Modifier.then(modifier),
-        //.height(60.dp),
-        isError = hasSubmitted.value && hasError.value,
-        supportingText = {
-            if (hasSubmitted.value && hasError.value) {
-                Text(errorString.value.toMessage(), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        trailingIcon = {
-            if (hasSubmitted.value && hasError.value) {
-                Icon(
-                    Icons.Filled.Error,
-                    contentDescription = errorString.value.toMessage(),
-                    tint = MaterialTheme.colorScheme.error
-                ) //TODO set error on main theme if not already.
-            } else {
-                IconButton(onClick = { expanded.value = !expanded.value })
-                {
-                    if (expanded.value) {
-                        Icon(
-                            Icons.Filled.UnfoldLess,
-                            contentDescription = ""
-                        ) //TODO set error on main theme if not already.
-                    } else {
-                        Icon(
-                            Icons.Filled.UnfoldMore,
-                            contentDescription = ""
-                        ) //TODO set error on main theme if not already.
-                    }
-                }
-            }
-        }
-    )
-}
-
-val createNewRuleRowWidth = 1.0f
-
-fun String.toIntOrMaxValue(): Int {
-    return try {
-        this.toInt()
-    } catch (e: Exception) {
-        Int.MAX_VALUE
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-@Preview
-fun outlineTextWithPicker() {
-    Column()
-    {
-        val expanded = remember { mutableStateOf(false) }
-        Row()
-        {
-            OutlinedTextField(
-                "Device",
-                modifier = Modifier.weight(.5f),
-                onValueChange = {
-
-                },
-                trailingIcon = null
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            OutlinedTextField(
-                "Port",
-                onValueChange = {
-
-                },
-                modifier = Modifier.weight(.5f),
-                trailingIcon = {
-                    IconButton(onClick = { expanded.value = !expanded.value })
-                    {
-                        if (expanded.value) {
-                            Icon(
-                                Icons.Filled.UnfoldLess,
-                                contentDescription = ""
-                            ) //TODO set error on main theme if not already.
-                        } else {
-                            Icon(
-                                Icons.Filled.UnfoldMore,
-                                contentDescription = ""
-                            ) //TODO set error on main theme if not already.
-                        }
-
-
-                    }
-                }
-            )
-        }
-
-        val expandAnimation by animateDpAsState(
-            targetValue = if (expanded.value) 60.dp else 0.dp,
-            animationSpec = tween(
-                durationMillis = 2000, // Duration of the animation
-                easing = LinearEasing // Animation easing
-            )
-        )
-
-
-//        AnimatedVisibility(
-//            visible = expanded.value,
-//            enter = fadeIn(),
-//            exit = fadeOut()
-//        ) {
-        if (expanded.value) {
-            Row(modifier = Modifier.height(expandAnimation))
-            {
-                Spacer(
-                    modifier = Modifier.weight(.5f),
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                OutlinedTextField(
-                    "Port",
-                    onValueChange = {
-
-                    },
-                    modifier = Modifier.weight(.5f),
-                    trailingIcon = {
-                        IconButton(onClick = { expanded.value = !expanded.value })
-                        {
-                            if (expanded.value) {
-                                Icon(
-                                    Icons.Filled.UnfoldLess,
-                                    contentDescription = ""
-                                ) //TODO set error on main theme if not already.
-                            } else {
-                                Icon(
-                                    Icons.Filled.UnfoldMore,
-                                    contentDescription = ""
-                                ) //TODO set error on main theme if not already.
-                            }
-
-
-                        }
-                    }
-                )
-            }
-        }
-        //}
-
-        Row()
-        {
-            OutlinedTextField(
-                "External Device",
-                modifier = Modifier.weight(.5f),
-                onValueChange = {
-
-                },
-                trailingIcon = null
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            OutlinedTextField(
-                "Port",
-                onValueChange = {
-
-                },
-                modifier = Modifier.weight(.5f),
-                trailingIcon = {
-                    IconButton(onClick = { })
-                    {
-
-                        Icon(
-                            Icons.Filled.UnfoldMore,
-                            contentDescription = ""
-                        ) //TODO set error on main theme if not already.
-
-
-                    }
-                }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PortRangeRow(
-    startPortText: MutableState<String>,
-    endPortText: MutableState<String>,
-    startHasError: MutableState<Boolean>,
-    endHasError: MutableState<Boolean>,
-    hasSubmitted: MutableState<Boolean>,
-    modifier: Modifier,
-    portSize: IntSize
-) {
-    DeviceRow()
-    {
-
-        val endHasErrorString = remember {
-            mutableStateOf(
-                validateEndPort(
-                    startPortText.value,
-                    endPortText.value
-                ).validationError
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(0.5f, true))
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Text("to", modifier = Modifier.align(Alignment.CenterVertically))
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-
-
-        OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = endPortText.value,
-            onValueChange = {
-                endPortText.value = it.filter { charIt -> charIt.isDigit() }
-                endHasError.value = validateEndPort(startPortText.value, endPortText.value).hasError
-                endHasErrorString.value =
-                    validateEndPort(startPortText.value, endPortText.value).validationError
-            },
-            label = { Text("Port End") },
-            modifier = Modifier.width(with(LocalDensity.current) { portSize.width.toDp() }),
-            isError = hasSubmitted.value && endHasError.value,
-            supportingText = {
-                if (hasSubmitted.value && endHasError.value) {
-                    Text(
-                        endHasErrorString.value.toMessage(),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-
-
-            trailingIcon =
-                if (hasSubmitted.value && endHasError.value) {
-                    @Composable {
-                        if (hasSubmitted.value && endHasError.value) {
-                            Icon(
-                                Icons.Filled.Error,
-                                contentDescription = endHasErrorString.value.toMessage(),
-                                tint = MaterialTheme.colorScheme.error
-                            ) //TODO set error on main theme if not already.
-                        }
-                    }
-                } else {
-                    null
-                }
-        )
-
-    }
-}
-
-
-fun RunUIThread(runnable: Runnable) {
-    val mainLooper = Looper.getMainLooper()
-
-    // Create a Handler to run some code on the UI thread
-    val handler = Handler(mainLooper)
-    handler.post(runnable)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DropDownOutline(
-    defaultModifier: Modifier,
-    selectedText: MutableState<String>,
-    suggestions: List<String>,
-    outlineLabel: String
-) {
-//    var defaultModifier = Modifier.then(Modifier)
-//    if(textfieldSize != null)
-//    {
-//        // bind size
-//        defaultModifier = Modifier
-//            .width(with(LocalDensity.current) { textfieldSize.width.toDp() })
-//            .height(with(LocalDensity.current) { textfieldSize.height.toDp() })
-//    }
-    var expanded by remember { mutableStateOf(false) }
-    val icon = if (expanded)
-        Icons.Filled.ArrowDropUp //it requires androidx.compose.material:material-icons-extended
-    else
-        Icons.Filled.ArrowDropDown
-
-    val interactionSource = remember { MutableInteractionSource() }
-    val focusRequester = remember { FocusRequester() }
-
-
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
-
-    Box(
-        modifier = defaultModifier
-            .then(
-                Modifier.clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
-                        focusRequester.requestFocus()
-                    })
-            )
-            .onSizeChanged { boxSize = it }
-    ) {
-
-        OutlinedTextField(
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            readOnly = true,
-            value = selectedText.value,
-            onValueChange = { selectedText.value = it },
-            interactionSource = interactionSource,
-            modifier = defaultModifier
-                .onGloballyPositioned { coordinates ->
-
-                    println("OurExternalDevice: " + coordinates.size.toSize())
-                    //This value is used to assign to the DropDown the same width
-                    //textfieldSize = coordinates.size.toSize()
-                }
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
-                    }
-                )
-                .focusRequester(focusRequester),
-            label = { Text(outlineLabel) },
-            trailingIcon = {
-                Icon(
-                    icon, "contentDescription",
-                    Modifier.clickable { expanded = !expanded })
-            }
-        )
-        //println(textfieldSize.toString())
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .width(with(LocalDensity.current) { boxSize.width.toDp() })
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("DropdownMenuItem clicked")
-                        expanded = !expanded
-                    }
-                ),
-        ) {
-            suggestions.forEach { label ->
-                DropdownMenuItem(
-                    text = {
-                        Text(text = label)
-                    },
-                    onClick = {
-                        selectedText.value = label
-                        expanded = false
-                    })
-            }
-        }
-        Box(
-//                            onClick = {
-//                                println("TextField clicked")
-//                                expanded = !expanded
-//                            },
-            modifier = Modifier
-                .width(with(LocalDensity.current) { boxSize.width.toDp() })
-                .background(Color.Blue)
-//                            .onGloballyPositioned { coordinates ->
-//                                //This value is used to assign to the DropDown the same width
-//                                //textfieldSize = coordinates.size.toSize()
-//                            }
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {
-                        println("TextField clicked")
-                        expanded = !expanded
-                        focusRequester.requestFocus()
-                    }
-                ),
-        )
-    }
-}
-
-@Composable
-fun DeviceRow(content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(createNewRuleRowWidth)
-            .padding(top = PortForwardApplication.PaddingBetweenCreateNewRuleRows),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.Top // for the error text
-    ) {
-        content(this)
-    }
-}
 
 @Composable
 fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: PortViewModel) {
@@ -1124,7 +326,9 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
     val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
 
-    IconButton(onClick = { expanded = true }) {
+    IconButton(
+        onClick = { expanded = true },
+        modifier = Modifier.semantics { testTag = "moreActionsButton" }) {
         Icon(Icons.Default.MoreVert, contentDescription = "menu")
     }
 

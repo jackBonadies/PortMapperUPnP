@@ -217,10 +217,8 @@ fun PortMappingCard(
                     AdditionalColors.LogErrorText
                 )
                 Text(
-                    portMapping.getRemainingLeaseTimeRoughString(
-                        portMappingWithPref.getAutoRenewOrDefault(),
-                        now
-                    ), color = color
+                    portMappingWithPref.getRemainingLeaseOrRenewTimeRoughString(now),
+                    color = color
                 )
             }
 

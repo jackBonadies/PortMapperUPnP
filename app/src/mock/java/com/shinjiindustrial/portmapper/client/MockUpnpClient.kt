@@ -71,7 +71,12 @@ enum class Speed(val latency : Long) {
     Slowest(2000)
 }
 
-data class MockUpnpClientConfig(val speed : Speed)
+enum class RuleSet() {
+    Demo,
+    Full
+}
+
+data class MockUpnpClientConfig(val speed : Speed, val ruleSet : RuleSet)
 
 class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
 
@@ -138,49 +143,109 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         )
 
     init {
-        var details = DeviceDetails("IGD Other", "192.168.1.255", 2, "UUID-1")
-        var igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
-        store.put(igdDevice.getKey(), linkedMapOf())
-        deviceStore.put(igdDevice.getKey(), igdDevice)
 
-        details = DeviceDetails("IGD Main", "192.168.1.1", 2, "UUID-2")
-        igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
-        var mappings: List<PortMapping> =
-            (1..200).map { i ->
-                makePortMapping(
-                    description = getDescription(i),
-                    localIP = "192.168.1.${i%2}",
-                    externalPort = if (i < 100)  { 5000 + i } else { 3000 + i },
-                    internalPort = 6000 + i,
-                    protocol = if (i % 2 == 0) "TCP" else "UDP",
-                    enabled = true,
-                    leaseDuration = 3600,
-                    actionExternalIP = igdDevice.getIpAddress(),
-                    pseudoSlot = i
+        when(config.ruleSet)
+        {
+            RuleSet.Demo -> {
+                var details = DeviceDetails("Nokia IGD v2", "192.168.18.1", 2, "UUID-1")
+                var igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
+
+                var mappings: List<PortMapping> = listOf(
+                    makePortMapping(
+                        description = "Minecraft Server",
+                        localIP = "192.168.1.13",
+                        externalPort = 5011,
+                        internalPort = 5011,
+                        protocol = "TCP",
+                        enabled = true,
+                        leaseDuration = 24*3600,
+                        actionExternalIP = igdDevice.getIpAddress(),
+                        pseudoSlot = 1
+                    ),
+                    makePortMapping(
+                        description = "Web Server 1",
+                        localIP = "192.168.1.18",
+                        externalPort = 8080,
+                        internalPort = 8080,
+                        protocol = "TCP",
+                        enabled = true,
+                        leaseDuration = 18*3600,
+                        actionExternalIP = igdDevice.getIpAddress(),
+                        pseudoSlot = 2
+                    ),
+                    makePortMapping(
+                        description = "ShareDrive",
+                        localIP = "192.168.1.13",
+                        externalPort = 4044,
+                        internalPort = 4044,
+                        protocol = "TCP",
+                        enabled = true,
+                        leaseDuration = 2*3600,
+                        actionExternalIP = igdDevice.getIpAddress(),
+                        pseudoSlot = 3
+                    ),
+                    makePortMapping(
+                        description = "Game Host 1",
+                        localIP = "192.168.1.13",
+                        externalPort = 50345,
+                        internalPort = 4000,
+                        protocol = "TCP",
+                        enabled = true,
+                        leaseDuration = 1800,
+                        actionExternalIP = igdDevice.getIpAddress(),
+                        pseudoSlot = 4
+                    ),
                 )
-            }
 
-        store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
-        deviceStore.put(igdDevice.getKey(), igdDevice)
-
-        details = DeviceDetails("IGD Other2", "192.168.1.244", 2, "UUID-3")
-        igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
-        mappings =
-            (1..2).map { i ->
-                makePortMapping(
-                    description = "Rule $i",
-                    localIP = "192.168.1.${i%2}",
-                    externalPort = 5000 + i,
-                    internalPort = 6000 + i,
-                    protocol = if (i % 2 == 0) "TCP" else "UDP",
-                    enabled = true,
-                    leaseDuration = 3600,
-                    actionExternalIP = igdDevice.getIpAddress(),
-                    pseudoSlot = i
-                )
+                store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+                deviceStore.put(igdDevice.getKey(), igdDevice)
             }
-        store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
-        deviceStore.put(igdDevice.getKey(), igdDevice)
+            RuleSet.Full -> {
+                var details = DeviceDetails("IGD Other", "192.168.1.255", 2, "UUID-1")
+                var igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
+                store.put(igdDevice.getKey(), linkedMapOf())
+                deviceStore.put(igdDevice.getKey(), igdDevice)
+
+                details = DeviceDetails("IGD Main", "192.168.1.1", 2, "UUID-2")
+                igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
+                var mappings: List<PortMapping> =
+                    (1..200).map { i ->
+                        makePortMapping(
+                            description = getDescription(i),
+                            localIP = "192.168.1.${i%2}",
+                            externalPort = if (i < 100)  { 5000 + i } else { 3000 + i },
+                            internalPort = 6000 + i,
+                            protocol = if (i % 2 == 0) "TCP" else "UDP",
+                            enabled = true,
+                            leaseDuration = 3600,
+                            actionExternalIP = igdDevice.getIpAddress(),
+                            pseudoSlot = i
+                        )
+                    }
+
+                store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+                deviceStore.put(igdDevice.getKey(), igdDevice)
+
+                details = DeviceDetails("IGD Other2", "192.168.1.244", 2, "UUID-3")
+                igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
+                mappings =
+                    (1..2).map { i ->
+                        makePortMapping(
+                            description = "Rule $i",
+                            localIP = "192.168.1.${i%2}",
+                            externalPort = 5000 + i,
+                            internalPort = 6000 + i,
+                            protocol = if (i % 2 == 0) "TCP" else "UDP",
+                            enabled = true,
+                            leaseDuration = 3600,
+                            actionExternalIP = igdDevice.getIpAddress(),
+                            pseudoSlot = i
+                        )
+                    }
+                store.put(igdDevice.getKey(), linkedMapOf(*mappings.map { getKey(it) to it }.toTypedArray()))
+                deviceStore.put(igdDevice.getKey(), igdDevice)
+            }
+        }
     }
 
     override suspend fun createPortMappingRule(
@@ -241,12 +306,11 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
     override fun search(maxSeconds : Int)
     {
         GlobalScope.launch {
-            tick()
-            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(0).deviceDetails))
-            tick()
-            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(1).deviceDetails))
-            tick()
-            deviceFoundEvent.invoke(MockClingIGDDevice(deviceStore.values.elementAt(2).deviceDetails))
+            for (device in deviceStore.values)
+            {
+                tick()
+                deviceFoundEvent.invoke(MockClingIGDDevice(device.deviceDetails))
+            }
         }
     }
 

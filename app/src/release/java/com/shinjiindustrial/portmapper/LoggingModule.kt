@@ -1,9 +1,12 @@
 package com.shinjiindustrial.portmapper
 
+import android.content.Context
+import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import java.util.logging.Level
@@ -15,8 +18,14 @@ object LoggingModule {
 
     @Provides
     @Singleton
-    fun provideFirebaseCrashlytics(): FirebaseCrashlytics =
-        FirebaseCrashlytics.getInstance()
+    fun provideFirebaseCrashlytics(@ApplicationContext context: Context): FirebaseCrashlytics =
+        initializeAndGetFirebaseInstances(context)
+
+    private fun initializeAndGetFirebaseInstances(context: Context) : FirebaseCrashlytics
+    {
+        FirebaseApp.initializeApp(context)
+        return FirebaseCrashlytics.getInstance()
+    }
 
     @Provides
     @IntoSet

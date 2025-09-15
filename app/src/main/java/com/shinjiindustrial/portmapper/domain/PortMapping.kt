@@ -3,7 +3,6 @@ package com.shinjiindustrial.portmapper.domain
 import android.os.Parcelable
 import android.os.SystemClock
 import com.shinjiindustrial.portmapper.PortForwardApplication
-import com.shinjiindustrial.portmapper.persistence.DevicesDao
 import com.shinjiindustrial.portmapper.persistence.DevicesEntity
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.parcelize.Parcelize
@@ -20,12 +19,71 @@ data class PortMappingWithPref(
         return portMappingPref?.autoRenew ?: false
     }
 
+    fun isManualRenewCadence(): Boolean {
+        return portMappingPref?.autoRenewalCadenceSeconds != null && portMappingPref.autoRenewalCadenceSeconds != -1
+    }
+
+    fun getRenewTimeMs(): Long
+    {
+        if (portMappingPref != null) {
+            if (portMappingPref.autoRenewalCadenceSeconds == -1)
+            {
+                return portMapping.getExpiresTimeMillis() - 1000 * PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING
+            }
+            else
+            {
+                return portMappingPref.timeLastRenewedMs + 1000 * portMappingPref.autoRenewalCadenceSeconds
+            }
+        }
+        return Long.MAX_VALUE
+    }
+
+    fun getAutoRenewCadenceOrDefault(): Int {
+        return portMappingPref?.autoRenewalCadenceSeconds ?: -1
+    }
+
     fun getDesiredLeaseDurationOrDefault(): Int {
         return portMappingPref?.desiredLeaseDuration ?: portMapping.LeaseDuration
     }
+
+    fun getRemainingLeaseOrRenewTimeRoughString(now: Long = -1): String {
+        if (!this.isManualRenewCadence() && this.portMapping.LeaseDuration == 0) {
+            return "Expires Never"
+        }
+        val autoRenew = this.getAutoRenewOrDefault()
+        val totalSecs = if (autoRenew)
+            (this.getRenewTimeMs() - SystemClock.elapsedRealtime()).toInt() / 1000
+            else
+            this.portMapping.getRemainingLeaseTimeSeconds(now)
+
+        val dhms = getDHMS(totalSecs)
+
+        val renewsExpiresString = if (autoRenew) "Renews in" else "Expires in"
+        val renewStringTime = roundOneUnit(dhms)
+        if (totalSecs < 60) {
+            if (autoRenew) {
+                if (totalSecs < 5) {
+                    return "Renewing now"
+                } else {
+                    return "Renewing <1 minute"
+                }
+            } else {
+                return "$renewsExpiresString <1 minute"
+            }
+        } else {
+            return "$renewsExpiresString $renewStringTime"
+        }
+    }
+
 }
 
-data class PortMappingPref(val autoRenew: Boolean, val desiredLeaseDuration: Int)
+data class PortMappingPref(val autoRenew: Boolean, val desiredLeaseDuration: Int, val autoRenewalCadenceSeconds: Int, val timeLastRenewedMs: Long)
+{
+    fun shouldAutoRenewOnCadence() : Boolean
+    {
+        return autoRenewalCadenceSeconds != -1
+    }
+}
 
 @Parcelize
 data class PortMappingKey(val deviceIP: String, val externalPort: Int, val protocol: String) :
@@ -83,7 +141,7 @@ data class PortMapping(
         return formatShortName(Protocol, DeviceIP, ExternalPort.toString())
     }
 
-    fun getRemainingLeaseTime(now: Long = -1): Int {
+    fun getRemainingLeaseTimeSeconds(now: Long = -1): Int {
         val secondsPassed =
             ((if (now == -1L) SystemClock.elapsedRealtime() else now) - TimeReadLeaseDurationMs) / 1000L
         val timeToExpiration = (LeaseDuration.toLong() - secondsPassed)
@@ -94,38 +152,12 @@ data class PortMapping(
         return TimeReadLeaseDurationMs + LeaseDuration.toLong() * 1000
     }
 
-    fun getRemainingLeaseTimeRoughString(autoRenew: Boolean, now: Long = -1): String {
-        if (this.LeaseDuration == 0) {
-            return "Expires Never"
-        }
-
-        val totalSecs = getRemainingLeaseTime(now)
-        val dhms = getDHMS(totalSecs)
-
-        val renewsExpiresString = if (autoRenew) "Renews in" else "Expires in"
-        val renewStringTime = roundOneUnit(dhms)
-        if (totalSecs < 60) {
-            if (autoRenew) {
-                if (totalSecs < PortForwardApplication.RENEW_RULE_WITHIN_X_SECONDS_OF_EXPIRING + 10) {
-                    return "Renewing now"
-                } else {
-                    return "Renewing <1 minute"
-                }
-            } else {
-                return "$renewsExpiresString <1 minute"
-            }
-        } else {
-            return "$renewsExpiresString $renewStringTime"
-        }
-
-    }
-
     fun getRemainingLeaseTimeString(now: Long = -1): String {
         if (this.LeaseDuration == 0) {
             return "Never"
         }
         // show only 2 units (i.e. days and hours. or hours and minutes. or minutes and seconds. or just seconds)
-        val totalSecs = getRemainingLeaseTime(now)
+        val totalSecs = getRemainingLeaseTimeSeconds(now)
         val dhms = getDHMS(totalSecs)
         val timeLeftString = roundTwoUnits(dhms)
 
@@ -137,10 +169,10 @@ data class PortMapping(
     }
 
     fun getUrgency(autoRenew: Boolean, now: Long = -1): Urgency {
-        if (autoRenew) {
+        if (autoRenew || this.LeaseDuration == 0) {
             return Urgency.Normal
         }
-        val totalSecs = getRemainingLeaseTime(now)
+        val totalSecs = getRemainingLeaseTimeSeconds(now)
         val totalMinutes = totalSecs / 60
         if (totalMinutes <= 1) {
             return Urgency.Error
@@ -258,8 +290,29 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String):
     return "$protocol rule at $externalIp:$externalPort"
 }
 
-fun PortMappingEntity.getPrefs(): PortMappingPref =
-    PortMappingPref(this.autoRenew, this.desiredLeaseDuration)
+fun PortMappingEntity.getPrefs(lastRenewTimeMs: Long): PortMappingPref =
+    PortMappingPref(this.autoRenew, this.desiredLeaseDuration, this.autoRenewManualCadence, lastRenewTimeMs)
 
 fun DevicesEntity.getPrefs(): DevicePreferences =
     DevicePreferences(this.useWildcardForRemoteHostDelete)
+
+
+// when we start up lets set a reasonable last renew time so the rule will not expire
+fun rollbackLastRenewTimeSoWeAreWithinLeaseExpiration(cadenceMs: Long, currentTimeMs: Long, expiresAtMs: Long): Long
+{
+    if (currentTimeMs + cadenceMs > expiresAtMs)
+    {
+        return expiresAtMs - cadenceMs - 30_000
+    }
+    else
+    {
+        return currentTimeMs
+    }
+}
+
+// this must have been set during a previous app run, otherwise it would have been renewed sooner
+// we can just set it to now / within lease expiration
+fun lastRenewedTimeIsTooFarAway(cadenceMs: Long, currentTimeMs: Long, lastRenewedTimeMs: Long): Boolean
+{
+    return lastRenewedTimeMs + cadenceMs < currentTimeMs
+}

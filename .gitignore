@@ -17,3 +17,5 @@
 .cxx
 local.properties
 google-services.json
+/fastlane/portmapperfirebase-2d08dd64cea2.json
+/app/prod/release/app-prod-release.aab

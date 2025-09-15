@@ -26,6 +26,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.shinjiindustrial.portmapper.common.parseCadence
+import com.shinjiindustrial.portmapper.common.validateCadence
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
@@ -58,7 +60,7 @@ fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState,
             PortMapperMainScreen(portViewModel, themeState, navController = navController)
         }
         composable(
-            "full_screen_dialog?description={description}&internalIp={internalIp}&internalRange={internalRange}&externalIp={externalIp}&externalRange={externalRange}&protocol={protocol}&leaseDuration={leaseDuration}&enabled={enabled}&autorenew={autorenew}",
+            "full_screen_dialog?description={description}&internalIp={internalIp}&internalRange={internalRange}&externalIp={externalIp}&externalRange={externalRange}&protocol={protocol}&leaseDuration={leaseDuration}&enabled={enabled}&autorenew={autorenew}&autorenewManualCadence={autorenewManualCadence}",
             arguments = listOf(
                 navArgument("description") {
                     nullable = true; type = NavType.StringType
@@ -71,6 +73,7 @@ fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState,
                 navArgument("leaseDuration") { nullable = true; type = NavType.StringType },
                 navArgument("enabled") { type = NavType.BoolType; defaultValue = false },
                 navArgument("autorenew") { type = NavType.BoolType; defaultValue = false },
+                navArgument("autorenewManualCadence") { type = NavType.StringType; nullable = true; },
             ),
             popExitTransition = {
 
@@ -109,9 +112,11 @@ fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState,
             val leaseDuration = arguments?.getString("leaseDuration")
             val enabled = arguments?.getBoolean("enabled")
             val autorenew = arguments?.getBoolean("autorenew")
+            val autorenewManualCadence = arguments?.getString("autorenewManualCadence")
 
             var portMappingUserInputToEdit: PortMappingUserInput? = null
             if (desc != null) {
+                val cadence = parseCadence(autorenewManualCadence!!)
                 portMappingUserInputToEdit = PortMappingUserInput(
                     desc,
                     internalIp!!,
@@ -121,8 +126,8 @@ fun PortMapperNavGraph(portViewModel : PortViewModel, themeState : ThemeUiState,
                     protocol!!,
                     leaseDuration!!,
                     enabled!!,
-                    autorenew!!
-                )
+                    autorenew!!,
+                    cadence.cadence)
             }
 
             RuleCreationDialog(

@@ -16,24 +16,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
+import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
-@Preview
-@Composable
-fun MoreInfoDialog() {
-    SetupPreview()
-    MoreInfoDialog(_getDefaultPortMapping(), remember { mutableStateOf(true) })
-}
+// TODO uncomment
+//@Preview
+//@Composable
+//fun MoreInfoDialog() {
+//    SetupPreview()
+//    MoreInfoDialog(_getDefaultPortMapping(), remember { mutableStateOf(true) })
+//}
 
 @Composable
-fun MoreInfoDialog(portMappingWithPref: PortMappingWithPref, showDialog: MutableState<Boolean>) {
-    val portMapping = portMappingWithPref.portMapping
-    if (showDialog.value) {
+fun MoreInfoDialog(
+    showMoreInfoDialog: MutableState<PortMappingKey?>,
+    getSelectedItem: (PortMappingKey) -> PortMappingWithPref) {
+    if (showMoreInfoDialog.value != null) {
         AlertDialog(
-            onDismissRequest = { showDialog.value = false },
+            onDismissRequest = { showMoreInfoDialog.value = null },
             title = { Text("Info") },
             text = {
+                val portMapping = getSelectedItem(showMoreInfoDialog.value!!).portMapping
                 val pairs = mutableListOf<Pair<String, String>>()
                 pairs.add(Pair("Internal IP", portMapping.InternalIP))
                 pairs.add(Pair("Internal Port", portMapping.InternalPort.toString()))
@@ -61,7 +65,7 @@ fun MoreInfoDialog(portMappingWithPref: PortMappingWithPref, showDialog: Mutable
 
             },
             confirmButton = {
-                Button(onClick = { showDialog.value = false }) {
+                Button(onClick = { showMoreInfoDialog.value = null }) {
                     Text("OK")
                 }
             })
