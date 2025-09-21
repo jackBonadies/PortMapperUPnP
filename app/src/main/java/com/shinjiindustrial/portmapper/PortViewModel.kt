@@ -366,7 +366,6 @@ class PortViewModel @Inject constructor(
         }
             .distinctUntilChanged()
             .onEach { filtered ->
-                println("filtered changed ...")
                 if (filtered != _selectedIds.value) _selectedIds.value = filtered
                 savedStateHandle["selected_ids"] = filtered.toList()
             }
