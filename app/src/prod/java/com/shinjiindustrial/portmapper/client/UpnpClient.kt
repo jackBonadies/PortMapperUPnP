@@ -55,7 +55,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                 registry: Registry,
                 device: RemoteDevice
             ) {
-                println("Discovery started: " + device.displayString)
+                ourLogger.log(Level.FINE, "Discovery started: " + device.displayString)
             }
 
             override fun remoteDeviceDiscoveryFailed(
@@ -63,7 +63,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
                 device: RemoteDevice,
                 ex: Exception
             ) {
-                println("Discovery failed: " + device.displayString + " => " + ex)
+                ourLogger.log(Level.FINE, "Discovery failed: " + device.displayString + " => " + ex)
             }
 
             // complete metadata
@@ -78,19 +78,19 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
             // expiration timestamp updated
             override fun remoteDeviceUpdated(registry: Registry, device: RemoteDevice) {
 
-                println("Device updated: " + device.displayString)
+                ourLogger.log(Level.FINE, "Device updated: " + device.displayString)
             }
 
             override fun remoteDeviceRemoved(registry: Registry, device: RemoteDevice) {
-                println("Device removed: " + device.displayString)
+                ourLogger.log(Level.FINE, "Device removed: " + device.displayString)
             }
 
             override fun localDeviceAdded(registry: Registry, device: LocalDevice) {
-                println("Added local device: " + device.displayString)
+                ourLogger.log(Level.FINE, "Added local device: " + device.displayString)
             }
 
             override fun localDeviceRemoved(registry: Registry, device: LocalDevice) {
-                println("Removed local device: " + device.displayString)
+                ourLogger.log(Level.FINE, "Removed local device: " + device.displayString)
             }
 
             override fun beforeShutdown(registry: Registry) {}
@@ -226,7 +226,7 @@ class UpnpClient @Inject constructor(@ApplicationContext private val context: Co
     {
         val ipAddress = device.getIpAddress()
         val actionInvocation = device.getActionInvocation(ACTION_NAMES.GetGenericPortMappingEntry)
-        println("requesting slot $slotIndex")
+        ourLogger.log(Level.FINE, "GetGeneric: Requesting slot $slotIndex")
         actionInvocation.setInput("NewPortMappingIndex", "$slotIndex");
         val result = this.executeAction(actionInvocation)
         when (result) {

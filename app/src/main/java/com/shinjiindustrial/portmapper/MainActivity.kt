@@ -164,7 +164,7 @@ fun fallbackRecursiveSearch(rootDevice: RemoteDevice) {
         for (service in deviceInQuestion.services) {
             for (action in service.actions) {
                 if (ActionNames.contains(action.name)) {
-                    println("Service ${service.serviceType} contains relevant action ${action}")
+                    println("Service ${service.serviceType} contains relevant action $action")
                 }
             }
         }

@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.example.myapplication.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -61,6 +62,7 @@ class LogStringBuilderSink(
     override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
         main.post {
             val prefix = when (level) {
+                Level.FINE -> "D: "
                 Level.INFO -> "I: "
                 Level.WARNING -> "W: "
                 Level.SEVERE -> "E: "
@@ -86,12 +88,17 @@ class CompositeLogger(
     private val sinks: Set<ILogSink>
 ) : ILogger {
     override fun log(level: Level, msg: String, t: Throwable?, opts: LogOptions) {
+        if (level.intValue() < threshold.intValue()) {
+            return
+        }
         sinks.forEach { it.log(level, msg, t, opts) }
     }
 
     override fun logBreadcrumb(obj: Any) {
         sinks.filter { it.isFirebaseLogger() }.forEach { it.log(Level.INFO, obj.toString(), null, LogOptions(FirebaseRoute.BREADCRUMB)) }
     }
+
+    val threshold: Level = if (BuildConfig.DEBUG) Level.ALL else Level.INFO
 }
 
 

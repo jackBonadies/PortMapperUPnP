@@ -55,7 +55,6 @@ class UpnpRepository @Inject constructor(
     @ApplicationScope private val applicationContext: CoroutineScope
 ) {
     private val renewMutex = Mutex()
-    private var counter = 1
 
     private var _initialized: Boolean = false
     var hasSearched: Boolean = false
@@ -112,14 +111,12 @@ class UpnpRepository @Inject constructor(
                 it.filter { it.value.getAutoRenewOrDefault() }
                     .minByOrNull { it.value.getRenewTimeMs() }
             }.onEach {
-                // null check
-                    it ->
-                println("running with ${it.value.portMapping.shortName()}")
+                it -> ourLogger.log(Level.FINE, "Next Rule to Renew: ${it.value.portMapping.shortName()}")
             }.collectLatest {
                 delayUntilExpiryBuffer(
                     (it.value.getRenewTimeMs())
                 )
-                println("delay is over launching")
+                ourLogger.log(Level.FINE, "Time to Renew Rule")
                 withContext(NonCancellable)
                 {
                     performBatchRenew()
@@ -129,32 +126,31 @@ class UpnpRepository @Inject constructor(
     }
 
     private suspend fun performBatchRenew() = renewMutex.withLock {
-        println("renewing all rules")
+        ourLogger.log(Level.FINE, "Renewing Rules")
         val snapshot = portMappings.first()
 
         val now = SystemClock.elapsedRealtime()
         val expiring =
             snapshot.filter { it.value.getRenewTimeMs() - now <= 1000 * PortForwardApplication.RENEW_BATCH_WITHIN_X_SECONDS }
         if (expiring.isEmpty()) {
-            println("batch is empty")
+            ourLogger.log(Level.FINE, "Batch of rules to renew is empty")
             return
         }
         expiring.forEach {
-            println("our batch $counter: ${it.value.portMapping.shortName()}")
+            ourLogger.log(Level.FINE, "Batch to renew contains: ${it.value.portMapping.shortName()}")
         }
-        counter++
 
         expiring.forEach {
-            println("renewed ${it.value.portMapping.shortName()}")
+            ourLogger.log(Level.FINE, "Renewing ${it.value.portMapping.shortName()}")
             try {
                 renewRule(it.value)
             } catch (exception: Exception) {
                 // we already logged just continue for now (TODO)
             }
-            println("updated ${it.value.portMapping.shortName()}")
+            ourLogger.log(Level.FINE, "Renewed ${it.value.portMapping.shortName()}")
         }
         //delay(1000) // just to prove that we do not cancel
-        println("end renewing all rules")
+        ourLogger.log(Level.FINE, "End renewing all rules")
     }
 
     private suspend fun delayUntilExpiryBuffer(
@@ -164,13 +160,13 @@ class UpnpRepository @Inject constructor(
             (renewTime - SystemClock.elapsedRealtime()).coerceAtLeast(
                 0L
             )
-        println("wait for $delayMilliseconds ms")
+        ourLogger.log(Level.FINE, "Wait for $delayMilliseconds ms")
         delay(delayMilliseconds)
     }
 
 //    private fun delayUntilExpiryBufferThenEmit(portMapping: PortMappingWithPref, expirationTime: Long, renewWithinXSecondsOfExpiring: Long = 45L): Flow<Unit> = flow {
 //        val delaySeconds = (expirationTime - renewWithinXSecondsOfExpiring).coerceAtLeast(0L)
-//        println("wait for $delaySeconds seconds")
+//        ourLogger.log(Level.FINE, "wait for $delaySeconds seconds")
 //        delay(delaySeconds * 1000)
 //        emit(portMapping)
 //    }
@@ -183,10 +179,10 @@ class UpnpRepository @Inject constructor(
 //                .filter { it.getAutoRenewOrDefault() }
 //                .minByOrNull { it.portMapping.getExpiresTimeMillis() }
 //                ?.let { pm -> pm to pm.portMapping.getExpiresTimeMillis() }
-//        }.onEach { it -> println("Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
+//        }.onEach { it -> ourLogger.log(Level.FINE, "Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
 //        val ruleClosestToExpirationDoNotEmitIfSameRuleSameTime = ruleClosestToExpirationFlow.distinctUntilChanged { oldUser, newUser ->
 //            oldUser.first.portMapping === newUser.first.portMapping && oldUser.second == newUser.second
-//        }.onEach { it -> println("UPDATE: Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
+//        }.onEach { it -> ourLogger.log(Level.FINE, "UPDATE: Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
 //        val emitOnRenewTime = ruleClosestToExpirationDoNotEmitIfSameRuleSameTime.flatMapLatest { it ->
 //            delayUntilExpiryBufferThenEmit(it.first, it.first.portMapping.getExpiresTimeMillis())
 //            // this is a problem if we are done but we edited or deleted the rule in the meantime. i.e. we will get a rule created that we did not want.
@@ -503,7 +499,7 @@ class UpnpRepository @Inject constructor(
 
         try {
             val pm = portMappingWithPref.portMapping
-            println("Requesting Delete: ${pm.shortName()}")
+            ourLogger.log(Level.FINE, "Requesting Delete: ${pm.shortName()}")
             val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
             portMappingDao.deleteByKey(pm.DeviceIP, device.udn, pm.Protocol, pm.ExternalPort)
             val result = deletePortMappingWithFallback(device, pm)
@@ -545,7 +541,7 @@ class UpnpRepository @Inject constructor(
 
             try {
                 val portMapping = portMappingWithPref.portMapping
-                println("Requesting Delete: ${portMapping.shortName()}")
+                ourLogger.log(Level.FINE, "Requesting Delete: ${portMapping.shortName()}")
                 val device = getIGDDevice(portMapping.DeviceIP)
                 portMappingDao.deleteByKey(
                     portMapping.DeviceIP,
@@ -622,7 +618,6 @@ class UpnpRepository @Inject constructor(
                     "created"
                 )
                 // this is what the user input
-                println("default adding rule callback")
                 if (result is UPnPCreateMappingWrapperResult.Success) {
                     val portMapping = result.resultingMapping
                     val pref = PortMappingPref(
@@ -731,7 +726,7 @@ class UpnpRepository @Inject constructor(
                         portMappingRequest.realize().shortName()
                     })."
                 )
-                println("Successfully added, now reading back")
+                ourLogger.log(Level.FINE, "Successfully added, now reading back")
                 if (skipReadingBack) {
                     val result = UPnPCreateMappingWrapperResult.Success(
                         portMappingRequest.realize(),
