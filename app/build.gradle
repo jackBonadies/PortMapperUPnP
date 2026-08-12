@@ -13,8 +13,13 @@ plugins {
 android.applicationVariants.all { variant ->
     println variant.flavorName
     def googleTask = tasks.findByName("process${variant.name.capitalize()}GoogleServices")
-    googleTask.enabled = !"release_no_gps".equals(variant.flavorName)
+    // Firebase is release-only
+    googleTask?.enabled = "release".equals(variant.buildType.name)
 }
+
+// release signing comes from the CI environment, without it we fall back to the
+// debug key so local release builds keep working with no setup.
+def hasReleaseSigning = System.getenv("ANDROID_KEYSTORE_PATH") != null
 
 
 android {
@@ -36,16 +41,28 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
         release_no_gps {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             ext.noGps = false
         }
         debug
