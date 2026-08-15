@@ -8,6 +8,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
@@ -109,7 +110,9 @@ fun OurSnackbarHost(snackbarManager : SnackbarManager)
     SnackbarHost(hostState) { data ->
         Snackbar(
             data,
-            actionColor = AdditionalColors.PrimaryDarkerBlue
+            containerColor = SnackbarDefaults.color,
+            contentColor = SnackbarDefaults.contentColor,
+            actionColor = AdditionalColors.SnackbarActionColor
             // according to https://m2.material.io/design/color/dark-theme.html
             // light snackbar in darkmode is good.
         )

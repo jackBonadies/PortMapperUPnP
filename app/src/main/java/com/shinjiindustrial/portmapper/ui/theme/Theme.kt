@@ -82,6 +82,7 @@ object AdditionalColors {
 
     var LogErrorText = AdditionalColorsLight.LogErrorText
     var LogWarningText = AdditionalColorsLight.LogWarningText
+    var SnackbarActionColor = AdditionalColorsLight.SnackbarActionColor
 
 
     interface IAdditionalColors {
@@ -93,6 +94,9 @@ object AdditionalColors {
         val TextColorWeak: Color
         val LogErrorText: Color
         val LogWarningText: Color
+
+        // inverted
+        val SnackbarActionColor: Color
     }
 
     object AdditionalColorsLight : IAdditionalColors {
@@ -108,6 +112,8 @@ object AdditionalColors {
         override var LogErrorText = Color(0xffCD0000)
         override var LogWarningText = Color(0xFFAD9727)
 
+        override var SnackbarActionColor = Color(0xff93C3F4)
+
     }
 
     object AdditionalColorsDark : IAdditionalColors {
@@ -122,6 +128,7 @@ object AdditionalColors {
         override var LogErrorText = Color(0xffCF5B56)
         override var LogWarningText = Color(0xffBBB529)
 
+        override var SnackbarActionColor = Color(0xFF11366B)
     }
 }
 
@@ -160,6 +167,7 @@ fun MyApplicationTheme(
         AdditionalColors.TextColorStrong = darkLightAdditionalColors.TextColorStrong
         AdditionalColors.LogErrorText = darkLightAdditionalColors.LogErrorText
         AdditionalColors.LogWarningText = darkLightAdditionalColors.LogWarningText
+        AdditionalColors.SnackbarActionColor = darkLightAdditionalColors.SnackbarActionColor
         AdditionalColors.TopAppBarColor = colorSchemeToUse.secondary
 
 
@@ -177,6 +185,8 @@ fun MyApplicationTheme(
 
             AdditionalColors.SubtleBorder =
                 getBlend(colorSchemeToUse.surface, colorSchemeToUse.onSurface, 0.2)
+
+            AdditionalColors.SnackbarActionColor = colorSchemeToUse.inversePrimary
         }
 
         //val colorScheme = if(colorSchemeToUse) DarkColorScheme else LightColorScheme
