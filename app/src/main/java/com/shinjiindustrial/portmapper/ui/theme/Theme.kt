@@ -189,41 +189,21 @@ fun MyApplicationTheme(
             AdditionalColors.SnackbarActionColor = colorSchemeToUse.inversePrimary
         }
 
-        //val colorScheme = if(colorSchemeToUse) DarkColorScheme else LightColorScheme
-//    val colorScheme = when {
-//        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-//            val context = LocalContext.current
-//            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-//        }
-//
-//        darkTheme -> DarkColorScheme
-//        else -> LightColorScheme
-//    }
-
         val view = LocalView.current
         if (!view.isInEditMode) {
             SideEffect {
                 val window = (view.context as Activity).window
                 window.statusBarColor = AdditionalColors.TopAppBarColor.toArgb()
+                // controls the icon colors the system draws (i.e. time, wifi, battery)
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
-                    darkTheme
+                    !useDark
             }
         }
 
-        // both clauses are the same. this is a hack to get
-        // theme to recompose.
-        //if (AdditionalColors.ThemeSetting.value == 0) {
         MaterialTheme(
             colorScheme = colorSchemeToUse,
             typography = Typography,
             content = content
         )
-//        } else {
-//            MaterialTheme(
-//                colorScheme = colorSchemeToUse,
-//                typography = Typography,
-//                content = content
-//            )
-//        }
     }
 }
