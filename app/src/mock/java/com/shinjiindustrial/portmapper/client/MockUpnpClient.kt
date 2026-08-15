@@ -260,7 +260,12 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
                 UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
             )
             else -> {
-                store[device.getKey()]!!.put(getKey(portMappingRequest.realize()), portMappingRequest.realize())
+                var realized = portMappingRequest.realize()
+                if (realized.Description.contains(NoDisableEnable)) {
+                    // simulate miniupnpd and my Nokia: success but NewEnabled is ignored
+                    realized = realized.copy(Enabled = true)
+                }
+                store[device.getKey()]!!.put(getKey(realized), realized)
                 UPnPCreateMappingResult.Success(portMappingRequest.realize())
             }
         }

@@ -731,7 +731,8 @@ class UpnpRepository @Inject constructor(
                     val result = UPnPCreateMappingWrapperResult.Success(
                         portMappingRequest.realize(),
                         portMappingRequest.realize(),
-                        false
+                        false,
+                        true
                     )
                     return result
                 } else {
@@ -757,7 +758,21 @@ class UpnpRepository @Inject constructor(
                        ourLogger.log(Level.SEVERE, result.details.toString())
                     }
 
-                    return result.toCreatePortMappingResult()
+                    // Disabled rules (NewEnabled=0) are not widely supported: miniupnpd (OpenWrt and
+                    // much consumer firmware) ignores NewEnabled and hardcodes it to 1 when reading it back.
+                    // https://github.com/miniupnp/miniupnp/blob/b91c025446d3ec3d9161cd56c91e200484af7906/miniupnpd/upnpsoap.c#L466
+                    // IGD-PCP interworking gateways instead reject it outright (RFC 6970 section 4.1).
+                    if (result is UPnPGetSpecificMappingResult.Success &&
+                        result.resultingMapping.Enabled != portMappingRequest.enabled
+                    ) {
+                        ourLogger.log(
+                            Level.WARNING,
+                            "Rule read back with Enabled=${result.resultingMapping.Enabled} but we requested " +
+                                    "Enabled=${portMappingRequest.enabled}. The router likely does not support disabled rules."
+                        )
+                    }
+
+                    return result.toCreatePortMappingResult(portMappingRequest.enabled)
                 }
             }
 
@@ -948,13 +963,18 @@ class UpnpRepository @Inject constructor(
 
 }
 
-fun UPnPGetSpecificMappingResult.toCreatePortMappingResult() : UPnPCreateMappingWrapperResult =
+fun UPnPGetSpecificMappingResult.toCreatePortMappingResult(requestedEnabled: Boolean) : UPnPCreateMappingWrapperResult =
     when(this){
         is UPnPGetSpecificMappingResult.Failure -> {
             UPnPCreateMappingWrapperResult.Failure(this.details)
         }
         is UPnPGetSpecificMappingResult.Success -> {
-            UPnPCreateMappingWrapperResult.Success(this.resultingMapping, this.resultingMapping, true)
+            UPnPCreateMappingWrapperResult.Success(
+                this.resultingMapping,
+                this.resultingMapping,
+                true,
+                this.resultingMapping.Enabled == requestedEnabled
+            )
         }
 }
 
