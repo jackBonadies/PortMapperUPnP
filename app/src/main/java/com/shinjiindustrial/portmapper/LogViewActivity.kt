@@ -39,11 +39,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import java.util.logging.Level
@@ -82,7 +83,9 @@ class LogViewActivity : ComponentActivity() {
     @Composable
     fun LogViewInner(themeUiState: ThemeUiState, logLines: List<String>, scrollToBottom: Boolean) {
         MyApplicationTheme(themeUiState) {
+            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 snackbarHost = { OurSnackbarHost(snackbarManager) },
                 topBar = {
                     TopAppBar(
@@ -94,11 +97,14 @@ class LogViewActivity : ComponentActivity() {
                             }
                         },
 //                                modifier = Modifier.height(40.dp),
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = PortMapperTheme.componentColors.appBarContainer,
+                            scrolledContainerColor = PortMapperTheme.componentColors.appBarScrolledContainer,
+                        ),
+                        scrollBehavior = scrollBehavior,
                         title = {
                             Text(
                                 text = "Logs",
-                                color = AdditionalColors.TextColorStrong,
                                 fontWeight = FontWeight.Normal
                             )
                         },
@@ -152,15 +158,15 @@ class LogViewActivity : ComponentActivity() {
                             .padding(it)
                             .fillMaxHeight()
                             .fillMaxWidth(),
-                        contentPadding = PaddingValues(0.dp),
+                        contentPadding = PaddingValues(horizontal=2.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
 
                         itemsIndexed(logLines) { index, message ->
                             val color = when {
-                                message.startsWith("W: ") -> AdditionalColors.LogWarningText
-                                message.startsWith("E: ") -> AdditionalColors.LogErrorText
-                                else -> AdditionalColors.TextColor
+                                message.startsWith("W: ") -> PortMapperTheme.semanticColors.logWarning
+                                message.startsWith("E: ") -> PortMapperTheme.semanticColors.logError
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                             Text(message, color = color)
 

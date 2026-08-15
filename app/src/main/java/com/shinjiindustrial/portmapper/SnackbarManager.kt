@@ -4,17 +4,18 @@ import android.content.Intent
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -109,7 +110,9 @@ fun OurSnackbarHost(snackbarManager : SnackbarManager)
     SnackbarHost(hostState) { data ->
         Snackbar(
             data,
-            actionColor = AdditionalColors.PrimaryDarkerBlue
+            containerColor = SnackbarDefaults.color,
+            contentColor = SnackbarDefaults.contentColor,
+            actionColor = MaterialTheme.colorScheme.inversePrimary
             // according to https://m2.material.io/design/color/dark-theme.html
             // light snackbar in darkmode is good.
         )

@@ -33,7 +33,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -65,7 +64,7 @@ import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
 import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
 import com.shinjiindustrial.portmapper.ui.PortMappingContent
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
+import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -131,9 +130,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     }
 
                     // compose doesn't allow spannable nor link movement method
+                    val bodyTextColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
                     AndroidView(factory = { context ->
                         TextView(context).apply {
-                            setTextColor(AdditionalColors.TextColor.toArgb())
+                            setTextColor(bodyTextColor)
                             textSize = 16f
                             text = spannedString
                             movementMethod = LinkMovementMethod.getInstance()
@@ -167,22 +167,17 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             sheetState = bottomSheetState,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             tonalElevation = 24.dp,
-            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             content = {
-                // This is what will be shown in the bottom sheet
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(vertical = 16.dp, horizontal = 10.dp)
                 ) {
                     BottomSheetSortBy(portViewModel)
                 }
             }
         )
-//
-//            LaunchedEffect(Unit) {
-//                bottomSheetState.expand()
-//            }
     }
 
     val ctrl = LocalScaffoldController.current
@@ -190,26 +185,22 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
         ctrl.fab = {
 
             if (anyDevices) {
+                val componentColors = PortMapperTheme.componentColors
                 FloatingActionButton(
-                    // uses MaterialTheme.colorScheme.secondaryContainer
                     modifier = Modifier.semantics { testTag = "createRuleFab" },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    containerColor = componentColors.fabContainer,
+                    contentColor = componentColors.fabContent,
                     onClick = {
-                        //showAddRuleDialogState.value = true
                         navController.navigate("full_screen_dialog")
-
-                        //this works
-
                     }) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Localized description",
-                        tint = AdditionalColors.TextColor,
                     )
                 }
             }
        }
-        ctrl.topBar = {
+        ctrl.topBar = { scrollBehavior ->
             TopAppBar(
                 navigationIcon = {
                     if (inMultiSelectMode) {
@@ -221,17 +212,16 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                         }
                     }
                 },
-//                                modifier = Modifier.height(40.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = AdditionalColors.TopAppBarColor
+                    containerColor = PortMapperTheme.componentColors.appBarContainer,
+                    scrolledContainerColor = PortMapperTheme.componentColors.appBarScrolledContainer,
                 ),
-                //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
+                scrollBehavior = scrollBehavior,
                 title = {
                     val title =
                         if (inMultiSelectMode) "${selectedIds.size} Selected" else "PortMapper"
                     Text(
                         text = title,
-                        color = AdditionalColors.TextColorStrong,
                         fontWeight = FontWeight.Normal
                     )
                 },
@@ -392,10 +382,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                                     .align(Alignment.CenterHorizontally),
                                 shape = RoundedCornerShape(4),
                             ) {
-                                Text(
-                                    "Retry",
-                                    color = AdditionalColors.TextColorStrong
-                                )
+                                Text("Retry")
                             }
                         }
                     } else {

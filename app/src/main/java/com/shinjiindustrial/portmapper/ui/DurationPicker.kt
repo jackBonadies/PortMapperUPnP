@@ -51,7 +51,6 @@ import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.domain.DayHourMinSec
 import com.shinjiindustrial.portmapper.domain.getDHMS
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -242,7 +241,7 @@ fun RowScope.Picker(
     visibleItemsCount: Int = 3,
     textModifier: Modifier = Modifier,
     textStyle: TextStyle = LocalTextStyle.current,
-    dividerColor: Color = AdditionalColors.TextColorWeak,
+    dividerColor: Color = MaterialTheme.colorScheme.outline,
 ) {
     val visibleItemsMiddle = visibleItemsCount / 2
     val listScrollCount =

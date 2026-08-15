@@ -53,7 +53,10 @@ sealed class UPnPCreateMappingWrapperResult {
     data class Success(
         val requestInfo: PortMapping,
         val resultingMapping: PortMapping,
-        val wasReadBack: Boolean
+        val wasReadBack: Boolean,
+        // set to false when router accepted rule but we read it back in different Enabled state
+        // most common when setting rule to disabled and router quietly accepts it.
+        val enabledMatchesRequest: Boolean
     ) : UPnPCreateMappingWrapperResult()
 
     data class Failure(val details: FailureDetails) :

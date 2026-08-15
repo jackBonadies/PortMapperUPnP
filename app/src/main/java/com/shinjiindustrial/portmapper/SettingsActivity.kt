@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,8 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
 import com.shinjiindustrial.portmapper.ui.SetupPreview
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -66,7 +67,9 @@ class SettingsActivity : ComponentActivity() {
     fun Settings() {
         val themeState by this.settingsViewModel.uiState.collectAsStateWithLifecycle()
         MyApplicationTheme(themeState) {
+            val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 topBar = {
                     TopAppBar(
                         navigationIcon = {
@@ -76,16 +79,18 @@ class SettingsActivity : ComponentActivity() {
                                 Icon(
                                     Icons.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = AdditionalColors.TextColorStrong
                                 )
                             }
                         },
 //                                modifier = Modifier.height(40.dp),
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AdditionalColors.TopAppBarColor),
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = PortMapperTheme.componentColors.appBarContainer,
+                            scrolledContainerColor = PortMapperTheme.componentColors.appBarScrolledContainer,
+                        ),
+                        scrollBehavior = scrollBehavior,
                         title = {
                             Text(
                                 text = "Settings",
-                                color = AdditionalColors.TextColorStrong,
                                 fontWeight = FontWeight.Normal
                             )
                         },
@@ -167,7 +172,7 @@ class SettingsActivity : ComponentActivity() {
                     Text(
                         "Theme",
                         fontSize = 26.sp,
-                        color = AdditionalColors.TextColorStrong,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp)
                     )
                     var pref = when (uiState.dayNightMode.intVal) {
@@ -181,7 +186,7 @@ class SettingsActivity : ComponentActivity() {
                             .padding(12.dp, 0.dp, 0.dp, 4.dp)
                             .offset(
                                 0.dp, (-4).dp
-                            ), color = AdditionalColors.TextColorWeak
+                            ), color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
@@ -198,7 +203,7 @@ class SettingsActivity : ComponentActivity() {
                             Text(
                                 "Material You",
                                 fontSize = 26.sp,
-                                color = AdditionalColors.TextColorStrong,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .padding(12.dp, 18.dp, 0.dp, 18.dp)
                                     .weight(1.0f)
@@ -230,7 +235,7 @@ class SettingsActivity : ComponentActivity() {
 //                    2 -> dark
 //                    else -> followSystem
 //                }
-//                Text(pref, fontSize = 16.sp, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp), color = AdditionalColors.TextColorWeak)
+//                Text(pref, fontSize = 16.sp, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
 //            }
 //            Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 4.dp, 0.dp, 0.dp))
 

@@ -30,6 +30,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
@@ -131,19 +134,23 @@ class MainActivity : ComponentActivity() {
     }
 
     @Stable
+    @OptIn(ExperimentalMaterial3Api::class)
     class ScaffoldController {
         var fab: (@Composable () -> Unit)? by mutableStateOf(null)
-        var topBar: (@Composable () -> Unit)? by mutableStateOf(null)
+        var topBar: (@Composable (TopAppBarScrollBehavior) -> Unit)? by mutableStateOf(null)
         var bottomBar: (@Composable () -> Unit)? by mutableStateOf(null)
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun RootScaffold(content: @Composable (PaddingValues) -> Unit) {
         val ctrl = remember { ScaffoldController() }
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
         CompositionLocalProvider(LocalScaffoldController provides ctrl) {
             Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 snackbarHost = { OurSnackbarHost(portViewModel.snackbarManager) },
-                topBar = { ctrl.topBar?.invoke() },
+                topBar = { ctrl.topBar?.invoke(scrollBehavior) },
                 bottomBar = { ctrl.bottomBar?.invoke() },
                 floatingActionButton = { ctrl.fab?.invoke() })
             { innerPadding ->

@@ -72,9 +72,9 @@ import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
+import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.PortViewModel
 import com.shinjiindustrial.portmapper.UiSnackToastEvent
 import com.shinjiindustrial.portmapper.common.AutoRenewMode
@@ -185,12 +185,14 @@ fun RuleCreationDialog(
     val ctrl = LocalScaffoldController.current
     DisposableEffect(Unit) {
         ctrl.fab = { }
-        ctrl.topBar = {
+        ctrl.topBar = { scrollBehavior ->
             TopAppBar(
 //                                modifier = Modifier.height(40.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = AdditionalColors.TopAppBarColor
+                    containerColor = PortMapperTheme.componentColors.appBarContainer,
+                    scrolledContainerColor = PortMapperTheme.componentColors.appBarScrolledContainer,
                 ),
+                scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = {
                         navController.popBackStack()
@@ -202,7 +204,6 @@ fun RuleCreationDialog(
                 title = {
                     Text(
                         text = if (ruleToEdit == null) "New Rule" else "Edit Rule",
-                        color = AdditionalColors.TextColorStrong,
                         fontWeight = FontWeight.Normal
                     )
                 },
@@ -319,7 +320,6 @@ fun RuleCreationDialog(
                     ) {
                         Text(
                             text = if (ruleToEdit == null) "CREATE" else "APPLY",
-                            color = AdditionalColors.TextColorStrong,
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                         )
                     }

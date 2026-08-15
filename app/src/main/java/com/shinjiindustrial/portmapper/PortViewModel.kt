@@ -261,7 +261,11 @@ class PortViewModel @Inject constructor(
             try {
                 val res = upnpRepository.disableEnablePortMappingEntry(portMapping, enable)
                 if (res is UPnPCreateMappingWrapperResult.Success) {
-                    snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                    if (res.enabledMatchesRequest) {
+                        snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+                    } else {
+                        snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("The router ignored the change. Many routers do not support disabling rules."))
+                    }
                 } else {
                     snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
                 }
@@ -308,10 +312,20 @@ class PortViewModel @Inject constructor(
                 }
 
                 val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
+                val ignoredCount =
+                    result.count { it is UPnPCreateMappingWrapperResult.Success && !it.enabledMatchesRequest }
+                val allIgnored = ignoredCount == result.size;
+                val anyIgnored = ignoredCount > 0;
 
                 if (anyFailed) {
                     val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
                     snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+                } else if (anyIgnored) {
+                    if (allIgnored) {
+                        snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("The router ignored the change. Many routers do not support disabling rules."))
+                    } else {
+                        snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("The router ignored the change for some rules. Many routers do not support disabling rules."))
+                    }
                 } else {
                     snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
                 }
