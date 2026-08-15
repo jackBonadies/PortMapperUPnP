@@ -62,8 +62,8 @@ import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
+import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import kotlinx.coroutines.delay
 import com.shinjiindustrial.portmapper.PortUiState
 import com.shinjiindustrial.portmapper.ThemeUiState
@@ -123,9 +123,9 @@ fun PortMappingCard(
 
 
         elevation = CardDefaults.cardElevation(),
-        border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
-            containerColor = AdditionalColors.CardContainerColor,
+            containerColor = PortMapperTheme.componentColors.cardContainer,
         ),
     ) {
 
@@ -193,12 +193,13 @@ fun PortMappingCard(
                     portMapping.Description,
                     fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
                     fontWeight = FontWeight.Companion.SemiBold,
-                    color = AdditionalColors.TextColor
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(portMapping.InternalIP, color = AdditionalColors.TextColor)
+                Text(portMapping.InternalIP, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+                val semanticColors = PortMapperTheme.semanticColors
                 val text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) AdditionalColors.Enabled_Green else AdditionalColors.Disabled_Red)) {
+                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) semanticColors.enabled else semanticColors.disabled)) {
                         append("⬤")
                     }
                     withStyle(style = SpanStyle()) {
@@ -207,14 +208,14 @@ fun PortMappingCard(
                 }
 
 
-                Text(text, color = AdditionalColors.TextColor)
+                Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val urgency =
                     portMapping.getUrgency(portMappingWithPref.getAutoRenewOrDefault(), now)
                 val color by urgencyColor(
                     urgency,
-                    AdditionalColors.TextColor,
-                    AdditionalColors.LogWarningText,
-                    AdditionalColors.LogErrorText
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                    semanticColors.logWarning,
+                    semanticColors.logError
                 )
                 Text(
                     portMappingWithPref.getRemainingLeaseOrRenewTimeRoughString(now),
@@ -227,9 +228,9 @@ fun PortMappingCard(
                     "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
                     fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
                     fontWeight = FontWeight.Companion.SemiBold,
-                    color = AdditionalColors.TextColor
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text("${portMapping.Protocol}", color = AdditionalColors.TextColor)
+                Text("${portMapping.Protocol}", color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             }
         }
@@ -382,10 +383,10 @@ fun DeviceHeader(device: IIGDDevice) {
             device.getDisplayName(),
             fontWeight = FontWeight.Companion.SemiBold,
             fontSize = TextUnit(24f, TextUnitType.Companion.Sp),
-            color = AdditionalColors.TextColor
+            color = MaterialTheme.colorScheme.onSurfaceVariant
 
         )
-        Text(device.getIpAddress(), color = AdditionalColors.TextColor)
+        Text(device.getIpAddress(), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     Spacer(modifier = Modifier.Companion.padding(2.dp))
 }
@@ -439,9 +440,9 @@ fun NoMappingsCard() {
 //                },
             elevation = CardDefaults.cardElevation(),
             colors = CardDefaults.cardColors(
-                containerColor = AdditionalColors.CardContainerColor,
+                containerColor = PortMapperTheme.componentColors.cardContainer,
             ),
-            border = BorderStroke(1.dp, AdditionalColors.SubtleBorder),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
 
             ) {
 
@@ -467,7 +468,7 @@ fun NoMappingsCard() {
                             .align(Alignment.Companion.CenterHorizontally)
                             .padding(0.dp, 0.dp, 0.dp, 8.dp),
                         textAlign = TextAlign.Companion.Center,
-                        color = AdditionalColors.TextColor
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(
                         verticalAlignment = Alignment.Companion.CenterVertically,
@@ -476,19 +477,19 @@ fun NoMappingsCard() {
                     ) {
                         Text(
                             text = "Tap ",
-                            color = AdditionalColors.TextColor
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                             //color = MaterialTheme.colors.onSurface
                         )
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add icon",
-                            tint = AdditionalColors.TextColor
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                             //tint = MaterialTheme.colors.secondary
                         )
                         Text(
                             text = " to add new rules",
                             //style = MaterialTheme.typography.body1,
-                            color = AdditionalColors.TextColor
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -583,7 +584,7 @@ fun PortMappingsListContent(
     LazyColumn(
         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
         modifier = Modifier
-            .background(AdditionalColors.Background)
+            .background(MaterialTheme.colorScheme.background)
             .fillMaxHeight()
             .fillMaxWidth(),
         contentPadding = PaddingValues(0.dp),

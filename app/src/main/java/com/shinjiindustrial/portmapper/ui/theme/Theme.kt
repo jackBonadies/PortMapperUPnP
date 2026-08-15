@@ -8,130 +8,159 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.key
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.ThemeUiState
 
-fun getBlend(first: Color, second: Color, ratio: Double): Color {
-    val newRed = first.red.toDouble() * (1f - ratio) + second.red.toDouble() * (ratio)
-    val newGreen = first.green.toDouble() * (1f - ratio) + second.green.toDouble() * (ratio)
-    val newBlue = first.blue.toDouble() * (1f - ratio) + second.blue.toDouble() * (ratio)
-    return Color(newRed.toFloat(), newGreen.toFloat(), newBlue.toFloat(), 1f)
-}
-
-
-val Blue40 = Color(0xff014C69)
-val Blue40_Lighter = Color(0xff0A7B9C)
-val Blue80 = Color(0xff93C3F4)
-val Blue80_Darker = Color(0xff509BEC)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = Blue40_Lighter,
-    secondary = Blue40,
-    tertiary = Pink80,
-
-    onSurface = AdditionalColors.AdditionalColorsDark.TextColor,
-    onPrimary = AdditionalColors.AdditionalColorsDark.TextColorStrong,
-    secondaryContainer = Blue40,
-    background = Color(0xff181C1F),
-
-    )
-
-private val LightColorScheme = lightColorScheme(
-    primary = Blue80_Darker, //AAdditionalColors.PrimaryDarkerBlue,
-    secondary = Blue80, //AdditionalColors.PrimaryBlue,
-    tertiary = Pink40,
-    // used in places where the background color isnt explicitly changed
-    onSurface = AdditionalColors.AdditionalColorsLight.TextColor,
-    onPrimary = AdditionalColors.AdditionalColorsLight.TextColorStrong,
-    secondaryContainer = Blue80,
-    background = Color(0xffF0F0F2),
+/*
+ * These colors are generated
+ */
+private val PortMapperLightColors = lightColorScheme(
+    primary = Color(0xFF005EB3),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD5E3FF),
+    onPrimaryContainer = Color(0xFF001B3C),
+    inversePrimary = Color(0xFFA7C8FF),
+    secondary = Color(0xFF555F71),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFD9E3F8),
+    onSecondaryContainer = Color(0xFF121C2B),
+    tertiary = Color(0xFF6E5676),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFF8D8FE),
+    onTertiaryContainer = Color(0xFF27132F),
+    background = Color(0xFFF9F9FF),
+    onBackground = Color(0xFF191C20),
+    surface = Color(0xFFF9F9FF),
+    onSurface = Color(0xFF191C20),
+    surfaceVariant = Color(0xFFE0E2EC),
+    onSurfaceVariant = Color(0xFF43474E),
+    surfaceTint = Color(0xFF005EB3),
+    inverseSurface = Color(0xFF2E3035),
+    inverseOnSurface = Color(0xFFF0F0F7),
+    outline = Color(0xFF74777F),
+    outlineVariant = Color(0xFFC4C6CF),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFFF9F9FF),
+    surfaceDim = Color(0xFFD9DAE0),
+    surfaceContainer = Color(0xFFEDEDF4),
+    surfaceContainerHigh = Color(0xFFE7E8EE),
+    surfaceContainerHighest = Color(0xFFE1E2E9),
+    surfaceContainerLow = Color(0xFFF3F3FA),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    error = Color(0xFFB3261E),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
 )
 
+private val PortMapperDarkColors = darkColorScheme(
+    primary = Color(0xFFA7C8FF),
+    onPrimary = Color(0xFF003061),
+    primaryContainer = Color(0xFF004789),
+    onPrimaryContainer = Color(0xFFD5E3FF),
+    inversePrimary = Color(0xFF005EB3),
+    secondary = Color(0xFFBDC7DC),
+    onSecondary = Color(0xFF273141),
+    secondaryContainer = Color(0xFF3D4758),
+    onSecondaryContainer = Color(0xFFD9E3F8),
+    tertiary = Color(0xFFDBBCE1),
+    onTertiary = Color(0xFF3E2845),
+    tertiaryContainer = Color(0xFF563E5D),
+    onTertiaryContainer = Color(0xFFF8D8FE),
+    background = Color(0xFF111318),
+    onBackground = Color(0xFFE1E2E9),
+    surface = Color(0xFF111318),
+    onSurface = Color(0xFFE1E2E9),
+    surfaceVariant = Color(0xFF43474E),
+    // Deliberate override, not a generated value: the palette's neutralVariant80
+    // (#C4C6CF) reads too grey for body text. Keep this if the scheme is regenerated.
+    onSurfaceVariant = Color(0xFFD8DAD9),
+    surfaceTint = Color(0xFFA7C8FF),
+    inverseSurface = Color(0xFFE1E2E9),
+    inverseOnSurface = Color(0xFF2E3035),
+    outline = Color(0xFF8E9199),
+    outlineVariant = Color(0xFF43474E),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFF37393E),
+    surfaceDim = Color(0xFF111318),
+    surfaceContainer = Color(0xFF1D2024),
+    surfaceContainerHigh = Color(0xFF282A2F),
+    surfaceContainerHighest = Color(0xFF33353A),
+    surfaceContainerLow = Color(0xFF191C20),
+    surfaceContainerLowest = Color(0xFF0C0E13),
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC),
+)
 
-object AdditionalColors {
-    var Enabled_Green = Color(0xff28B740)
-    var Disabled_Red = Color(0xffB23131)
-    var OrangePastel = Color(0xfff0d5c2)
-    var CardSurface = Color(0xFFC2DDF0) //0xFFC2DDF0
+@Immutable
+data class SemanticColors(
+    val enabled: Color,
+    val disabled: Color,
+    val logError: Color,
+    val logWarning: Color,
+)
 
+private val LightSemanticColors = SemanticColors(
+    enabled = Color(0xFF1E9B34),
+    disabled = Color(0xFFB3261E),
+    logError = Color(0xFFC00000),
+    logWarning = Color(0xFF6F5B00),
+)
 
-    var CardSurfaceNoMappings = Color(0xFFC7D1D8)
+private val DarkSemanticColors = SemanticColors(
+    enabled = Color(0xFF60DD7F),
+    disabled = Color(0xFFF2B8B5),
+    logError = Color(0xFFFF897D),
+    logWarning = Color(0xFFE0C74A),
+)
 
+/**
+ * Default theme which breaks from M3 in a few chosen areas
+ */
+@Immutable
+data class ComponentColors(
+    val appBarContainer: Color,
+    val appBarScrolledContainer: Color,
+    val fabContainer: Color,
+    val fabContent: Color,
+    val cardContainer: Color,
+)
 
-    var PrimaryDarkerBlue = Color(0xFF11366B)
-    var PrimaryBlue = Color(0xFF3076CC)
-
-    //TODO: clean up, make part of constructor or such
-    var CardContainerColor = AdditionalColorsLight.CardContainerColor
-    var Background = AdditionalColorsLight.Background
-    var TextColorStrong = AdditionalColorsLight.TextColorStrong
-    var TextColor = AdditionalColorsLight.TextColor
-    var TextColorWeak = AdditionalColorsLight.TextColorWeak
-    var TopAppBarColor = AdditionalColorsLight.TextColorWeak
-    var SubtleBorder = AdditionalColorsLight.SubtleBorder
-
-    var LogErrorText = AdditionalColorsLight.LogErrorText
-    var LogWarningText = AdditionalColorsLight.LogWarningText
-    var SnackbarActionColor = AdditionalColorsLight.SnackbarActionColor
-
-
-    interface IAdditionalColors {
-        val Background: Color
-        val SubtleBorder: Color
-        val CardContainerColor: Color
-        val TextColorStrong: Color
-        val TextColor: Color
-        val TextColorWeak: Color
-        val LogErrorText: Color
-        val LogWarningText: Color
-
-        // inverted
-        val SnackbarActionColor: Color
-    }
-
-    object AdditionalColorsLight : IAdditionalColors {
-        override var Background = Color(0xffF0F0F2)
-        override var SubtleBorder = Color(0xffE2E2E4)
-        override var CardContainerColor = Color(0xffFCFCFE)
-
-
-        override var TextColorStrong = Color(0xff1B1B1F)
-        override var TextColor = Color(0xff303037)
-        override var TextColorWeak = Color(0xff45464F)
-
-        override var LogErrorText = Color(0xffCD0000)
-        override var LogWarningText = Color(0xFFAD9727)
-
-        override var SnackbarActionColor = Color(0xff93C3F4)
-
-    }
-
-    object AdditionalColorsDark : IAdditionalColors {
-        override var Background = Color(0xff181C1F)
-        override var SubtleBorder = Color(0xff3A3E41)
-        override var CardContainerColor = Color(0xff2D3134)
-
-        override var TextColorStrong = Color(0xffffffff)
-        override var TextColor = Color(0xffd8dad9)
-        override var TextColorWeak = Color(0xffa3a8a6)
-
-        override var LogErrorText = Color(0xffCF5B56)
-        override var LogWarningText = Color(0xffBBB529)
-
-        override var SnackbarActionColor = Color(0xFF11366B)
-    }
+private val LocalSemanticColors = staticCompositionLocalOf { LightSemanticColors }
+private val LocalComponentColors = staticCompositionLocalOf {
+    ComponentColors(
+        appBarContainer = Color(0xFFE7EEFF),
+        appBarScrolledContainer = Color(0xFFDFE8FE),
+        fabContainer = PortMapperLightColors.primary,
+        fabContent = PortMapperLightColors.onPrimary,
+        cardContainer = PortMapperLightColors.surfaceContainerLow,
+    )
 }
 
+object PortMapperTheme {
+    val semanticColors: SemanticColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalSemanticColors.current
+
+    val componentColors: ComponentColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComponentColors.current
+}
 
 @Composable
 fun MyApplicationTheme(
@@ -141,67 +170,71 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-
     val dayNightMode = themeState.dayNightMode
-    val useDark = dayNightMode == DayNightMode.FORCE_NIGHT || (dayNightMode == DayNightMode.FOLLOW_SYSTEM && darkTheme)
+    val useDark =
+        dayNightMode == DayNightMode.FORCE_NIGHT || (dayNightMode == DayNightMode.FOLLOW_SYSTEM && darkTheme)
     val useMaterialYou = themeState.materialYou
 
-    key(useMaterialYou, dayNightMode)
-    {
-        val colorSchemeToUse = when {
-            useMaterialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                val context = LocalContext.current
-                if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }
-            useDark -> DarkColorScheme
-            else -> LightColorScheme
+    val usingDynamicColor =
+        useMaterialYou && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val colorScheme = when {
+        usingDynamicColor -> {
+            val context = LocalContext.current
+            if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        val darkLightAdditionalColors: AdditionalColors.IAdditionalColors =
-            if (useDark) AdditionalColors.AdditionalColorsDark else AdditionalColors.AdditionalColorsLight
-        AdditionalColors.Background = darkLightAdditionalColors.Background
-        AdditionalColors.SubtleBorder = darkLightAdditionalColors.SubtleBorder
-        AdditionalColors.CardContainerColor = darkLightAdditionalColors.CardContainerColor
-        AdditionalColors.TextColorWeak = darkLightAdditionalColors.TextColorWeak
-        AdditionalColors.TextColor = darkLightAdditionalColors.TextColor
-        AdditionalColors.TextColorStrong = darkLightAdditionalColors.TextColorStrong
-        AdditionalColors.LogErrorText = darkLightAdditionalColors.LogErrorText
-        AdditionalColors.LogWarningText = darkLightAdditionalColors.LogWarningText
-        AdditionalColors.SnackbarActionColor = darkLightAdditionalColors.SnackbarActionColor
-        AdditionalColors.TopAppBarColor = colorSchemeToUse.secondary
+        useDark -> PortMapperDarkColors
+        else -> PortMapperLightColors
+    }
 
+    val cardContainer =
+        if (useDark) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainerLow
 
-        if (useMaterialYou) {
-            AdditionalColors.TextColorStrong = colorSchemeToUse.onSurface
-            AdditionalColors.TextColor = colorSchemeToUse.onSurfaceVariant
-            AdditionalColors.TextColorWeak = colorSchemeToUse.onSurfaceVariant
-            //AdditionalColors.Background = colorSchemeToUse.background //TODO: just set background for non material
-            AdditionalColors.CardContainerColor = colorSchemeToUse.surfaceColorAtElevation(
-                5.dp
-            )
-            AdditionalColors.TopAppBarColor = colorSchemeToUse.surfaceColorAtElevation(
-                4.dp
-            )
+    val componentColors = when {
+        usingDynamicColor -> ComponentColors(
+            appBarContainer = colorScheme.surfaceContainer,
+            appBarScrolledContainer = colorScheme.surfaceContainerHigh,
+            fabContainer = colorScheme.primaryContainer,
+            fabContent = colorScheme.onPrimaryContainer,
+            cardContainer = cardContainer,
+        )
 
-            AdditionalColors.SubtleBorder =
-                getBlend(colorSchemeToUse.surface, colorSchemeToUse.onSurface, 0.2)
+        useDark -> ComponentColors(
+            appBarContainer = Color(0xFF004159),
+            appBarScrolledContainer = Color(0xFF144C64),
+            fabContainer = colorScheme.primary,
+            fabContent = colorScheme.onPrimary,
+            cardContainer = cardContainer,
+        )
 
-            AdditionalColors.SnackbarActionColor = colorSchemeToUse.inversePrimary
+        else -> ComponentColors(
+            appBarContainer = Color(0xFFE7EEFF),
+            appBarScrolledContainer = Color(0xFFDFE8FE),
+            fabContainer = colorScheme.primary,
+            fabContent = colorScheme.onPrimary,
+            cardContainer = cardContainer,
+        )
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        val statusBarColor = componentColors.appBarContainer.toArgb()
+        SideEffect {
+            val window = (view.context as Activity).window
+            @Suppress("DEPRECATION")
+            window.statusBarColor = statusBarColor
+            // controls the icon colors the system draws (i.e. time, wifi, battery)
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDark
         }
+    }
 
-        val view = LocalView.current
-        if (!view.isInEditMode) {
-            SideEffect {
-                val window = (view.context as Activity).window
-                window.statusBarColor = AdditionalColors.TopAppBarColor.toArgb()
-                // controls the icon colors the system draws (i.e. time, wifi, battery)
-                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
-                    !useDark
-            }
-        }
-
+    CompositionLocalProvider(
+        LocalSemanticColors provides if (useDark) DarkSemanticColors else LightSemanticColors,
+        LocalComponentColors provides componentColors,
+    ) {
         MaterialTheme(
-            colorScheme = colorSchemeToUse,
+            colorScheme = colorScheme,
             typography = Typography,
             content = content
         )

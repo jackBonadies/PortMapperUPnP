@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -18,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 // TODO uncomment
 //@Preview
@@ -56,9 +56,9 @@ fun MoreInfoDialog(
                                     .padding(0.dp, 0.dp, 10.dp, 4.dp)
                                     .width(100.dp),
                                 textAlign = TextAlign.Right,
-                                color = AdditionalColors.TextColorWeak
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(p.second, color = AdditionalColors.TextColorStrong)
+                            Text(p.second, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }

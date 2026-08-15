@@ -40,9 +40,8 @@ fun CircleCheckbox(
 
     val color = MaterialTheme.colorScheme
     val imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle
-    val tint =
-        if (selected) color.primary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f) // colorScheme.primary.copy(alpha=.8f)
-    val background = if (selected) Color.White else Color.Transparent
+    val tint = if (selected) color.primary else color.onSurfaceVariant
+    val background = if (selected) color.onPrimary else Color.Transparent
 
     IconButton(
         onClick = onChecked,

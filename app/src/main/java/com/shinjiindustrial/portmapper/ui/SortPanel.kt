@@ -9,6 +9,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinjiindustrial.portmapper.common.SortBy
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 import com.shinjiindustrial.portmapper.PortViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +32,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
             text = "Sort By",
             fontWeight = FontWeight.SemiBold,
             fontSize = 24.sp,
-            color = AdditionalColors.TextColorStrong,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = 0.dp, bottom = 6.dp)
         )
 

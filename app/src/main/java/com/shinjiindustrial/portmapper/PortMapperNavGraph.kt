@@ -30,7 +30,6 @@ import com.shinjiindustrial.portmapper.common.parseCadence
 import com.shinjiindustrial.portmapper.common.validateCadence
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.ui.RuleCreationDialog
-import com.shinjiindustrial.portmapper.ui.theme.AdditionalColors
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
