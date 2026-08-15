@@ -169,20 +169,15 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             tonalElevation = 24.dp,
             containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
             content = {
-                // This is what will be shown in the bottom sheet
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(vertical = 16.dp, horizontal = 10.dp)
                 ) {
                     BottomSheetSortBy(portViewModel)
                 }
             }
         )
-//
-//            LaunchedEffect(Unit) {
-//                bottomSheetState.expand()
-//            }
     }
 
     val ctrl = LocalScaffoldController.current
@@ -195,11 +190,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     modifier = Modifier.semantics { testTag = "createRuleFab" },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     onClick = {
-                        //showAddRuleDialogState.value = true
                         navController.navigate("full_screen_dialog")
-
-                        //this works
-
                     }) {
                     Icon(
                         Icons.Default.Add,
@@ -221,11 +212,9 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                         }
                     }
                 },
-//                                modifier = Modifier.height(40.dp),
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = AdditionalColors.TopAppBarColor
                 ),
-                //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                 title = {
                     val title =
                         if (inMultiSelectMode) "${selectedIds.size} Selected" else "PortMapper"

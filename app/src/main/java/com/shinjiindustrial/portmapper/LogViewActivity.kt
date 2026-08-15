@@ -152,7 +152,7 @@ class LogViewActivity : ComponentActivity() {
                             .padding(it)
                             .fillMaxHeight()
                             .fillMaxWidth(),
-                        contentPadding = PaddingValues(0.dp),
+                        contentPadding = PaddingValues(horizontal=2.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
 
