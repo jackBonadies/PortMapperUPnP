@@ -229,11 +229,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 
                     if (inMultiSelectMode) {
                         IconButton(onClick = {
-                            if (inMultiSelectMode) {
-                                portViewModel.deleteAll(selectedIds)
-                            } else {
-                                portViewModel.deleteAll()
-                            }
+                            portViewModel.deleteAll(selectedIds)
                         })
                         {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")

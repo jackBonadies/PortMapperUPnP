@@ -274,7 +274,7 @@ fun EnterContextMenu(
                         )
                         menuItems.add(
                             Pair<String, () -> Unit>(
-                                "Renew"
+                                stringResource(R.string.renew_action)
                             ) {
                                 portViewModel.renew(portMappingWithPref)
                             }
@@ -347,10 +347,13 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
 
         val items: MutableList<Int> = mutableListOf()
         if (isInMultiSelectMode) {
-            val anyEnabled =
-                portViewModel.getSelectedItems(selectedIds).any { it -> it.portMapping.Enabled }
-            val anyDisabled =
-                portViewModel.getSelectedItems(selectedIds).any { it -> !it.portMapping.Enabled }
+            val selectedItems = portViewModel.getSelectedItems(selectedIds)
+            // renew is only applicable for leases that expire
+            if (selectedItems.any { it -> it.portMapping.LeaseDuration != 0 }) {
+                items.add(R.string.renew_action)
+            }
+            val anyEnabled = selectedItems.any { it -> it.portMapping.Enabled }
+            val anyDisabled = selectedItems.any { it -> !it.portMapping.Enabled }
             if (anyEnabled) {
                 items.add(R.string.disable_action)
             }
@@ -415,6 +418,10 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
 
                     R.string.delete_all_action -> {
                         portViewModel.deleteAll()
+                    }
+
+                    R.string.renew_action -> {
+                        portViewModel.renewAll(selectedIds)
                     }
 
                     R.string.renew_all_action -> {
