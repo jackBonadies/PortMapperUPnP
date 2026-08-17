@@ -20,8 +20,8 @@ import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
+import com.shinjiindustrial.portmapper.domain.toEntity
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
-import com.shinjiindustrial.portmapper.persistence.DevicesEntity
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.coroutines.CoroutineScope
@@ -84,17 +84,20 @@ class UpnpRepository @Inject constructor(
             } else {
 
                 val devicePreferencesNullable = runBlocking {
-                    devicesDao.getByPrimaryKey(device.deviceDetails.ipAddress, device.deviceDetails.udn)
+                    devicesDao.getByPrimaryKey(device.deviceDetails.udn)
                 }
                 if (devicePreferencesNullable == null) {
                     ourLogger.log(Level.INFO, "Preferences not found for device")
                 } else {
                     ourLogger.log(Level.INFO, "Preferences found for device")
                 }
-                val igdDevice = device.createClingDevice(
-                        devicePreferencesNullable?.getPrefs() ?: DevicePreferences())
+                val devicePreferences = devicePreferencesNullable?.getPrefs() ?: DevicePreferences()
+                val igdDevice = device.createClingDevice(devicePreferences)
                 addDevice(igdDevice)
                 runBlocking {
+                    devicesDao.upsert(
+                        device.deviceDetails.toEntity(devicePreferences, System.currentTimeMillis())
+                    )
                     enumeratePortMappings(igdDevice.getIpAddress())
                 }
             }
@@ -464,10 +467,9 @@ class UpnpRepository @Inject constructor(
                         // set new default to be the opposite of the old
                         device.devicePreferences = device.devicePreferences.copy(useWildcardForRemoteHostDelete = !device.devicePreferences.useWildcardForRemoteHostDelete)
                         devicesDao.upsert(
-                            DevicesEntity(
-                                device.getIpAddress(),
-                                device.udn,
-                                device.devicePreferences.useWildcardForRemoteHostDelete
+                            device.deviceDetails.toEntity(
+                                device.devicePreferences,
+                                System.currentTimeMillis()
                             )
                         )
                         return fallbackResult
@@ -501,7 +503,7 @@ class UpnpRepository @Inject constructor(
             val pm = portMappingWithPref.portMapping
             ourLogger.log(Level.FINE, "Requesting Delete: ${pm.shortName()}")
             val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
-            portMappingDao.deleteByKey(pm.DeviceIP, device.udn, pm.Protocol, pm.ExternalPort)
+            portMappingDao.deleteByKey(device.udn, pm.Protocol, pm.ExternalPort)
             val result = deletePortMappingWithFallback(device, pm)
             if (result is UPnPResult.Success)
             {
@@ -544,7 +546,6 @@ class UpnpRepository @Inject constructor(
                 ourLogger.log(Level.FINE, "Requesting Delete: ${portMapping.shortName()}")
                 val device = getIGDDevice(portMapping.DeviceIP)
                 portMappingDao.deleteByKey(
-                    portMapping.DeviceIP,
                     device.udn,
                     portMapping.Protocol,
                     portMapping.ExternalPort
@@ -583,24 +584,33 @@ class UpnpRepository @Inject constructor(
         }
     }
 
-    private fun createPortMappingDaoEntity(
+    private suspend fun createPortMappingDaoEntity(
         portMapping: PortMapping,
         pref: PortMappingPref
     ): PortMappingEntity {
         val igdDevice = getIGDDevice(portMapping.DeviceIP)
-        return PortMappingEntity(
-            igdDevice.getIpAddress(),
+        val nowUtcMs = System.currentTimeMillis()
+        // overwriting a rule we already track keeps its original creation time
+        val existingCreatedAtUtcMs = portMappingDao.getByPrimaryKey(
             igdDevice.udn,
-            portMapping.ExternalPort,
             portMapping.Protocol,
-            portMapping.Description,
-            portMapping.InternalIP,
-            portMapping.InternalPort,
-            pref.autoRenew,
-            pref.desiredLeaseDuration,
-            pref.autoRenewalCadenceSeconds,
-            portMapping.Enabled
-        ) // TODO enabled
+            portMapping.ExternalPort
+        )?.createdAtUtcMs
+        return PortMappingEntity(
+            deviceSignature = igdDevice.udn,
+            protocol = portMapping.Protocol,
+            externalPort = portMapping.ExternalPort,
+            deviceIp = igdDevice.getIpAddress(),
+            description = portMapping.Description,
+            internalIp = portMapping.InternalIP,
+            internalPort = portMapping.InternalPort,
+            autoRenew = pref.autoRenew,
+            desiredLeaseDuration = pref.desiredLeaseDuration,
+            autoRenewManualCadence = pref.autoRenewalCadenceSeconds,
+            desiredEnabled = portMapping.Enabled, // TODO enabled
+            createdAtUtcMs = existingCreatedAtUtcMs ?: nowUtcMs,
+            lastSeenAtUtcMs = nowUtcMs,
+        )
     }
 
     suspend fun createPortMappingRulesEntry(
@@ -846,7 +856,6 @@ class UpnpRepository @Inject constructor(
                        ourLogger.log(Level.INFO, "GetGenericPortMapping succeeded for entry $slotIndex")
                         val portMapping = result.resultingMapping
                         val entity = portMappingDao.getByPrimaryKey(
-                            device.getIpAddress(),
                             device.udn,
                             portMapping.Protocol,
                             portMapping.ExternalPort
@@ -858,6 +867,15 @@ class UpnpRepository @Inject constructor(
                                 "The rule is ours: ${portMapping.shortName()}"
                             )
                             pref = entity!!.getPrefs(SystemClock.elapsedRealtime())
+                            // the router still has it.  anything ours that does not get stamped
+                            //   during this sweep is a rule that has gone missing.
+                            portMappingDao.markSeen(
+                                device.udn,
+                                portMapping.Protocol,
+                                portMapping.ExternalPort,
+                                System.currentTimeMillis(),
+                                device.getIpAddress()
+                            )
                         } else {
                             ourLogger.log(
                                 Level.INFO,
