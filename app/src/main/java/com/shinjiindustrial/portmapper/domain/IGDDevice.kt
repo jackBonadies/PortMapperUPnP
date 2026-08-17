@@ -33,6 +33,7 @@ abstract class IIGDDevice {
     abstract fun supportsAction(actionName: String): Boolean
     abstract fun getActionInvocation(actionName: String): ActionInvocation<*>
     abstract fun withStatus(status: DeviceStatus): IIGDDevice
+    abstract val deviceDetails: DeviceDetails
     abstract val udn: String
     abstract val status: DeviceStatus
     abstract var devicePreferences: DevicePreferences
@@ -42,22 +43,46 @@ abstract class IIGDDevice {
     }
 }
 
-data class DeviceDetails(val displayName: String, val ipAddress: String, val upnpVersion: Int, val udn : String)
+data class DeviceDetails(
+    val displayName: String,
+    val ipAddress: String,
+    // the IGD device type version i.e. the 2 in InternetGatewayDevice:2
+    val upnpVersion: Int,
+    val udn: String,
+    // everything below comes straight off the SSDP description and is routinely absent
+    val friendlyName: String? = null,
+    val manufacturer: String? = null,
+    val modelName: String? = null,
+    val modelNumber: String? = null,
+    val serialNumber: String? = null,
+    val upc: String? = null,
+    val deviceType: String? = null, //i.e. InternetGatewayDevice
+    val udaVersion: String? = null, //i.e. 1.0, the UPnP spec version, not the device type version
+)
 {
     companion object {
         fun fromRemoteDevice(remoteDevice: RemoteDevice): DeviceDetails {
+            val details = remoteDevice.details
             return DeviceDetails(
                 remoteDevice.displayString,
                 remoteDevice.identity.descriptorURL.host,
                 remoteDevice.type.version,
-                remoteDevice.root.identity.udn.toString()
+                remoteDevice.root.identity.udn.toString(),
+                friendlyName = details?.friendlyName,
+                manufacturer = details?.manufacturerDetails?.manufacturer,
+                modelName = details?.modelDetails?.modelName,
+                modelNumber = details?.modelDetails?.modelNumber,
+                serialNumber = details?.serialNumber,
+                upc = details?.upc,
+                deviceType = remoteDevice.type?.type,
+                udaVersion = remoteDevice.version?.let { "${it.major}.${it.minor}" },
             )
         }
     }
 }
 
 // has state including rules. add update those rules. and do a upnp action. and sort.
-data class IGDDevice(val deviceDetails: DeviceDetails,
+data class IGDDevice(override val deviceDetails: DeviceDetails,
                      override var devicePreferences : DevicePreferences,
                      private val wanIPService: RemoteService,
                      override val status: DeviceStatus = DeviceStatus.Discovered) :
@@ -72,13 +97,6 @@ data class IGDDevice(val deviceDetails: DeviceDetails,
     private val upnpTypeVersion: Int = deviceDetails.upnpVersion//i.e. 2
     private val actionsMap: MutableMap<String, Action<RemoteService>> = mutableMapOf()
     override val udn = deviceDetails.udn
-
-    //private val upnpType : String = this.rootDevice.type.type //i.e. InternetGatewayDevice
-    // can cause crashes if friendlyName is null
-    //private val friendlyDetailsName : String =
-    //    this.rootDevice.details.friendlyName //i.e. Internet Home Gateway Device
-//    private val manufacturer : String =
-//        this.rootDevice.details.manufacturerDetails?.manufacturer ?: "" //i.e. Nokia
 
     override fun getUpnpVersion(): Int {
         return upnpTypeVersion

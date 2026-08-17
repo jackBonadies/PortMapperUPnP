@@ -18,7 +18,7 @@ import org.fourthline.cling.model.action.ActionInvocation
 import org.fourthline.cling.model.message.UpnpResponse
 import org.fourthline.cling.model.meta.RemoteService
 
-data class MockIGDDevice(val deviceDetails : DeviceDetails,
+data class MockIGDDevice(override val deviceDetails : DeviceDetails,
                          override val status: DeviceStatus,
                          override var devicePreferences: DevicePreferences
 ) : IIGDDevice()
@@ -147,7 +147,17 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
         when(config.ruleSet)
         {
             RuleSet.Demo -> {
-                var details = DeviceDetails("Nokia IGD v2", "192.168.18.1", 2, "UUID-1")
+                var details = DeviceDetails(
+                    "Nokia IGD v2", "192.168.18.1", 2, "UUID-1",
+                    friendlyName = "Nokia Internet Home Gateway",
+                    manufacturer = "Nokia",
+                    modelName = "Nokia IGD",
+                    modelNumber = "A1-2000",
+                    serialNumber = "SN-0123456789",
+                    upc = "012345678905",
+                    deviceType = "InternetGatewayDevice",
+                    udaVersion = "1.0",
+                )
                 var igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
 
                 var mappings: List<PortMapping> = listOf(
@@ -206,7 +216,18 @@ class MockUpnpClient(val config : MockUpnpClientConfig) : IUpnpClient {
                 store.put(igdDevice.getKey(), linkedMapOf())
                 deviceStore.put(igdDevice.getKey(), igdDevice)
 
-                details = DeviceDetails("IGD Main", "192.168.1.1", 2, "UUID-2")
+                details = DeviceDetails(
+                    // realistic length udn - real ones are uuid: prefixed and wrap in the info sheet
+                    "IGD Main", "192.168.1.1", 2, "uuid:2f402f80-da50-11e1-9b23-0017881c4e33",
+                    friendlyName = "Main Internet Gateway",
+                    manufacturer = "Acme Networks",
+                    modelName = "AcmeRouter 9000",
+                    modelNumber = "AR9000-X",
+                    serialNumber = "AC-99887766",
+                    upc = "987654321098",
+                    deviceType = "InternetGatewayDevice",
+                    udaVersion = "1.0",
+                )
                 igdDevice = MockIGDDevice(details, DeviceStatus.Discovered, DevicePreferences())
                 var mappings: List<PortMapping> =
                     (1..200).map { i ->

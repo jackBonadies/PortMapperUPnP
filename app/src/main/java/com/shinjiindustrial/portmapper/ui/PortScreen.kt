@@ -24,12 +24,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -366,27 +369,33 @@ fun PreviewDeviceHeader() {
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun DeviceHeader(device: IIGDDevice) {
+fun DeviceHeader(device: IIGDDevice, onInfoClick: () -> Unit) {
     Spacer(modifier = Modifier.Companion.padding(2.dp))
-    Column(
+    Row(
         modifier = Modifier.Companion
-//                    .background(
-//                        MaterialTheme.colorScheme.secondaryContainer,
-//                        shape = RoundedCornerShape(16.dp, 16.dp, 0.dp, 0.dp)
-//                    )
             .fillMaxWidth()
-            .padding(6.dp, 4.dp)
+            .padding(6.dp, 4.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically
     )
     {
-//                    Divider(color = Color.Gray, thickness = 1.dp)
-        Text(
-            device.getDisplayName(),
-            fontWeight = FontWeight.Companion.SemiBold,
-            fontSize = TextUnit(24f, TextUnitType.Companion.Sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        Column(modifier = Modifier.Companion.weight(1f))
+        {
+            Text(
+                device.getDisplayName(),
+                fontWeight = FontWeight.Companion.SemiBold,
+                fontSize = TextUnit(24f, TextUnitType.Companion.Sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
 
-        )
-        Text(device.getIpAddress(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            )
+            Text(device.getIpAddress(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onInfoClick) {
+            Icon(
+                Icons.Outlined.Info,
+                contentDescription = "Device info",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
     Spacer(modifier = Modifier.Companion.padding(2.dp))
 }
@@ -581,6 +590,9 @@ fun PortMappingsListContent(
 
     val now by rememberTicker(8_000)
 
+    // remember not rememberSaveable - IIGDDevice isnt Parcelable.
+    var infoDevice by remember { mutableStateOf<IIGDDevice?>(null) }
+
     LazyColumn(
         //modifier = Modifier.background(MaterialTheme.colorScheme.background),
         modifier = Modifier
@@ -598,7 +610,7 @@ fun PortMappingsListContent(
 
             when (message) {
                 is UpnpViewRow.DeviceHeaderViewRow -> {
-                    DeviceHeader(message.device)
+                    DeviceHeader(message.device) { infoDevice = message.device }
                 }
 
                 is UpnpViewRow.DeviceEmptyViewRow -> {
@@ -626,4 +638,5 @@ fun PortMappingsListContent(
 
     }
 
+    infoDevice?.let { DeviceInfoBottomSheet(it) { infoDevice = null } }
 }
