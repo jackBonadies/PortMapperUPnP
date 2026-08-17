@@ -1,21 +1,14 @@
 package com.shinjiindustrial.portmapper.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
@@ -48,18 +41,7 @@ fun MoreInfoDialog(
                 pairs.add(Pair("Expires", portMapping.getRemainingLeaseTimeString()))
                 Column {
                     for (p in pairs) {
-                        Row()
-                        {
-                            Text(
-                                p.first,
-                                modifier = Modifier
-                                    .padding(0.dp, 0.dp, 10.dp, 4.dp)
-                                    .width(100.dp),
-                                textAlign = TextAlign.Right,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(p.second, color = MaterialTheme.colorScheme.onSurface)
-                        }
+                        KeyValueRow(p.first, p.second)
                     }
                 }
 
