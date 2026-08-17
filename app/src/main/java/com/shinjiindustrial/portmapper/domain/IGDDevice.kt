@@ -39,7 +39,7 @@ abstract class IIGDDevice {
     abstract var devicePreferences: DevicePreferences
 
     fun getKey() : String {
-        return "${getIpAddress()}:${udn}"
+        return udn
     }
 }
 
