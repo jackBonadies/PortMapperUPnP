@@ -296,10 +296,15 @@ fun PortMappingEntity.getPrefs(lastRenewTimeMs: Long): PortMappingPref =
 fun DevicesEntity.getPrefs(): DevicePreferences =
     DevicePreferences(this.useWildcardForRemoteHostDelete)
 
+private fun String?.orNullIfBlank(): String? = this?.takeIf { it.isNotBlank() }
+
 // for a device we have stored before but is not current on network
 fun DevicesEntity.toDeviceDetails(): DeviceDetails =
     DeviceDetails(
-        displayName = this.displayName ?: this.friendlyName ?: this.deviceSignature,
+        displayName = this.displayName.orNullIfBlank()
+            ?: this.friendlyName.orNullIfBlank()
+            ?: this.modelName.orNullIfBlank()
+            ?: this.deviceSignature,
         ipAddress = this.lastKnownIp,
         upnpVersion = this.upnpVersion ?: 0,
         udn = this.deviceSignature,
