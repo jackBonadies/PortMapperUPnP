@@ -503,7 +503,6 @@ class UpnpRepository @Inject constructor(
             val pm = portMappingWithPref.portMapping
             ourLogger.log(Level.FINE, "Requesting Delete: ${pm.shortName()}")
             val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
-            portMappingDao.deleteByKey(device.udn, pm.Protocol, pm.ExternalPort)
             val result = deletePortMappingWithFallback(device, pm)
             if (result is UPnPResult.Success)
             {
@@ -511,6 +510,8 @@ class UpnpRepository @Inject constructor(
                     Level.INFO,
                     "Successfully deleted rule (${pm.shortName()})."
                 )
+                // only delete after router confirms, otherwise it will show up as a remote (discovered) rule
+                portMappingDao.deleteByKey(device.udn, pm.Protocol, pm.ExternalPort)
                 removeMapping(portMappingWithPref)
             }
             else if (result is UPnPResult.Failure)
@@ -545,17 +546,18 @@ class UpnpRepository @Inject constructor(
                 val portMapping = portMappingWithPref.portMapping
                 ourLogger.log(Level.FINE, "Requesting Delete: ${portMapping.shortName()}")
                 val device = getIGDDevice(portMapping.DeviceIP)
-                portMappingDao.deleteByKey(
-                    device.udn,
-                    portMapping.Protocol,
-                    portMapping.ExternalPort
-                )
                 val result = deletePortMappingWithFallback(device, portMapping)
                 if (result is UPnPResult.Success)
                 {
                    ourLogger.log(
                         Level.INFO,
                         "Successfully deleted rule (${portMapping.shortName()})."
+                    )
+                    // only delete after router confirms, otherwise it will show up as a remote (discovered) rule
+                    portMappingDao.deleteByKey(
+                        device.udn,
+                        portMapping.Protocol,
+                        portMapping.ExternalPort
                     )
                     removeMapping(portMappingWithPref)
                 }
