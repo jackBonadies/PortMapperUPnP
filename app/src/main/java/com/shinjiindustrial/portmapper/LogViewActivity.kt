@@ -18,11 +18,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SaveAs
@@ -37,7 +36,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
@@ -81,7 +79,7 @@ class LogViewActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun LogViewInner(themeUiState: ThemeUiState, logLines: List<String>, scrollToBottom: Boolean) {
+    fun LogViewInner(themeUiState: ThemeUiState, logLines: List<LogEntry>, scrollToBottom: Boolean) {
         MyApplicationTheme(themeUiState) {
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             Scaffold(
@@ -111,7 +109,7 @@ class LogViewActivity : ComponentActivity() {
                         actions = {
 
                             IconButton(onClick = {
-                                logStoreRepository.logs.clear()
+                                logStoreRepository.clear()
                             }) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
                             }
@@ -134,7 +132,6 @@ class LogViewActivity : ComponentActivity() {
                 content = { it ->
 
                     val listState = rememberLazyListState()
-                    rememberCoroutineScope()
 
                     if (scrollToBottom) {
                         //scrollToBottom = true // not necessary?
@@ -162,14 +159,13 @@ class LogViewActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
 
-                        itemsIndexed(logLines) { index, message ->
-                            val color = when {
-                                message.startsWith("W: ") -> PortMapperTheme.semanticColors.logWarning
-                                message.startsWith("E: ") -> PortMapperTheme.semanticColors.logError
+                        items(logLines, key = { it.seq }) { entry ->
+                            val color = when (entry.level) {
+                                Level.WARNING -> PortMapperTheme.semanticColors.logWarning
+                                Level.SEVERE -> PortMapperTheme.semanticColors.logError
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
-                            Text(message, color = color)
-
+                            Text(LogFormatter.forView(entry), color = color)
                         }
 
                     }
@@ -183,7 +179,7 @@ class LogViewActivity : ComponentActivity() {
     fun LogViewContent() {
         val scrollToBottom =
             this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false)
-        val logLines = logStoreRepository.logs
+        val logLines = logStoreRepository.entries
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         LogViewInner(themeState, logLines, scrollToBottom)
     }
