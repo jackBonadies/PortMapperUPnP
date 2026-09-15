@@ -1015,11 +1015,14 @@ class UpnpRepository @Inject constructor(
     }
 
     private fun updateDeviceState(deviceToUpdate: IIGDDevice, newStatus : DeviceStatus) {
+        // the ON ROUTER header shows this as "refreshed <time>"
+        val enumeratedAtUtcMs =
+            if (newStatus == DeviceStatus.FinishedEnumeratingMappings) System.currentTimeMillis() else null
         _devices.update { list ->
             list.map { device ->
                 if (device.getKey() == deviceToUpdate.getKey())
                 {
-                    device.withStatus(newStatus)
+                    device.withStatus(newStatus, enumeratedAtUtcMs)
                 }
                 else
                 {

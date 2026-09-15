@@ -32,10 +32,14 @@ abstract class IIGDDevice {
     abstract fun getUpnpVersion(): Int
     abstract fun supportsAction(actionName: String): Boolean
     abstract fun getActionInvocation(actionName: String): ActionInvocation<*>
-    abstract fun withStatus(status: DeviceStatus): IIGDDevice
+    abstract fun withStatus(status: DeviceStatus, enumeratedAtUtcMs: Long?): IIGDDevice
     abstract val deviceDetails: DeviceDetails
     abstract val udn: String
     abstract val status: DeviceStatus
+    // wall clock (System.currentTimeMillis) of when status last became
+    //   FinishedEnumeratingMappings, null until then.  shown to the user as a time of day so
+    //   it is not elapsedRealtime.
+    abstract val enumeratedAtUtcMs: Long?
     abstract var devicePreferences: DevicePreferences
 
     fun getKey() : String {
@@ -85,7 +89,8 @@ data class DeviceDetails(
 data class IGDDevice(override val deviceDetails: DeviceDetails,
                      override var devicePreferences : DevicePreferences,
                      private val wanIPService: RemoteService,
-                     override val status: DeviceStatus = DeviceStatus.Discovered) :
+                     override val status: DeviceStatus = DeviceStatus.Discovered,
+                     override val enumeratedAtUtcMs: Long? = null) :
     IIGDDevice() {
     // nullrefs warning: this is SSDP response, very possible for some fields to be null, DeviceDetails constructor allows it.
     // the best bet on ip is (rootDevice!!.identity.descriptorURL.host) imo.  since that is what we use in RetreiveRemoteDescriptors class
@@ -119,8 +124,8 @@ data class IGDDevice(override val deviceDetails: DeviceDetails,
         return ActionInvocation(action)
     }
 
-    override fun withStatus(status: DeviceStatus): IIGDDevice {
-        return this.copy(status = status)
+    override fun withStatus(status: DeviceStatus, enumeratedAtUtcMs: Long?): IIGDDevice {
+        return this.copy(status = status, enumeratedAtUtcMs = enumeratedAtUtcMs)
     }
 
     init {

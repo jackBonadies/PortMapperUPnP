@@ -8,6 +8,7 @@ import com.shinjiindustrial.portmapper.client.RuleSet
 import com.shinjiindustrial.portmapper.client.Speed
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
 import com.shinjiindustrial.portmapper.domain.DeviceDetails
+import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.LocalRule
 import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
@@ -128,6 +129,18 @@ class LocalRulesTests {
 
     private fun key(externalPort: Int, protocol: String = "TCP") =
         LocalRuleKey(UDN, externalPort, protocol)
+
+    @Test
+    fun `device is stamped with a wall clock refresh time once enumerated`() {
+        val before = System.currentTimeMillis()
+        val repository = createRepository(emptyList())
+
+        val device = repository.devices.value.single()
+        assertEquals(DeviceStatus.FinishedEnumeratingMappings, device.status)
+        val enumeratedAt = device.enumeratedAtUtcMs
+        assertNotNull(enumeratedAt)
+        assertTrue(enumeratedAt!! >= before && enumeratedAt <= System.currentTimeMillis())
+    }
 
     @Test
     fun `rule the router no longer reports is local`() {
