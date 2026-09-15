@@ -16,6 +16,7 @@ import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.LocalRule
 import com.shinjiindustrial.portmapper.domain.LocalRuleKey
+import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
@@ -91,23 +92,35 @@ class UpnpRepository @Inject constructor(
                 if (device.status != DeviceStatus.FinishedEnumeratingMappings) {
                     continue
                 }
-                for (entity in entities) {
-                    if (entity.deviceSignature != device.udn) {
-                        continue
-                    }
-                    // only v4+
-                    if (entity.createdAtUtcMs == null) {
-                        continue
-                    }
-                    val onRouter = portMappings[PortMappingKey(
+                val forDevice = entities.filter { it.deviceSignature == device.udn }
+                fun onRouter(entity: PortMappingEntity): PortMappingWithPref? =
+                    portMappings[PortMappingKey(
                         device.getIpAddress(),
                         entity.externalPort,
                         entity.protocol
                     )]
+                // slots (ext port + protocol) whose router rule is one of ours.  v3 rows count
+                //   here even though they never show under LOCAL: a v3 rule still on the router
+                //   is ours (isRuleOurs) and so a sibling of it is SiblingActive, not Drifted.
+                val slotsHeldByOurs = forDevice.filter { entity ->
+                    onRouter(entity)?.let { entity.matches(it.portMapping) } == true
+                }.map { Pair(it.externalPort, it.protocol) }.toSet()
+                for (entity in forDevice) {
+                    // only v4+
+                    if (entity.createdAtUtcMs == null) {
+                        continue
+                    }
+                    val onRouter = onRouter(entity)
                     if (onRouter != null && entity.matches(onRouter.portMapping)) {
                         continue
                     }
-                    val localRule = LocalRule(entity, device, drifted = onRouter != null)
+                    val status = when {
+                        onRouter == null -> LocalRuleStatus.Missing
+                        Pair(entity.externalPort, entity.protocol) in slotsHeldByOurs ->
+                            LocalRuleStatus.SiblingActive
+                        else -> LocalRuleStatus.Drifted
+                    }
+                    val localRule = LocalRule(entity, device, status)
                     put(localRule.key, localRule)
                 }
             }
@@ -484,7 +497,8 @@ class UpnpRepository @Inject constructor(
         }
     }
 
-    // local rule -> router
+    // local rule -> router.  on a SiblingActive rule this is an AddPortMapping overwrite of the
+    //   sibling, which then stops matching its row and moves to LOCAL: the two swap.
     suspend fun activateLocalRule(localRule: LocalRule): UPnPCreateMappingWrapperResult {
         try {
             val res = createPortMappingRuleWrapper(
@@ -513,6 +527,8 @@ class UpnpRepository @Inject constructor(
 
     // router -> local rule.  the DB row is what puts a rule under LOCAL, so a rule that is not
     //   ours gets one (createdAtUtcMs = now) and is adopted; a rule that is ours keeps its row.
+    //   the internal target is part of the key, so adopting the router's version of a drifted
+    //   rule adds a row beside ours rather than replacing it.
     //   the row is written only after the router confirms, same as delete: writing first would
     //   adopt a rule the router still has if the delete then fails.
     suspend fun deactivatePortMappingEntry(portMappingWithPref: PortMappingWithPref): UPnPResult {
@@ -566,7 +582,9 @@ class UpnpRepository @Inject constructor(
         portMappingDao.deleteByKey(
             localRule.entity.deviceSignature,
             localRule.entity.protocol,
-            localRule.entity.externalPort
+            localRule.entity.externalPort,
+            localRule.entity.internalIp,
+            localRule.entity.internalPort
         )
     }
 
@@ -637,8 +655,16 @@ class UpnpRepository @Inject constructor(
                     Level.INFO,
                     "Successfully deleted rule (${pm.shortName()})."
                 )
-                // only delete after router confirms, otherwise it will show up as a remote (discovered) rule
-                portMappingDao.deleteByKey(device.udn, pm.Protocol, pm.ExternalPort)
+                // only delete after router confirms, otherwise it will show up as a remote (discovered) rule.
+                //   keyed on the internal target too, so deleting an unmanaged rule at a port
+                //   where we have a drifted rule leaves our row alone.
+                portMappingDao.deleteByKey(
+                    device.udn,
+                    pm.Protocol,
+                    pm.ExternalPort,
+                    pm.InternalIP,
+                    pm.InternalPort
+                )
                 removeMapping(portMappingWithPref)
             }
             else if (result is UPnPResult.Failure)
@@ -684,7 +710,9 @@ class UpnpRepository @Inject constructor(
                     portMappingDao.deleteByKey(
                         device.udn,
                         portMapping.Protocol,
-                        portMapping.ExternalPort
+                        portMapping.ExternalPort,
+                        portMapping.InternalIP,
+                        portMapping.InternalPort
                     )
                     removeMapping(portMappingWithPref)
                 }
@@ -719,11 +747,14 @@ class UpnpRepository @Inject constructor(
     ): PortMappingEntity {
         val igdDevice = getIGDDevice(portMapping.DeviceIP)
         val nowUtcMs = System.currentTimeMillis()
-        // overwriting a rule we already track keeps its original creation time
+        // overwriting a rule we already track keeps its original creation time.  a rule at the
+        //   same port but a different internal target is a new row, so it gets its own.
         val existingCreatedAtUtcMs = portMappingDao.getByPrimaryKey(
             igdDevice.udn,
             portMapping.Protocol,
-            portMapping.ExternalPort
+            portMapping.ExternalPort,
+            portMapping.InternalIP,
+            portMapping.InternalPort
         )?.createdAtUtcMs
         return PortMappingEntity(
             deviceSignature = igdDevice.udn,
@@ -954,7 +985,9 @@ class UpnpRepository @Inject constructor(
         updateDeviceState(device, DeviceStatus.FinishedEnumeratingMappings)
     }
 
-    // the same comparison decides "drifted" in localRules, so it lives on the entity
+    // the same comparison decides Drifted vs SiblingActive in localRules, so it lives on the
+    //   entity.  the row is looked up by full key (internal target included), so all that is
+    //   left for matches() to catch is a description changed out of band.
     private fun isRuleOurs(
         databaseEntity: PortMappingEntity?,
         device: IIGDDevice,
@@ -980,7 +1013,9 @@ class UpnpRepository @Inject constructor(
                         val entity = portMappingDao.getByPrimaryKey(
                             device.udn,
                             portMapping.Protocol,
-                            portMapping.ExternalPort
+                            portMapping.ExternalPort,
+                            portMapping.InternalIP,
+                            portMapping.InternalPort
                         )
                         var pref: PortMappingPref? = null
                         if (isRuleOurs(entity, device, portMapping)) {
@@ -995,6 +1030,8 @@ class UpnpRepository @Inject constructor(
                                 device.udn,
                                 portMapping.Protocol,
                                 portMapping.ExternalPort,
+                                portMapping.InternalIP,
+                                portMapping.InternalPort,
                                 System.currentTimeMillis(),
                                 device.getIpAddress()
                             )

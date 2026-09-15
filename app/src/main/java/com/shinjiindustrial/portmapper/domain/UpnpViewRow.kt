@@ -20,8 +20,13 @@ sealed class ViewKey : Parcelable {
     data class SectionHeaderKey(val udn: String, val section: String) : ViewKey()
 
     @Parcelize
-    data class LocalRuleViewKey(val udn: String, val externalPort: Int, val protocol: String) :
-        ViewKey()
+    data class LocalRuleViewKey(
+        val udn: String,
+        val externalPort: Int,
+        val protocol: String,
+        val internalIp: String,
+        val internalPort: Int,
+    ) : ViewKey()
 }
 
 enum class RuleSection(val label: String) {
@@ -57,7 +62,9 @@ sealed class UpnpViewRow {
         override val key = ViewKey.LocalRuleViewKey(
             localRule.entity.deviceSignature,
             localRule.entity.externalPort,
-            localRule.entity.protocol
+            localRule.entity.protocol,
+            localRule.entity.internalIp,
+            localRule.entity.internalPort
         )
     }
 }

@@ -5,21 +5,48 @@ import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.parcelize.Parcelize
 
-// same as port_mappings primary key
+// same as port_mappings primary key.  the internal target is part of it so that two of our
+//   rules for the same external port (i.e. minecraft on laptop A and on laptop B) are distinct
+//   rows and distinct cards.
 @Parcelize
-data class LocalRuleKey(val udn: String, val externalPort: Int, val protocol: String) : Parcelable
+data class LocalRuleKey(
+    val udn: String,
+    val externalPort: Int,
+    val protocol: String,
+    val internalIp: String,
+    val internalPort: Int,
+) : Parcelable
+
+// what the router has at a local rule's external port / protocol.  a property of the slot, not
+//   the row: the router holds one rule per slot, we may hold several.
+enum class LocalRuleStatus {
+    // nothing.  expired, router rebooted, or deleted out of band
+    Missing,
+
+    // a rule that matches none of ours (isRuleOurs false for every row at the slot) i.e. it was
+    //   changed out of band, or something unrelated took the port.  shows under ON ROUTER as
+    //   unmanaged.  the only status that gets a badge.
+    Drifted,
+
+    // another of our rules for the same port, which shows under ON ROUTER as ours.  this one is
+    //   simply the inactive alternative; activating it replaces the sibling.
+    SiblingActive,
+}
 
 // a rule we created on a router that the router no longer reports as ours
 data class LocalRule(
     val entity: PortMappingEntity,
     val device: IIGDDevice,
-    // the router has a rule at this external port / protocol but it no longer matches what we
-    //   stored (isRuleOurs false) i.e. it was changed out of band
-    //   shows under ON ROUTER
-    val drifted: Boolean,
+    val status: LocalRuleStatus,
 ) {
     val key: LocalRuleKey
-        get() = LocalRuleKey(entity.deviceSignature, entity.externalPort, entity.protocol)
+        get() = LocalRuleKey(
+            entity.deviceSignature,
+            entity.externalPort,
+            entity.protocol,
+            entity.internalIp,
+            entity.internalPort
+        )
 
     // lets the existing sort comparers and card layout run on a stored rule.  the lease and
     //   enabled fields are what we would ask for, not anything the router said.

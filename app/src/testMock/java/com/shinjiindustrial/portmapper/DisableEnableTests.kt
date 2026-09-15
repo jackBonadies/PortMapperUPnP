@@ -50,7 +50,7 @@ class DisableEnableTests {
     private fun createRepository(): UpnpRepository {
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest, RuleSet.Demo))
         val portMappingDao = mockk<PortMappingDao>(relaxed = true)
-        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any()) } returns null
+        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any(), any(), any()) } returns null
         every { portMappingDao.observeAll() } returns MutableStateFlow(emptyList())
         val devicesDao = mockk<DevicesDao>(relaxed = true)
         coEvery { devicesDao.getByPrimaryKey(any()) } returns null

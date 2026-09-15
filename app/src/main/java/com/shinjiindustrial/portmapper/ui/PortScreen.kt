@@ -69,6 +69,7 @@ import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 import com.shinjiindustrial.portmapper.domain.LocalRule
 import com.shinjiindustrial.portmapper.domain.LocalRuleKey
+import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
@@ -235,7 +236,7 @@ fun LocalRuleCard(
                     ) {
                         RuleTitle(entity.description) {
                             val semanticColors = PortMapperTheme.semanticColors
-                            if (localRule.drifted) {
+                            if (localRule.status == LocalRuleStatus.Drifted) {
                                 StatusBadge("Drifted", semanticColors.logWarning)
                             }
                             // what an activate would ask for, not anything the router said

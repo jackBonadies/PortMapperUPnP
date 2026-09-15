@@ -12,7 +12,9 @@ import com.shinjiindustrial.portmapper.domain.DeviceDetails
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.LocalRule
 import com.shinjiindustrial.portmapper.domain.LocalRuleKey
+import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
+import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
@@ -44,6 +46,8 @@ class LocalRulesTests {
     private companion object {
         const val UDN = "UUID-1"
         const val DEVICE_IP = "192.168.18.1"
+        const val LAPTOP_A = "192.168.1.13"
+        const val LAPTOP_B = "192.168.1.14"
     }
 
     private lateinit var scope: CoroutineScope
@@ -66,7 +70,7 @@ class LocalRulesTests {
         description: String,
         externalPort: Int,
         protocol: String = "TCP",
-        internalIp: String = "192.168.1.13",
+        internalIp: String = LAPTOP_A,
         internalPort: Int = externalPort,
         createdAtUtcMs: Long? = 1_000L,
     ) = PortMappingEntity(
@@ -85,29 +89,47 @@ class LocalRulesTests {
         lastSeenAtUtcMs = createdAtUtcMs,
     )
 
-    private fun PortMappingEntity.hasKey(udn: String, protocol: String, externalPort: Int) =
-        this.deviceSignature == udn && this.protocol == protocol && this.externalPort == externalPort
+    private fun PortMappingEntity.hasKey(
+        udn: String,
+        protocol: String,
+        externalPort: Int,
+        internalIp: String,
+        internalPort: Int
+    ) = this.deviceSignature == udn && this.protocol == protocol &&
+            this.externalPort == externalPort && this.internalIp == internalIp &&
+            this.internalPort == internalPort
+
+    private fun PortMappingEntity.hasKey(key: LocalRuleKey) =
+        hasKey(key.udn, key.protocol, key.externalPort, key.internalIp, key.internalPort)
 
     private fun createRepository(stored: List<PortMappingEntity>): UpnpRepository {
         entities = MutableStateFlow(stored)
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest, RuleSet.Demo))
         val portMappingDao = mockk<PortMappingDao>(relaxed = true)
         every { portMappingDao.observeAll() } returns entities
-        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any()) } answers {
-            entities.value.firstOrNull { it.hasKey(firstArg(), secondArg(), thirdArg()) }
+        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any(), any(), any()) } answers {
+            entities.value.firstOrNull {
+                it.hasKey(arg(0), arg(1), arg(2), arg(3), arg(4))
+            }
         }
         coEvery { portMappingDao.upsert(any()) } answers {
             val upserted = firstArg<PortMappingEntity>()
             entities.update { list ->
                 list.filterNot {
-                    it.hasKey(upserted.deviceSignature, upserted.protocol, upserted.externalPort)
+                    it.hasKey(
+                        upserted.deviceSignature,
+                        upserted.protocol,
+                        upserted.externalPort,
+                        upserted.internalIp,
+                        upserted.internalPort
+                    )
                 } + upserted
             }
         }
-        coEvery { portMappingDao.deleteByKey(any(), any(), any()) } answers {
+        coEvery { portMappingDao.deleteByKey(any(), any(), any(), any(), any()) } answers {
             val before = entities.value.size
             entities.update { list ->
-                list.filterNot { it.hasKey(firstArg(), secondArg(), thirdArg()) }
+                list.filterNot { it.hasKey(arg(0), arg(1), arg(2), arg(3), arg(4)) }
             }
             before - entities.value.size
         }
@@ -128,8 +150,30 @@ class LocalRulesTests {
         withTimeout(2_000) { localRules.first(predicate) }
     }
 
-    private fun key(externalPort: Int, protocol: String = "TCP") =
-        LocalRuleKey(UDN, externalPort, protocol)
+    private fun key(
+        externalPort: Int,
+        protocol: String = "TCP",
+        internalIp: String = LAPTOP_A,
+        internalPort: Int = externalPort,
+    ) = LocalRuleKey(UDN, externalPort, protocol, internalIp, internalPort)
+
+    private fun userInput(
+        description: String,
+        externalPort: Int,
+        internalIp: String,
+        internalPort: Int = externalPort,
+    ) = PortMappingUserInput(
+        description = description,
+        internalIp = internalIp,
+        internalRange = internalPort.toString(),
+        externalIp = DEVICE_IP,
+        externalRange = externalPort.toString(),
+        protocol = "TCP",
+        leaseDuration = "3600",
+        enabled = true,
+        autoRenew = true,
+        autoRenewManualCadence = -1,
+    )
 
     @Test
     fun `device is stamped with a wall clock refresh time once enumerated`() {
@@ -150,7 +194,7 @@ class LocalRulesTests {
         val local = repository.awaitLocalRules { it.containsKey(key(7777)) }
 
         val rule = local[key(7777)]!!
-        assertFalse(rule.drifted)
+        assertEquals(LocalRuleStatus.Missing, rule.status)
         assertEquals("Gone", rule.entity.description)
         assertEquals(UDN, rule.device.udn)
         assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 7777, "TCP")])
@@ -184,12 +228,13 @@ class LocalRulesTests {
 
     @Test
     fun `rule changed out of band is local and drifted`() {
-        // doesnt match Demo store Minecraft Server at TCP 5011
+        // same target as Demo store Minecraft Server at TCP 5011, different description.  the
+        //   row is found by key, so this is exactly the case matches() is left to catch.
         val repository = createRepository(listOf(entity("Mine", 5011)))
 
         val local = repository.awaitLocalRules { it.containsKey(key(5011)) }
 
-        assertTrue(local[key(5011)]!!.drifted)
+        assertEquals(LocalRuleStatus.Drifted, local[key(5011)]!!.status)
         val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]
         assertNotNull(onRouter)
         assertEquals("Minecraft Server", onRouter!!.portMapping.Description)
@@ -204,7 +249,7 @@ class LocalRulesTests {
         repository.forgetLocalRule(rule)
 
         repository.awaitLocalRules { !it.containsKey(key(7777)) }
-        assertTrue(entities.value.none { it.hasKey(UDN, "TCP", 7777) })
+        assertTrue(entities.value.none { it.hasKey(key(7777)) })
     }
 
     @Test
@@ -220,7 +265,7 @@ class LocalRulesTests {
         assertNotNull(onRouter)
         assertEquals("Gone", onRouter!!.portMapping.Description)
         assertNotNull("activated rule should be ours", onRouter.portMappingPref)
-        val stored = entities.value.first { it.hasKey(UDN, "TCP", 7777) }
+        val stored = entities.value.first { it.hasKey(key(7777)) }
         assertEquals(1_000L, stored.createdAtUtcMs)
         assertTrue(stored.lastSeenAtUtcMs!! > 1_000L)
     }
@@ -236,9 +281,9 @@ class LocalRulesTests {
 
         assertTrue(res is UPnPResult.Success)
         val local = repository.awaitLocalRules { it.containsKey(key(5011)) }
-        assertFalse(local[key(5011)]!!.drifted)
+        assertEquals(LocalRuleStatus.Missing, local[key(5011)]!!.status)
         assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")])
-        val stored = entities.value.single { it.hasKey(UDN, "TCP", 5011) }
+        val stored = entities.value.single { it.hasKey(key(5011)) }
         assertEquals(1_000L, stored.createdAtUtcMs)
         assertEquals("Minecraft Server", stored.description)
     }
@@ -253,12 +298,123 @@ class LocalRulesTests {
         val res = repository.deactivatePortMappingEntry(onRouter)
 
         assertTrue(res is UPnPResult.Success)
-        repository.awaitLocalRules { it.containsKey(key(8080)) }
+        repository.awaitLocalRules { it.containsKey(key(8080, internalIp = "192.168.1.18")) }
         assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 8080, "TCP")])
-        val stored = entities.value.single { it.hasKey(UDN, "TCP", 8080) }
+        val stored = entities.value.single { it.hasKey(key(8080, internalIp = "192.168.1.18")) }
         assertEquals("Web Server 1", stored.description)
         assertEquals("192.168.1.18", stored.internalIp)
         assertEquals(18 * 3600, stored.desiredLeaseDuration)
         assertTrue(stored.createdAtUtcMs!! >= before)
+    }
+
+    // two of our rules for the same external port, different internal target
+
+    @Test
+    fun `sibling of a rule that is on the router is local and not drifted`() {
+        // laptop A matches the Demo store Minecraft Server row; laptop B is the alternative
+        val repository = createRepository(
+            listOf(
+                entity("Minecraft Server", 5011, internalIp = LAPTOP_A),
+                entity("Minecraft Server", 5011, internalIp = LAPTOP_B),
+            )
+        )
+
+        val local = repository.awaitLocalRules { it.containsKey(key(5011, internalIp = LAPTOP_B)) }
+
+        assertEquals(LocalRuleStatus.SiblingActive, local[key(5011, internalIp = LAPTOP_B)]!!.status)
+        assertFalse(local.containsKey(key(5011, internalIp = LAPTOP_A)))
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+        assertEquals(LAPTOP_A, onRouter.portMapping.InternalIP)
+        assertNotNull("router's version is ours", onRouter.portMappingPref)
+    }
+
+    @Test
+    fun `activating a sibling swaps which rule is on the router`() = runBlocking {
+        val repository = createRepository(
+            listOf(
+                entity("Minecraft Server", 5011, internalIp = LAPTOP_A, createdAtUtcMs = 1_000L),
+                entity("Minecraft Server", 5011, internalIp = LAPTOP_B, createdAtUtcMs = 2_000L),
+            )
+        )
+        val ruleB = repository.awaitLocalRules {
+            it.containsKey(key(5011, internalIp = LAPTOP_B))
+        }[key(5011, internalIp = LAPTOP_B)]!!
+
+        val res = repository.activateLocalRule(ruleB)
+
+        assertTrue(res is UPnPCreateMappingWrapperResult.Success)
+        val local = repository.awaitLocalRules { it.containsKey(key(5011, internalIp = LAPTOP_A)) }
+        assertEquals(LocalRuleStatus.SiblingActive, local[key(5011, internalIp = LAPTOP_A)]!!.status)
+        assertFalse(local.containsKey(key(5011, internalIp = LAPTOP_B)))
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+        assertEquals(LAPTOP_B, onRouter.portMapping.InternalIP)
+        assertNotNull("activated rule should be ours", onRouter.portMappingPref)
+        // both rows survive with their own creation times
+        assertEquals(1_000L, entities.value.single { it.hasKey(key(5011, internalIp = LAPTOP_A)) }.createdAtUtcMs)
+        assertEquals(2_000L, entities.value.single { it.hasKey(key(5011, internalIp = LAPTOP_B)) }.createdAtUtcMs)
+    }
+
+    @Test
+    fun `creating a rule at a port we already have adds a sibling with its own creation time`() = runBlocking {
+        val before = System.currentTimeMillis()
+        val repository = createRepository(
+            listOf(entity("Gone", 7777, internalIp = LAPTOP_A, createdAtUtcMs = 1_000L))
+        )
+        repository.awaitLocalRules { it.containsKey(key(7777, internalIp = LAPTOP_A)) }
+
+        val results = repository.createPortMappingRulesEntry(userInput("Gone", 7777, LAPTOP_B))
+
+        assertTrue(results.single() is UPnPCreateMappingWrapperResult.Success)
+        val local = repository.awaitLocalRules {
+            it[key(7777, internalIp = LAPTOP_A)]?.status == LocalRuleStatus.SiblingActive
+        }
+        assertFalse(local.containsKey(key(7777, internalIp = LAPTOP_B)))
+        val storedA = entities.value.single { it.hasKey(key(7777, internalIp = LAPTOP_A)) }
+        val storedB = entities.value.single { it.hasKey(key(7777, internalIp = LAPTOP_B)) }
+        assertEquals(1_000L, storedA.createdAtUtcMs)
+        assertTrue("new row must not inherit the sibling's creation time", storedB.createdAtUtcMs!! >= before)
+    }
+
+    @Test
+    fun `deactivating the router's rule at a drifted port keeps our drifted rule`() = runBlocking {
+        // ours points at laptop B; the router (Demo store) has Minecraft Server -> laptop A
+        val repository = createRepository(
+            listOf(entity("Minecraft Server", 5011, internalIp = LAPTOP_B, createdAtUtcMs = 1_000L))
+        )
+        val ours = key(5011, internalIp = LAPTOP_B)
+        val adopted = key(5011, internalIp = LAPTOP_A)
+        assertEquals(
+            LocalRuleStatus.Drifted,
+            repository.awaitLocalRules { it.containsKey(ours) }[ours]!!.status
+        )
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+        assertNull("precondition: router's rule is not ours", onRouter.portMappingPref)
+
+        val res = repository.deactivatePortMappingEntry(onRouter)
+
+        assertTrue(res is UPnPResult.Success)
+        val local = repository.awaitLocalRules { it.containsKey(adopted) }
+        assertEquals(LocalRuleStatus.Missing, local[adopted]!!.status)
+        assertEquals(LocalRuleStatus.Missing, local[ours]!!.status)
+        assertEquals(1_000L, entities.value.single { it.hasKey(ours) }.createdAtUtcMs)
+        assertEquals(LAPTOP_A, entities.value.single { it.hasKey(adopted) }.internalIp)
+    }
+
+    @Test
+    fun `deleting an unmanaged rule at a drifted port keeps our drifted rule`() = runBlocking {
+        val repository = createRepository(
+            listOf(entity("Minecraft Server", 5011, internalIp = LAPTOP_B))
+        )
+        val ours = key(5011, internalIp = LAPTOP_B)
+        repository.awaitLocalRules { it[ours]?.status == LocalRuleStatus.Drifted }
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+
+        val res = repository.deletePortMappingEntry(onRouter)
+
+        assertTrue(res is UPnPResult.Success)
+        val local = repository.awaitLocalRules { it[ours]?.status == LocalRuleStatus.Missing }
+        assertEquals(1, local.keys.count { it.externalPort == 5011 })
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")])
+        assertTrue(entities.value.any { it.hasKey(ours) })
     }
 }

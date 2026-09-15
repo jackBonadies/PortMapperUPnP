@@ -28,13 +28,18 @@ import javax.inject.Singleton
 //   They do not care about remote IP which can both change for the same device OR
 //   be the same for distinct devices (i.e. always 192.168.1.1) (and so broken both ways)
 
+// the router allows one rule per (protocol, externalPort).  this table does not: it holds rules
+//   we would like to be able to activate, and "minecraft -> laptop A" and "minecraft -> laptop B"
+//   are both worth keeping even though only one of them can be on the router at a time.  so the
+//   internal target is part of the key, and creating / deactivating a rule at a port we already
+//   have a row for adds a sibling rather than overwriting it.
 @Entity(
     tableName = "port_mappings",
-    primaryKeys = ["deviceSignature", "protocol", "externalPort"]
+    primaryKeys = ["deviceSignature", "protocol", "externalPort", "internalIp", "internalPort"]
 )
 data class PortMappingEntity(
 
-    // uniquely identifies a rule
+    // uniquely identifies a rule (together with internalIp / internalPort below)
     @ColumnInfo(name = "deviceSignature") val deviceSignature: String,
     @ColumnInfo(name = "protocol") val protocol: String,
     @ColumnInfo(name = "externalPort") val externalPort: Int,
@@ -43,7 +48,9 @@ data class PortMappingEntity(
     @ColumnInfo(name = "deviceIp") val deviceIp: String,
 
     // using these we can tell if it was likely created by us, or done out of band
-    //   and if so, then remove it bc it was overwritten out of band by the user
+    //   and if so, then remove it bc it was overwritten out of band by the user.
+    //   description is deliberately not part of the key: it is cosmetic, routers truncate it,
+    //   and an Edit that only renames should update the row rather than fork it.
     @ColumnInfo(name = "description") val description: String,
     @ColumnInfo(name = "internalIp") val internalIp: String,
     @ColumnInfo(name = "internalPort") val internalPort: Int,
@@ -146,13 +153,17 @@ interface PortMappingDao {
         WHERE deviceSignature = :deviceSignature
           AND protocol = :protocol
           AND externalPort = :externalPort
+          AND internalIp = :internalIp
+          AND internalPort = :internalPort
         LIMIT 1
     """
     )
     suspend fun getByPrimaryKey(
         deviceSignature: String,
         protocol: String,
-        externalPort: Int
+        externalPort: Int,
+        internalIp: String,
+        internalPort: Int,
     ): PortMappingEntity?
 
     @Upsert
@@ -165,12 +176,16 @@ interface PortMappingDao {
           WHERE deviceSignature = :deviceSignature
             AND protocol = :protocol
             AND externalPort = :externalPort
+            AND internalIp = :internalIp
+            AND internalPort = :internalPort
         """
     )
     suspend fun markSeen(
         deviceSignature: String,
         protocol: String,
         externalPort: Int,
+        internalIp: String,
+        internalPort: Int,
         seenAtUtcMs: Long,
         deviceIp: String,
     ): Int
@@ -181,12 +196,16 @@ interface PortMappingDao {
           WHERE deviceSignature = :deviceSignature
             AND protocol = :protocol
             AND externalPort = :externalPort
+            AND internalIp = :internalIp
+            AND internalPort = :internalPort
         """
     )
     suspend fun deleteByKey(
         deviceSignature: String,
         protocol: String,
-        externalPort: Int
+        externalPort: Int,
+        internalIp: String,
+        internalPort: Int,
     ): Int
 }
 
@@ -273,8 +292,52 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+// v4 -> v5 adds the internal target to the port_mappings primary key.  still a table recreate
+//   (Room auto-migrations cannot change a primary key), but widening a key cannot produce
+//   duplicates, so this is a plain INSERT with no collapsing.
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `port_mappings_new` (
+                `deviceSignature` TEXT NOT NULL,
+                `protocol` TEXT NOT NULL,
+                `externalPort` INTEGER NOT NULL,
+                `deviceIp` TEXT NOT NULL,
+                `description` TEXT NOT NULL,
+                `internalIp` TEXT NOT NULL,
+                `internalPort` INTEGER NOT NULL,
+                `autorenew` INTEGER NOT NULL,
+                `desiredLeaseDuration` INTEGER NOT NULL,
+                `autorenewManualCadence` INTEGER NOT NULL DEFAULT -1,
+                `desiredEnabled` INTEGER NOT NULL,
+                `createdAtUtcMs` INTEGER,
+                `lastSeenAtUtcMs` INTEGER,
+                PRIMARY KEY(`deviceSignature`, `protocol`, `externalPort`, `internalIp`, `internalPort`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO `port_mappings_new` (
+                `deviceSignature`, `protocol`, `externalPort`, `deviceIp`, `description`,
+                `internalIp`, `internalPort`, `autorenew`, `desiredLeaseDuration`,
+                `autorenewManualCadence`, `desiredEnabled`, `createdAtUtcMs`, `lastSeenAtUtcMs`
+            )
+            SELECT
+                `deviceSignature`, `protocol`, `externalPort`, `deviceIp`, `description`,
+                `internalIp`, `internalPort`, `autorenew`, `desiredLeaseDuration`,
+                `autorenewManualCadence`, `desiredEnabled`, `createdAtUtcMs`, `lastSeenAtUtcMs`
+            FROM `port_mappings`
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE `port_mappings`")
+        db.execSQL("ALTER TABLE `port_mappings_new` RENAME TO `port_mappings`")
+    }
+}
+
 @Database(entities = [PortMappingEntity::class, DevicesEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
 abstract class AppDatabase : RoomDatabase() {
@@ -290,7 +353,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
-            .addMigrations(MIGRATION_3_4)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     @Provides

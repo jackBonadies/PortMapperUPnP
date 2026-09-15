@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.LocalRule
 import com.shinjiindustrial.portmapper.domain.LocalRuleKey
+import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import java.text.SimpleDateFormat
@@ -96,8 +97,11 @@ fun LocalRuleInfoDialog(
             pairs.add(
                 Pair(
                     "Status",
-                    if (localRule.drifted) "Drifted - the router has a different rule at this port"
-                    else "Missing from router"
+                    when (localRule.status) {
+                        LocalRuleStatus.Missing -> "Missing from router"
+                        LocalRuleStatus.Drifted -> "Drifted - the router has a different rule at this port"
+                        LocalRuleStatus.SiblingActive -> "Inactive - another of your rules is using this port"
+                    }
                 )
             )
             Column {
