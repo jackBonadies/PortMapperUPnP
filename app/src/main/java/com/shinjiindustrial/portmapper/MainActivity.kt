@@ -261,6 +261,13 @@ fun EnterContextMenu(
         )
         menuItems.add(
             Pair<String, () -> Unit>(
+                "Deactivate"
+            ) {
+                portViewModel.deactivate(portMappingWithPref)
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
                 "Delete"
             ) {
                 portViewModel.delete(portMappingWithPref)

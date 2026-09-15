@@ -266,6 +266,19 @@ class PortViewModel @Inject constructor(
         }
     }
 
+    fun deactivate(portMapping: PortMappingWithPref) = applicationScope.launch {
+        try {
+            val res = upnpRepository.deactivatePortMappingEntry(portMapping)
+            if (res is UPnPResult.Success) {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Deactivate Port Mapping Failed"))
+        }
+    }
+
     fun forget(localRule: LocalRule) = applicationScope.launch {
         try {
             upnpRepository.forgetLocalRule(localRule)

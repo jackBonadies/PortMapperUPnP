@@ -7,6 +7,7 @@ import com.shinjiindustrial.portmapper.client.MockUpnpClientConfig
 import com.shinjiindustrial.portmapper.client.RuleSet
 import com.shinjiindustrial.portmapper.client.Speed
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
+import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.domain.DeviceDetails
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.LocalRule
@@ -222,5 +223,42 @@ class LocalRulesTests {
         val stored = entities.value.first { it.hasKey(UDN, "TCP", 7777) }
         assertEquals(1_000L, stored.createdAtUtcMs)
         assertTrue(stored.lastSeenAtUtcMs!! > 1_000L)
+    }
+
+    @Test
+    fun `deactivate takes our rule off the router and keeps its creation time`() = runBlocking {
+        // matches Demo store Minecraft Server row exactly
+        val repository = createRepository(listOf(entity("Minecraft Server", 5011, createdAtUtcMs = 1_000L)))
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+        assertNotNull("precondition: rule is ours", onRouter.portMappingPref)
+
+        val res = repository.deactivatePortMappingEntry(onRouter)
+
+        assertTrue(res is UPnPResult.Success)
+        val local = repository.awaitLocalRules { it.containsKey(key(5011)) }
+        assertFalse(local[key(5011)]!!.drifted)
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")])
+        val stored = entities.value.single { it.hasKey(UDN, "TCP", 5011) }
+        assertEquals(1_000L, stored.createdAtUtcMs)
+        assertEquals("Minecraft Server", stored.description)
+    }
+
+    @Test
+    fun `deactivate adopts a rule that is not ours`() = runBlocking {
+        val before = System.currentTimeMillis()
+        val repository = createRepository(emptyList())
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 8080, "TCP")]!!
+        assertNull("precondition: rule is not ours", onRouter.portMappingPref)
+
+        val res = repository.deactivatePortMappingEntry(onRouter)
+
+        assertTrue(res is UPnPResult.Success)
+        repository.awaitLocalRules { it.containsKey(key(8080)) }
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 8080, "TCP")])
+        val stored = entities.value.single { it.hasKey(UDN, "TCP", 8080) }
+        assertEquals("Web Server 1", stored.description)
+        assertEquals("192.168.1.18", stored.internalIp)
+        assertEquals(18 * 3600, stored.desiredLeaseDuration)
+        assertTrue(stored.createdAtUtcMs!! >= before)
     }
 }

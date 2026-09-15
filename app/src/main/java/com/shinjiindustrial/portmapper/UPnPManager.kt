@@ -511,6 +511,55 @@ class UpnpRepository @Inject constructor(
         }
     }
 
+    // router -> local rule.  the DB row is what puts a rule under LOCAL, so a rule that is not
+    //   ours gets one (createdAtUtcMs = now) and is adopted; a rule that is ours keeps its row.
+    //   the row is written only after the router confirms, same as delete: writing first would
+    //   adopt a rule the router still has if the delete then fails.
+    suspend fun deactivatePortMappingEntry(portMappingWithPref: PortMappingWithPref): UPnPResult {
+        try {
+            val pm = portMappingWithPref.portMapping
+            ourLogger.log(Level.FINE, "Requesting Deactivate: ${pm.shortName()}")
+            val device: IIGDDevice = getIGDDevice(pm.DeviceIP)
+            val result = deletePortMappingWithFallback(device, pm)
+            if (result is UPnPResult.Success)
+            {
+                ourLogger.log(
+                    Level.INFO,
+                    "Successfully deactivated rule (${pm.shortName()})."
+                )
+                // what Edit would prefill for a rule with no stored prefs
+                val pref = portMappingWithPref.portMappingPref ?: PortMappingPref(
+                    portMappingWithPref.getAutoRenewOrDefault(),
+                    portMappingWithPref.getDesiredLeaseDurationOrDefault(),
+                    portMappingWithPref.getAutoRenewCadenceOrDefault(),
+                    SystemClock.elapsedRealtime()
+                )
+                portMappingDao.upsert(createPortMappingDaoEntity(pm, pref))
+                removeMapping(portMappingWithPref)
+            }
+            else if (result is UPnPResult.Failure)
+            {
+                ourLogger.logBreadcrumb(portMappingWithPref)
+                ourLogger.log(
+                    Level.SEVERE,
+                    "Failed to deactivate rule (${pm.shortName()}).",
+                    null,
+                    LogOptions(FirebaseRoute.BREADCRUMB)
+                )
+                ourLogger.log(Level.SEVERE,
+                    result.details.toString())
+            }
+            return result
+        } catch (exception: Exception) {
+            ourLogger.logBreadcrumb(portMappingWithPref)
+            ourLogger.log(
+                Level.SEVERE,
+                "Deactivate Port Mapping Failed: " + exception.message + exception.stackTraceToString()
+            )
+            throw exception
+        }
+    }
+
     // delete local rule
     suspend fun forgetLocalRule(localRule: LocalRule) {
         ourLogger.log(Level.INFO, "Forgetting local rule ${localRule.entity.protocol} ${localRule.entity.externalPort}")
