@@ -290,18 +290,24 @@ fun LocalRuleCard(
                 )
                 Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                val semanticColors = PortMapperTheme.semanticColors
-                val lastSeen = entity.lastSeenAtUtcMs
-                val text = buildAnnotatedString {
-                    append(if (lastSeen == null) "Not on router" else "Last seen ${formatAgo(lastSeen, nowUtc)}")
-                    if (localRule.drifted) {
-                        append(" · ")
+                if (localRule.drifted) {
+                    val semanticColors = PortMapperTheme.semanticColors
+                    val text = buildAnnotatedString {
                         withStyle(style = SpanStyle(color = semanticColors.logWarning)) {
-                            append("drifted")
+                            append("⬤")
+                        }
+                        withStyle(style = SpanStyle()) {
+                            append(" Drifted")
                         }
                     }
+                    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                val lastSeen = entity.lastSeenAtUtcMs
+                Text(
+                    if (lastSeen == null) "Not on router" else "Last seen ${formatAgo(lastSeen, nowUtc)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
