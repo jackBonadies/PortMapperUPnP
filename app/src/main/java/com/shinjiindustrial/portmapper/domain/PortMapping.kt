@@ -290,6 +290,14 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String):
     return "$protocol rule at $externalIp:$externalPort"
 }
 
+fun formatAgo(thenUtcMs: Long, nowUtcMs: Long): String {
+    val totalSecs = ((nowUtcMs - thenUtcMs) / 1000L).coerceAtLeast(0L).toInt()
+    if (totalSecs < 60) {
+        return "just now"
+    }
+    return "${roundOneUnit(getDHMS(totalSecs))} ago"
+}
+
 fun PortMappingEntity.getPrefs(lastRenewTimeMs: Long): PortMappingPref =
     PortMappingPref(this.autoRenew, this.desiredLeaseDuration, this.autoRenewManualCadence, lastRenewTimeMs)
 

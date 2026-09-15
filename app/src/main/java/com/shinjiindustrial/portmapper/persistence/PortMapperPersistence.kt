@@ -17,6 +17,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Singleton
 
 // deviceSignature (i.e. UDN) is the closest we can semantically get to a unique device the user cares about -
@@ -125,6 +126,11 @@ interface DevicesDao {
 interface PortMappingDao {
     @Query("SELECT * FROM port_mappings")
     suspend fun getAll(): List<PortMappingEntity>
+
+    // re-emits on every write to the table, which is what keeps the LOCAL section current
+    //   without any manual invalidation after create / delete / markSeen
+    @Query("SELECT * FROM port_mappings")
+    fun observeAll(): Flow<List<PortMappingEntity>>
 
     @Query(
         """

@@ -23,6 +23,7 @@ import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -50,6 +51,7 @@ class DisableEnableTests {
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest, RuleSet.Demo))
         val portMappingDao = mockk<PortMappingDao>(relaxed = true)
         coEvery { portMappingDao.getByPrimaryKey(any(), any(), any()) } returns null
+        every { portMappingDao.observeAll() } returns MutableStateFlow(emptyList())
         val devicesDao = mockk<DevicesDao>(relaxed = true)
         coEvery { devicesDao.getByPrimaryKey(any()) } returns null
         val repository =

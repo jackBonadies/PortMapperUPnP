@@ -14,12 +14,15 @@ import com.shinjiindustrial.portmapper.domain.DevicePreferences
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IGDDevice
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.domain.getPrefs
+import com.shinjiindustrial.portmapper.domain.matches
 import com.shinjiindustrial.portmapper.domain.toEntity
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
@@ -29,12 +32,15 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -72,6 +78,41 @@ class UpnpRepository @Inject constructor(
 
     // I think this should be a local var inside mutable state flow
     val portMappings: StateFlow<Map<PortMappingKey, PortMappingWithPref>> = _portMappings
+
+    // rules we created that the router in question no longer reports (expired, rebooted, removed
+    //   out of band).  derived, so it needs no maintenance: observeAll() re-emits on every write
+    //   to port_mappings and the two in-memory flows cover discovery / enumeration.
+    val localRules: StateFlow<Map<LocalRuleKey, LocalRule>> = combine(
+        _devices, _portMappings, portMappingDao.observeAll()
+    ) { devices, portMappings, entities ->
+        buildMap {
+            for (device in devices) {
+                // must wait for device to finish enumerating
+                if (device.status != DeviceStatus.FinishedEnumeratingMappings) {
+                    continue
+                }
+                for (entity in entities) {
+                    if (entity.deviceSignature != device.udn) {
+                        continue
+                    }
+                    // only v4+
+                    if (entity.createdAtUtcMs == null) {
+                        continue
+                    }
+                    val onRouter = portMappings[PortMappingKey(
+                        device.getIpAddress(),
+                        entity.externalPort,
+                        entity.protocol
+                    )]
+                    if (onRouter != null && entity.matches(onRouter.portMapping)) {
+                        continue
+                    }
+                    val localRule = LocalRule(entity, device, drifted = onRouter != null)
+                    put(localRule.key, localRule)
+                }
+            }
+        }
+    }.stateIn(applicationContext, SharingStarted.Eagerly, emptyMap())
 
     init {
         upnpClient.deviceFoundEvent += { device ->
@@ -441,6 +482,43 @@ class UpnpRepository @Inject constructor(
             )
             throw exception
         }
+    }
+
+    // local rule -> router
+    suspend fun recreateLocalRule(localRule: LocalRule): UPnPCreateMappingWrapperResult {
+        try {
+            val res = createPortMappingRuleWrapper(
+                localRule.toRequest(),
+                false,
+                "recreated",
+            )
+            if (res is UPnPCreateMappingWrapperResult.Success) {
+                val pref = localRule.entity.getPrefs(SystemClock.elapsedRealtime())
+                // keeps the original createdAtUtcMs and stamps lastSeen = now.  the read-back
+                //   then matches the stored row, which is what moves it out of localRules.
+                val entity = createPortMappingDaoEntity(res.resultingMapping, pref)
+                portMappingDao.upsert(entity)
+                addOrUpdateMapping(PortMappingWithPref(res.resultingMapping, pref))
+            }
+            return res
+        } catch (exception: Exception) {
+            ourLogger.logBreadcrumb(localRule.entity)
+            ourLogger.log(
+                Level.SEVERE,
+                "Recreate Port Mapping Failed: " + exception.message + exception.stackTraceToString()
+            )
+            throw exception
+        }
+    }
+
+    // delete local rule
+    suspend fun forgetLocalRule(localRule: LocalRule) {
+        ourLogger.log(Level.INFO, "Forgetting local rule ${localRule.entity.protocol} ${localRule.entity.externalPort}")
+        portMappingDao.deleteByKey(
+            localRule.entity.deviceSignature,
+            localRule.entity.protocol,
+            localRule.entity.externalPort
+        )
     }
 
     suspend fun deletePortMappingWithFallback(device: IIGDDevice, portMapping : PortMapping) : UPnPResult {
@@ -827,20 +905,13 @@ class UpnpRepository @Inject constructor(
         updateDeviceState(device, DeviceStatus.FinishedEnumeratingMappings)
     }
 
+    // the same comparison decides "drifted" in localRules, so it lives on the entity
     private fun isRuleOurs(
         databaseEntity: PortMappingEntity?,
         device: IIGDDevice,
         portMapping: PortMapping
     ): Boolean {
-        if (databaseEntity == null) {
-            return false
-        } else {
-            return databaseEntity.description == portMapping.Description &&
-                    databaseEntity.internalIp == portMapping.InternalIP &&
-                    databaseEntity.internalPort == portMapping.InternalPort
-            // rule has been created / changed on the router side and no longer matches
-            //   what we had before.  it now belongs to the router, do not take control of it.
-        }
+        return databaseEntity?.matches(portMapping) ?: false
     }
 
     // Had previously tried GetListOfPortMappings but it would encounter error more than 100 ports
