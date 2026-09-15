@@ -485,12 +485,12 @@ class UpnpRepository @Inject constructor(
     }
 
     // local rule -> router
-    suspend fun recreateLocalRule(localRule: LocalRule): UPnPCreateMappingWrapperResult {
+    suspend fun activateLocalRule(localRule: LocalRule): UPnPCreateMappingWrapperResult {
         try {
             val res = createPortMappingRuleWrapper(
                 localRule.toRequest(),
                 false,
-                "recreated",
+                "activated",
             )
             if (res is UPnPCreateMappingWrapperResult.Success) {
                 val pref = localRule.entity.getPrefs(SystemClock.elapsedRealtime())
@@ -505,7 +505,7 @@ class UpnpRepository @Inject constructor(
             ourLogger.logBreadcrumb(localRule.entity)
             ourLogger.log(
                 Level.SEVERE,
-                "Recreate Port Mapping Failed: " + exception.message + exception.stackTraceToString()
+                "Activate Port Mapping Failed: " + exception.message + exception.stackTraceToString()
             )
             throw exception
         }

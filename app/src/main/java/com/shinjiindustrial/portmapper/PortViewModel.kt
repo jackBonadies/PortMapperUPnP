@@ -122,7 +122,7 @@ class PortViewModel @Inject constructor(
         return listOfMappings[0]
     }
 
-    // nullable: a re-enumeration (or a recreate) can move the rule back onto the router while
+    // nullable: a re-enumeration (or an activate) can move the rule back onto the router while
     //   its menu is still up
     fun getSelectedLocalRule(selectedId: LocalRuleKey): LocalRule? {
         return upnpRepository.localRules.value[selectedId]
@@ -253,16 +253,16 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun recreate(localRule: LocalRule) = applicationScope.launch {
+    fun activate(localRule: LocalRule) = applicationScope.launch {
         try {
-            val res = upnpRepository.recreateLocalRule(localRule)
+            val res = upnpRepository.activateLocalRule(localRule)
             if (res is UPnPCreateMappingWrapperResult.Success) {
                 snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
             } else {
                 snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
             }
         } catch (e: Exception) {
-            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Recreate Port Mapping Failed"))
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Activate Port Mapping Failed"))
         }
     }
 

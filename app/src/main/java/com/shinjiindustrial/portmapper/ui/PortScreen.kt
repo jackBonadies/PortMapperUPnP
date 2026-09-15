@@ -238,7 +238,7 @@ fun LocalRuleCard(
                             if (localRule.drifted) {
                                 StatusBadge("Drifted", semanticColors.logWarning)
                             }
-                            // what a recreate would ask for, not anything the router said
+                            // what an activate would ask for, not anything the router said
                             if (!entity.desiredEnabled) {
                                 StatusBadge("Disabled", semanticColors.disabled)
                             }

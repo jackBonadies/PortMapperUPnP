@@ -207,18 +207,18 @@ class LocalRulesTests {
     }
 
     @Test
-    fun `recreate puts the rule back on the router and keeps its creation time`() = runBlocking {
+    fun `activate puts the rule back on the router and keeps its creation time`() = runBlocking {
         val repository = createRepository(listOf(entity("Gone", 7777, createdAtUtcMs = 1_000L)))
         val rule = repository.awaitLocalRules { it.containsKey(key(7777)) }[key(7777)]!!
 
-        val res = repository.recreateLocalRule(rule)
+        val res = repository.activateLocalRule(rule)
 
         assertTrue(res is UPnPCreateMappingWrapperResult.Success)
         repository.awaitLocalRules { !it.containsKey(key(7777)) }
         val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 7777, "TCP")]
         assertNotNull(onRouter)
         assertEquals("Gone", onRouter!!.portMapping.Description)
-        assertNotNull("recreated rule should be ours", onRouter.portMappingPref)
+        assertNotNull("activated rule should be ours", onRouter.portMappingPref)
         val stored = entities.value.first { it.hasKey(UDN, "TCP", 7777) }
         assertEquals(1_000L, stored.createdAtUtcMs)
         assertTrue(stored.lastSeenAtUtcMs!! > 1_000L)
