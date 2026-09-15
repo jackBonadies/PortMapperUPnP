@@ -300,8 +300,11 @@ fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier.Compan
     )
 }
 
-// "5050 → 5050 TCP" on one line.  active (on the router) gets the primary container fill,
-//   inactive (local only) is just the outline so it reads ghosted next to a live rule.
+// "5050 → 5050 TCP" on one line.  active (on the router) is primary text over a 10% primary
+//   wash (M3's state-layer technique - primaryContainer read as a tonal button and was too
+//   loud, secondaryContainer / surfaceContainerHighest were tried and rejected), inactive
+//   (local only) is just the outline so it reads ghosted next to a live rule.  both share the
+//   outlineVariant border so the fill is the only difference.
 @Composable
 fun PortPill(
     externalPort: Int,
@@ -312,8 +315,8 @@ fun PortPill(
 ) {
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(10.dp)
-    val fill = if (active) colors.primaryContainer else Color.Companion.Transparent
-    val border = if (active) colors.primary.copy(alpha = 0.35f) else colors.outlineVariant
+    val fill = if (active) colors.primary.copy(alpha = 0.10f) else Color.Companion.Transparent
+    val border = colors.outlineVariant
     val textColor = if (active) colors.primary else colors.onSurfaceVariant
     Row(
         modifier = modifier
