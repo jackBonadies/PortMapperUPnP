@@ -15,6 +15,18 @@ sealed class ViewKey : Parcelable {
 
     @Parcelize
     data class DeviceEmptyKey(val deviceIp: String) : ViewKey()
+
+    @Parcelize
+    data class SectionHeaderKey(val udn: String, val section: String) : ViewKey()
+
+    @Parcelize
+    data class LocalRuleViewKey(val udn: String, val externalPort: Int, val protocol: String) :
+        ViewKey()
+}
+
+enum class RuleSection(val label: String) {
+    OnRouter("ON ROUTER"),
+    Local("LOCAL")
 }
 
 sealed class UpnpViewRow {
@@ -34,5 +46,18 @@ sealed class UpnpViewRow {
 
     data class DeviceEmptyViewRow(val device: IIGDDevice) : UpnpViewRow() {
         override val key = ViewKey.DeviceEmptyKey(device.getKey())
+    }
+
+    data class SectionHeaderViewRow(val device: IIGDDevice, val section: RuleSection) :
+        UpnpViewRow() {
+        override val key = ViewKey.SectionHeaderKey(device.udn, section.name)
+    }
+
+    data class LocalRuleViewRow(val localRule: LocalRule) : UpnpViewRow() {
+        override val key = ViewKey.LocalRuleViewKey(
+            localRule.entity.deviceSignature,
+            localRule.entity.externalPort,
+            localRule.entity.protocol
+        )
     }
 }

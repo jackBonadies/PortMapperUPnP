@@ -394,6 +394,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             isInMultiSelectMode,
                             portViewModel::toggle,
                             portViewModel::openContextMenu,
+                            portViewModel::openLocalContextMenu,
                             selectedIds
                         )
                     }

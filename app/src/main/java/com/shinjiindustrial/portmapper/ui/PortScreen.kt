@@ -30,6 +30,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -60,11 +62,15 @@ import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.RuleSection
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
+import com.shinjiindustrial.portmapper.domain.formatAgo
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import kotlinx.coroutines.delay
@@ -237,6 +243,95 @@ fun PortMappingCard(
 
             }
         }
+    }
+}
+
+// mostly same as PortMappingCard, slightly ghosted / disabled feel
+@OptIn(ExperimentalUnitApi::class)
+@Composable
+fun LocalRuleCard(
+    localRule: LocalRule,
+    now: Long = -1,
+    isInMultiSelectMode: Boolean = false,
+    onClick: (LocalRuleKey) -> Unit = {},
+    additionalModifier: Modifier = Modifier.Companion
+) {
+    val entity = localRule.entity
+    val nowUtc = remember(now) { System.currentTimeMillis() }
+
+    Card(
+        modifier = additionalModifier
+            .fillMaxWidth()
+            .padding(4.dp, 4.dp)
+            .clickable(enabled = !isInMultiSelectMode) { onClick(localRule.key) },
+        elevation = CardDefaults.cardElevation(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = PortMapperTheme.componentColors.cardContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.Companion
+                .alpha(0.7f)
+                .padding(2.dp, 6.dp, 15.dp, 6.dp),
+            verticalAlignment = Alignment.Companion.CenterVertically
+        ) {
+            val padLeft = 13.dp
+            Column(
+                modifier = Modifier.Companion
+                    .weight(1f)
+                    .padding(padLeft, 0.dp, 0.dp, 0.dp)
+            ) {
+                Text(
+                    entity.description,
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                val semanticColors = PortMapperTheme.semanticColors
+                val lastSeen = entity.lastSeenAtUtcMs
+                val text = buildAnnotatedString {
+                    append(if (lastSeen == null) "Not on router" else "Last seen ${formatAgo(lastSeen, nowUtc)}")
+                    if (localRule.drifted) {
+                        append(" · ")
+                        withStyle(style = SpanStyle(color = semanticColors.logWarning)) {
+                            append("drifted")
+                        }
+                    }
+                }
+                Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
+                Text(
+                    "${entity.externalPort} ➝ ${entity.internalPort}",
+                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
+                    fontWeight = FontWeight.Companion.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(entity.protocol, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(section: RuleSection) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .padding(top = 6.dp, bottom = 2.dp)
+    ) {
+        Text(
+            section.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -550,7 +645,7 @@ fun PreviewConversation() {
         for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
-        PortMappingsListContent(msgs, false, {}, {},emptySet())
+        PortMappingsListContent(msgs, false, {}, {}, {}, emptySet())
     }
 }
 
@@ -560,9 +655,10 @@ fun PortMappingContent(
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
+    onLocalClick: (LocalRuleKey) -> Unit,
     selectedIds: Set<PortMappingKey>
 ) {
-    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, onClick, selectedIds)
+    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, onClick, onLocalClick, selectedIds)
 }
 
 @Composable
@@ -585,6 +681,7 @@ fun PortMappingsListContent(
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
+    onLocalClick: (LocalRuleKey) -> Unit,
     selectedIds: Set<PortMappingKey>
 ) {
 
@@ -625,6 +722,20 @@ fun PortMappingsListContent(
                         onToggle,
                         onClick,
                         selectedIds,
+                        Modifier.animateItem()
+                    )
+                }
+
+                is UpnpViewRow.SectionHeaderViewRow -> {
+                    SectionHeader(message.section)
+                }
+
+                is UpnpViewRow.LocalRuleViewRow -> {
+                    LocalRuleCard(
+                        message.localRule,
+                        now,
+                        isInMultiSelectMode,
+                        onLocalClick,
                         Modifier.animateItem()
                     )
                 }
