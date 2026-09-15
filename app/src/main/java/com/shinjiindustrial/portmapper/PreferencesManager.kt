@@ -29,6 +29,7 @@ class PreferencesManager @Inject constructor(
         val SORT_DESC_KEY = booleanPreferencesKey("descAscPref")
         val DAY_NIGHT_KEY = intPreferencesKey("dayNightPref")
         val MATERIAL_YOU_KEY = booleanPreferencesKey("materialYouPref")
+        val SHOW_ENABLE_DISABLE_KEY = booleanPreferencesKey("showEnableDisablePref")
     }
 
     init {
@@ -40,6 +41,12 @@ class PreferencesManager @Inject constructor(
     val materialYou: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[Keys.MATERIAL_YOU_KEY] ?: false
+        }
+        .distinctUntilChanged()
+
+    val showEnableDisable: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[Keys.SHOW_ENABLE_DISABLE_KEY] ?: false
         }
         .distinctUntilChanged()
 
@@ -67,6 +74,12 @@ class PreferencesManager @Inject constructor(
     suspend fun updateMaterialYou(materialYou: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[Keys.MATERIAL_YOU_KEY] = materialYou
+        }
+    }
+
+    suspend fun updateShowEnableDisable(show: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.SHOW_ENABLE_DISABLE_KEY] = show
         }
     }
 

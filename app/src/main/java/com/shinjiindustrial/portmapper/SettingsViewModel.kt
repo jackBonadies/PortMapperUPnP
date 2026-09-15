@@ -29,6 +29,12 @@ class SettingsViewModel @Inject constructor(
         initialValue = ThemeUiState(DayNightMode.FOLLOW_SYSTEM, false)
     )
 
+    val showEnableDisable: StateFlow<Boolean> = preferencesRepository.showEnableDisable.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
     fun updateDayNight(dayNight: DayNightMode) {
         viewModelScope.launch {
             preferencesRepository.updateDayNight(dayNight)
@@ -38,6 +44,12 @@ class SettingsViewModel @Inject constructor(
     fun updateMaterialYou(materialYou: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateMaterialYou(materialYou)
+        }
+    }
+
+    fun updateShowEnableDisable(show: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateShowEnableDisable(show)
         }
     }
 }
