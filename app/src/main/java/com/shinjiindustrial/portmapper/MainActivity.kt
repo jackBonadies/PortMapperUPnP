@@ -35,6 +35,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -61,6 +62,8 @@ import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.MainActivity.ScaffoldController
 import com.shinjiindustrial.portmapper.common.MAX_PORT
 import com.shinjiindustrial.portmapper.domain.ActionNames
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
@@ -194,6 +197,120 @@ fun EnterContextMenu(
         return
     }
 
+    ContextMenuDialog(closeContextMenu, themeState) {
+        val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
+        //TODO
+        val portMappingWithPref = getSelectedItem(selectedKey)
+        val portMapping = portMappingWithPref.portMapping
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Edit"
+            ) {
+                ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
+                val uriBuilder = Uri.Builder()
+                    .path("full_screen_dialog")
+                    .appendQueryParameter("description", portMapping.Description)
+                    .appendQueryParameter("internalIp", portMapping.InternalIP)
+                    .appendQueryParameter(
+                        "internalRange",
+                        portMapping.InternalPort.toString()
+                    )
+                    .appendQueryParameter(
+                        "externalIp",
+                        portMapping.DeviceIP
+                    ) // this is actual external IP as we only use it to delete the old rule...
+                    .appendQueryParameter(
+                        "externalRange",
+                        portMapping.ExternalPort.toString()
+                    )
+                    .appendQueryParameter("protocol", portMapping.Protocol)
+                    .appendQueryParameter(
+                        "leaseDuration",
+                        portMappingWithPref.getDesiredLeaseDurationOrDefault()
+                            .toString()
+                    )
+                    .appendQueryParameter("enabled", portMapping.Enabled.toString())
+                    .appendQueryParameter(
+                        "autorenew",
+                        portMappingWithPref.getAutoRenewOrDefault().toString()
+                    )
+                    .appendQueryParameter(
+                        "autorenewManualCadence",
+                        portMappingWithPref.getAutoRenewCadenceOrDefault().toString()
+                    )
+                val uri = uriBuilder.build()
+                navController.navigate(uri.toString())
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                if (portMapping.Enabled) "Disable" else "Enable"
+            ) {
+                portViewModel.enableDisable(
+                    portMappingWithPref,
+                    !portMapping.Enabled
+                )
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Renew"
+            ) {
+                portViewModel.renew(portMappingWithPref)
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Delete"
+            ) {
+                portViewModel.delete(portMappingWithPref)
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "More Info"
+            ) {
+                showMoreInfoDialog.value = selectedKey
+            }
+        )
+        menuItems
+    }
+}
+
+@Composable
+fun LocalRuleContextMenu(
+    selectedKey: LocalRuleKey?,
+    getSelectedLocalRule: (LocalRuleKey) -> LocalRule?,
+    closeContextMenu: () -> Unit,
+    showLocalInfoDialog: MutableState<LocalRuleKey?>,
+    portViewModel: PortViewModel,
+    themeState: ThemeUiState
+) {
+    if (selectedKey == null) {
+        return
+    }
+    // a re-enumeration can move the rule back onto the router while the menu is up
+    val localRule = getSelectedLocalRule(selectedKey)
+    if (localRule == null) {
+        LaunchedEffect(selectedKey) { closeContextMenu() }
+        return
+    }
+
+    ContextMenuDialog(closeContextMenu, themeState) {
+        listOf(
+            Pair<String, () -> Unit>("Recreate") { portViewModel.recreate(localRule) },
+            Pair<String, () -> Unit>("Delete") { portViewModel.forget(localRule) },
+            Pair<String, () -> Unit>("More Info") { showLocalInfoDialog.value = selectedKey },
+        )
+    }
+}
+
+@Composable
+fun ContextMenuDialog(
+    closeContextMenu: () -> Unit,
+    themeState: ThemeUiState,
+    buildMenuItems: @Composable () -> List<Pair<String, () -> Unit>>
+) {
     val prop = DialogProperties(
         dismissOnClickOutside = true,
         dismissOnBackPress = true,
@@ -216,108 +333,31 @@ fun EnterContextMenu(
 
                 ) {
                     // it redraws starting at this inner context...
-                    if (selectedKey != null) {
-
-                        val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
-                        //TODO
-                        val portMappingWithPref = getSelectedItem(selectedKey)
-                        val portMapping = portMappingWithPref.portMapping
-                        menuItems.add(
-                            Pair<String, () -> Unit>(
-                                "Edit"
-                            ) {
-                                ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
-                                val uriBuilder = Uri.Builder()
-                                    .path("full_screen_dialog")
-                                    .appendQueryParameter("description", portMapping.Description)
-                                    .appendQueryParameter("internalIp", portMapping.InternalIP)
-                                    .appendQueryParameter(
-                                        "internalRange",
-                                        portMapping.InternalPort.toString()
-                                    )
-                                    .appendQueryParameter(
-                                        "externalIp",
-                                        portMapping.DeviceIP
-                                    ) // this is actual external IP as we only use it to delete the old rule...
-                                    .appendQueryParameter(
-                                        "externalRange",
-                                        portMapping.ExternalPort.toString()
-                                    )
-                                    .appendQueryParameter("protocol", portMapping.Protocol)
-                                    .appendQueryParameter(
-                                        "leaseDuration",
-                                        portMappingWithPref.getDesiredLeaseDurationOrDefault()
-                                            .toString()
-                                    )
-                                    .appendQueryParameter("enabled", portMapping.Enabled.toString())
-                                    .appendQueryParameter(
-                                        "autorenew",
-                                        portMappingWithPref.getAutoRenewOrDefault().toString()
-                                    )
-                                    .appendQueryParameter(
-                                        "autorenewManualCadence",
-                                        portMappingWithPref.getAutoRenewCadenceOrDefault().toString()
-                                    )
-                                val uri = uriBuilder.build()
-                                navController.navigate(uri.toString())
-                            }
-                        )
-                        menuItems.add(
-                            Pair<String, () -> Unit>(
-                                if (portMapping.Enabled) "Disable" else "Enable"
-                            ) {
-                                portViewModel.enableDisable(
-                                    portMappingWithPref,
-                                    !portMapping.Enabled
-                                )
-                            }
-                        )
-                        menuItems.add(
-                            Pair<String, () -> Unit>(
-                                "Renew"
-                            ) {
-                                portViewModel.renew(portMappingWithPref)
-                            }
-                        )
-                        menuItems.add(
-                            Pair<String, () -> Unit>(
-                                "Delete"
-                            ) {
-                                portViewModel.delete(portMappingWithPref)
-                            }
-                        )
-                        menuItems.add(
-                            Pair<String, () -> Unit>(
-                                "More Info"
-                            ) {
-                                showMoreInfoDialog.value = selectedKey
-                            }
-                        )
-                        var index = 0
-                        val lastIndex = menuItems.size - 1
-                        for (menuItem in menuItems) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        menuItem.second()
-                                        closeContextMenu()
-                                    }
-                                    .padding(vertical = 14.dp)
-                            ) {
-                                Text(
-                                    text = menuItem.first,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    fontSize = 20.sp
-                                )
-                            }
-
-                            if (index != lastIndex) {
-                                Divider(color = Color.LightGray)
-                            }
-                            index++
+                    val menuItems = buildMenuItems()
+                    var index = 0
+                    val lastIndex = menuItems.size - 1
+                    for (menuItem in menuItems) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    menuItem.second()
+                                    closeContextMenu()
+                                }
+                                .padding(vertical = 14.dp)
+                        ) {
+                            Text(
+                                text = menuItem.first,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                                fontSize = 20.sp
+                            )
                         }
+
+                        if (index != lastIndex) {
+                            Divider(color = Color.LightGray)
+                        }
+                        index++
                     }
                 }
             }

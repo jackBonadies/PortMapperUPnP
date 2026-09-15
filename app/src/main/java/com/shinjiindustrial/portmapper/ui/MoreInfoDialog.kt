@@ -5,13 +5,19 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // TODO uncomment
 //@Preview
@@ -52,4 +58,57 @@ fun MoreInfoDialog(
                 }
             })
     }
+}
+
+@Composable
+fun LocalRuleInfoDialog(
+    showLocalInfoDialog: MutableState<LocalRuleKey?>,
+    getSelectedLocalRule: (LocalRuleKey) -> LocalRule?
+) {
+    val key = showLocalInfoDialog.value ?: return
+    // the rule can move back onto the router while this is up
+    val localRule = getSelectedLocalRule(key)
+    if (localRule == null) {
+        LaunchedEffect(key) { showLocalInfoDialog.value = null }
+        return
+    }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    fun formatDate(utcMs: Long?): String {
+        return if (utcMs == null) "Unknown" else dateFormat.format(Date(utcMs))
+    }
+
+    AlertDialog(
+        onDismissRequest = { showLocalInfoDialog.value = null },
+        title = { Text("Local Rule Info") },
+        text = {
+            val entity = localRule.entity
+            val pairs = mutableListOf<Pair<String, String>>()
+            pairs.add(Pair("Device", localRule.device.getDisplayName()))
+            pairs.add(Pair("Internal IP", entity.internalIp))
+            pairs.add(Pair("Internal Port", entity.internalPort.toString()))
+            pairs.add(Pair("External Port", entity.externalPort.toString()))
+            pairs.add(Pair("Protocol", entity.protocol))
+            pairs.add(Pair("Lease", if (entity.desiredLeaseDuration == 0) "Never expires" else "${entity.desiredLeaseDuration} s"))
+            pairs.add(Pair("Auto Renew", if (entity.autoRenew) "True" else "False"))
+            pairs.add(Pair("Enabled", if (entity.desiredEnabled) "True" else "False"))
+            pairs.add(Pair("Created", formatDate(entity.createdAtUtcMs)))
+            pairs.add(Pair("Last Seen", formatDate(entity.lastSeenAtUtcMs)))
+            pairs.add(
+                Pair(
+                    "Status",
+                    if (localRule.drifted) "Drifted - the router has a different rule at this port"
+                    else "Missing from router"
+                )
+            )
+            Column {
+                for (p in pairs) {
+                    KeyValueRow(p.first, p.second)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { showLocalInfoDialog.value = null }) {
+                Text("OK")
+            }
+        })
 }

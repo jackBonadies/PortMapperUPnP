@@ -58,10 +58,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.common.NetworkType
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
+import com.shinjiindustrial.portmapper.ui.LocalRuleInfoDialog
 import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
 import com.shinjiindustrial.portmapper.ui.PortMappingContent
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
@@ -77,6 +79,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     rememberScrollState()
     val showAboutDialogState = rememberSaveable { mutableStateOf(false) }
     val showMoreInfoDialogState = rememberSaveable { mutableStateOf<PortMappingKey?>(null) }
+    val showLocalInfoDialogState = rememberSaveable { mutableStateOf<LocalRuleKey?>(null) }
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
@@ -95,10 +98,28 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
         )
     }
 
+    if (contextMenuUiState.isLocalOpen()) {
+        LocalRuleContextMenu(
+            contextMenuUiState.selectedLocalId,
+            portViewModel::getSelectedLocalRule,
+            portViewModel::closeContextMenu,
+            showLocalInfoDialogState,
+            portViewModel,
+            themeState
+        )
+    }
+
     if (showMoreInfoDialogState.value != null) {
         MoreInfoDialog(
             showMoreInfoDialogState,
             portViewModel::getSelectedItem
+        )
+    }
+
+    if (showLocalInfoDialogState.value != null) {
+        LocalRuleInfoDialog(
+            showLocalInfoDialogState,
+            portViewModel::getSelectedLocalRule
         )
     }
 
