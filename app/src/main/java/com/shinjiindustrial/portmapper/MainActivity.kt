@@ -197,6 +197,8 @@ fun EnterContextMenu(
         return
     }
 
+    val showEnableDisable by portViewModel.showEnableDisable.collectAsStateWithLifecycle()
+
     ContextMenuDialog(closeContextMenu, themeState) {
         val menuItems: MutableList<Pair<String, () -> Unit>> = mutableListOf()
         //TODO
@@ -242,16 +244,20 @@ fun EnterContextMenu(
                 navController.navigate(uri.toString())
             }
         )
-        menuItems.add(
-            Pair<String, () -> Unit>(
-                if (portMapping.Enabled) "Disable" else "Enable"
-            ) {
-                portViewModel.enableDisable(
-                    portMappingWithPref,
-                    !portMapping.Enabled
-                )
-            }
-        )
+        // Enable is always offered for a disabled rule: hiding it would strand the rule, since
+        //   Deactivate -> Activate round-trips desiredEnabled. Only Disable is behind the setting.
+        if (!portMapping.Enabled || showEnableDisable) {
+            menuItems.add(
+                Pair<String, () -> Unit>(
+                    if (portMapping.Enabled) "Disable" else "Enable"
+                ) {
+                    portViewModel.enableDisable(
+                        portMappingWithPref,
+                        !portMapping.Enabled
+                    )
+                }
+            )
+        }
         menuItems.add(
             Pair<String, () -> Unit>(
                 "Renew"
@@ -379,6 +385,17 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
 
     val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val showEnableDisable by portViewModel.showEnableDisable.collectAsStateWithLifecycle()
+
+    // In multi select mode this menu only ever holds Enable / Disable, so when neither applies
+    //   there is nothing to open and the button goes away. remember(selectedIds): the lookup logs
+    //   SEVERE for an id it can't find, so keep it off the recomposition path.
+    val anyDisabledSelected = remember(selectedIds) {
+        portViewModel.getSelectedItems(selectedIds).any { !it.portMapping.Enabled }
+    }
+    if (isInMultiSelectMode && !showEnableDisable && !anyDisabledSelected) {
+        return
+    }
 
     IconButton(
         onClick = { expanded = true },
@@ -398,7 +415,7 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
                 portViewModel.getSelectedItems(selectedIds).any { it -> it.portMapping.Enabled }
             val anyDisabled =
                 portViewModel.getSelectedItems(selectedIds).any { it -> !it.portMapping.Enabled }
-            if (anyEnabled) {
+            if (anyEnabled && showEnableDisable) {
                 items.add(R.string.disable_action)
             }
             if (anyDisabled) {
@@ -408,7 +425,7 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
             items.add(R.string.refresh_action)
             if (portViewModel.isInitialized()) {
                 val (anyEnabled, anyDisabled) = portViewModel.getExistingRuleInfos()
-                if (anyEnabled) // also get info i.e. any enabled, any disabled
+                if (anyEnabled && showEnableDisable) // also get info i.e. any enabled, any disabled
                 {
                     items.add(R.string.disable_all_action)
                 }
