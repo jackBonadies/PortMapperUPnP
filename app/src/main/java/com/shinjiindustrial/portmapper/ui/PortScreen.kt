@@ -145,15 +145,34 @@ fun PortMappingCard(
             Column(
                 modifier = Modifier.Companion
                     .weight(1f)
-                    .padding(padLeft, 0.dp, 8.dp, 0.dp)
+                    .padding(padLeft, 0.dp, 0.dp, 0.dp)
             ) {
-                RuleTitle(portMapping.Description) {
-                    // nearly every rule is enabled, so only the exception gets called out
-                    if (!portMapping.Enabled) {
-                        StatusBadge("Disabled", PortMapperTheme.semanticColors.disabled)
+                // pill is centered on the title + ip block, the lease line runs full width below
+                Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                    Column(
+                        modifier = Modifier.Companion
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        RuleTitle(portMapping.Description) {
+                            // nearly every rule is enabled, so only the exception gets called out
+                            if (!portMapping.Enabled) {
+                                StatusBadge("Disabled", PortMapperTheme.semanticColors.disabled)
+                            }
+                        }
+                        Text(
+                            portMapping.InternalIP,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+
+                    PortPill(
+                        portMapping.ExternalPort,
+                        portMapping.InternalPort,
+                        portMapping.Protocol,
+                        active = true
+                    )
                 }
-                Text(portMapping.InternalIP, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 val semanticColors = PortMapperTheme.semanticColors
                 val urgency =
@@ -169,13 +188,6 @@ fun PortMappingCard(
                     color = color
                 )
             }
-
-            PortPill(
-                portMapping.ExternalPort,
-                portMapping.InternalPort,
-                portMapping.Protocol,
-                active = true
-            )
         }
     }
 }
@@ -213,19 +225,34 @@ fun LocalRuleCard(
             Column(
                 modifier = Modifier.Companion
                     .weight(1f)
-                    .padding(padLeft, 0.dp, 8.dp, 0.dp)
+                    .padding(padLeft, 0.dp, 0.dp, 0.dp)
             ) {
-                RuleTitle(entity.description) {
-                    val semanticColors = PortMapperTheme.semanticColors
-                    if (localRule.drifted) {
-                        StatusBadge("Drifted", semanticColors.logWarning)
+                Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                    Column(
+                        modifier = Modifier.Companion
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        RuleTitle(entity.description) {
+                            val semanticColors = PortMapperTheme.semanticColors
+                            if (localRule.drifted) {
+                                StatusBadge("Drifted", semanticColors.logWarning)
+                            }
+                            // what a recreate would ask for, not anything the router said
+                            if (!entity.desiredEnabled) {
+                                StatusBadge("Disabled", semanticColors.disabled)
+                            }
+                        }
+                        Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    // what a recreate would ask for, not anything the router said
-                    if (!entity.desiredEnabled) {
-                        StatusBadge("Disabled", semanticColors.disabled)
-                    }
+
+                    PortPill(
+                        entity.externalPort,
+                        entity.internalPort,
+                        entity.protocol,
+                        active = false
+                    )
                 }
-                Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 val lastSeen = entity.lastSeenAtUtcMs
                 Text(
@@ -233,8 +260,6 @@ fun LocalRuleCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            PortPill(entity.externalPort, entity.internalPort, entity.protocol, active = false)
         }
     }
 }
