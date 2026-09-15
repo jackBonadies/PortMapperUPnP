@@ -99,10 +99,13 @@ class SettingsActivity : ComponentActivity() {
                 },
                 content = { it ->
                     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+                    val showEnableDisable by settingsViewModel.showEnableDisable.collectAsStateWithLifecycle()
                     SettingsContent(
                         uiState,
+                        showEnableDisable,
                         settingsViewModel::updateMaterialYou,
                         settingsViewModel::updateDayNight,
+                        settingsViewModel::updateShowEnableDisable,
                         Modifier.padding(it)
                     )
                 }
@@ -122,8 +125,10 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     fun SettingsContent(
         uiState: ThemeUiState,
+        showEnableDisable: Boolean,
         updateMaterialYou: (Boolean) -> Unit,
         updateDayNight: (DayNightMode) -> Unit,
+        updateShowEnableDisable: (Boolean) -> Unit,
         modifier: Modifier = Modifier
     ) {
         MyApplicationTheme(uiState)
@@ -219,6 +224,49 @@ class SettingsActivity : ComponentActivity() {
                     }
                     Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
                 }
+
+                Text(
+                    "Advanced",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(12.dp, 16.dp, 0.dp, 4.dp),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                {
+                    Column(
+                        modifier = Modifier
+                            .weight(1.0f)
+                            .padding(12.dp, 12.dp, 12.dp, 12.dp)
+                    )
+                    {
+                        Text(
+                            "Enable / Disable actions",
+                            fontSize = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        // Enable is always offered for a rule the router reports as disabled; the
+                        //   switch only controls Disable (see EnterContextMenu / OverflowMenu).
+                        Text(
+                            "Adds Enable and Disable to rule menus. Disable asks the router to keep " +
+                                    "the rule but switch it off — most routers accept the request and " +
+                                    "then ignore it. Deactivate is the reliable way to turn a rule off.",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        showEnableDisable,
+                        onCheckedChange = {
+                            updateShowEnableDisable(it)
+                        },
+                        modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                    )
+                }
+                Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
 
 //            Column(
 //                modifier = Modifier.clickable(onClick = {
