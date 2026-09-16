@@ -15,6 +15,7 @@ import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
+import com.shinjiindustrial.portmapper.domain.hasSlotConflict
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
@@ -416,5 +417,82 @@ class LocalRulesTests {
         assertEquals(1, local.keys.count { it.externalPort == 5011 })
         assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")])
         assertTrue(entities.value.any { it.hasKey(ours) })
+    }
+
+    // multi select
+
+    @Test
+    fun `activate all puts every selected local rule on the router`() = runBlocking {
+        val repository = createRepository(
+            listOf(entity("Gone A", 7777, createdAtUtcMs = 1_000L), entity("Gone B", 7778, createdAtUtcMs = 2_000L))
+        )
+        val local = repository.awaitLocalRules {
+            it.containsKey(key(7777)) && it.containsKey(key(7778))
+        }
+        val selected = repository.localRulesFromIds(setOf(key(7777), key(7778)))
+        assertEquals(2, selected.size)
+
+        val results = repository.activateLocalRules(selected)
+
+        assertEquals(2, results.size)
+        assertTrue(results.all { it is UPnPCreateMappingWrapperResult.Success })
+        repository.awaitLocalRules { !it.containsKey(key(7777)) && !it.containsKey(key(7778)) }
+        assertNotNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 7777, "TCP")]?.portMappingPref)
+        assertNotNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 7778, "TCP")]?.portMappingPref)
+        assertEquals(1_000L, entities.value.single { it.hasKey(key(7777)) }.createdAtUtcMs)
+        assertEquals(2_000L, entities.value.single { it.hasKey(key(7778)) }.createdAtUtcMs)
+    }
+
+    @Test
+    fun `deactivate all moves every selected router rule to local`() = runBlocking {
+        val repository = createRepository(emptyList())
+        val minecraft = repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!
+        val web = repository.portMappings.value[PortMappingKey(DEVICE_IP, 8080, "TCP")]!!
+
+        val results = repository.deactivatePortMappingEntries(listOf(minecraft, web))
+
+        assertEquals(2, results.size)
+        assertTrue(results.all { it is UPnPResult.Success })
+        val local = repository.awaitLocalRules {
+            it.containsKey(key(5011)) && it.containsKey(key(8080, internalIp = "192.168.1.18"))
+        }
+        assertEquals(LocalRuleStatus.Missing, local[key(5011)]!!.status)
+        assertEquals(LocalRuleStatus.Missing, local[key(8080, internalIp = "192.168.1.18")]!!.status)
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")])
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 8080, "TCP")])
+    }
+
+    @Test
+    fun `forget all removes every selected local rule and nothing else`() = runBlocking {
+        val repository = createRepository(
+            listOf(entity("Gone A", 7777), entity("Gone B", 7778), entity("Kept", 7779))
+        )
+        repository.awaitLocalRules { it.size == 3 }
+
+        repository.forgetLocalRules(repository.localRulesFromIds(setOf(key(7777), key(7778))))
+
+        val local = repository.awaitLocalRules { it.size == 1 }
+        assertTrue(local.containsKey(key(7779)))
+        assertEquals(listOf("Kept"), entities.value.map { it.description })
+    }
+
+    @Test
+    fun `local rules from ids skips a key that is no longer local`() {
+        val repository = createRepository(listOf(entity("Gone", 7777)))
+        repository.awaitLocalRules { it.containsKey(key(7777)) }
+
+        val found = repository.localRulesFromIds(setOf(key(7777), key(9999)))
+
+        assertEquals(listOf(key(7777)), found.map { it.key })
+    }
+
+    @Test
+    fun `two selected local rules at the same slot conflict`() {
+        // same ext port + protocol, different internal target: only one can be on the router
+        assertTrue(listOf(key(5011, internalIp = LAPTOP_A), key(5011, internalIp = LAPTOP_B)).hasSlotConflict())
+        // different protocol is a different slot
+        assertFalse(listOf(key(5011, protocol = "TCP"), key(5011, protocol = "UDP")).hasSlotConflict())
+        assertFalse(listOf(key(5011), key(5012)).hasSlotConflict())
+        assertFalse(emptyList<LocalRuleKey>().hasSlotConflict())
     }
 }

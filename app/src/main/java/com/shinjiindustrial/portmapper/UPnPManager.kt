@@ -525,6 +525,12 @@ class UpnpRepository @Inject constructor(
         }
     }
 
+    // multi select.  same abort-on-exception semantics as renewRules: a Failure result is
+    //   collected, a thrown exception ends the batch.
+    suspend fun activateLocalRules(localRules: List<LocalRule>): List<UPnPCreateMappingWrapperResult> {
+        return localRules.map { activateLocalRule(it) }
+    }
+
     // router -> local rule.  the DB row is what puts a rule under LOCAL, so a rule that is not
     //   ours gets one (createdAtUtcMs = now) and is adopted; a rule that is ours keeps its row.
     //   the internal target is part of the key, so adopting the router's version of a drifted
@@ -576,6 +582,10 @@ class UpnpRepository @Inject constructor(
         }
     }
 
+    suspend fun deactivatePortMappingEntries(portMappings: List<PortMappingWithPref>): List<UPnPResult> {
+        return portMappings.map { deactivatePortMappingEntry(it) }
+    }
+
     // delete local rule
     suspend fun forgetLocalRule(localRule: LocalRule) {
         ourLogger.log(Level.INFO, "Forgetting local rule ${localRule.entity.protocol} ${localRule.entity.externalPort}")
@@ -586,6 +596,12 @@ class UpnpRepository @Inject constructor(
             localRule.entity.internalIp,
             localRule.entity.internalPort
         )
+    }
+
+    suspend fun forgetLocalRules(localRules: List<LocalRule>) {
+        for (localRule in localRules) {
+            forgetLocalRule(localRule)
+        }
     }
 
     suspend fun deletePortMappingWithFallback(device: IIGDDevice, portMapping : PortMapping) : UPnPResult {
@@ -1139,6 +1155,21 @@ class UpnpRepository @Inject constructor(
         }
 
         return portMappingWithPrefList
+    }
+
+    // WARNING not SEVERE: a re-enumeration or an activate can legitimately move a selected local
+    //   rule back onto the router before the selection is pruned.
+    fun localRulesFromIds(selectedIds: Set<LocalRuleKey>): List<LocalRule> {
+        val localRulesList = mutableListOf<LocalRule>()
+        for (id in selectedIds) {
+            val localRule = localRules.value[id]
+            if (localRule != null) {
+                localRulesList.add(localRule)
+            } else {
+                ourLogger.log(Level.WARNING, "Cannot find local rule with key $id")
+            }
+        }
+        return localRulesList
     }
 
 }

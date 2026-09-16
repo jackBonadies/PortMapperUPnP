@@ -17,6 +17,14 @@ data class LocalRuleKey(
     val internalPort: Int,
 ) : Parcelable
 
+// the router holds one rule per slot, so two selected local rules at the same slot cannot both
+//   be activated (the second would just overwrite the first).  keys only, no lookup needed.
+fun Collection<LocalRuleKey>.hasSlotConflict(): Boolean {
+    return groupingBy { Triple(it.udn, it.protocol, it.externalPort) }
+        .eachCount()
+        .any { it.value > 1 }
+}
+
 // what the router has at a local rule's external port / protocol.  a property of the slot, not
 //   the row: the router holds one rule per slot, we may hold several.
 enum class LocalRuleStatus {
