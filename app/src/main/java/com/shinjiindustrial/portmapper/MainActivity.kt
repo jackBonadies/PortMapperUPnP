@@ -67,6 +67,7 @@ import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.hasSlotConflict
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import dagger.hilt.android.AndroidEntryPoint
 import org.fourthline.cling.model.meta.RemoteDevice
@@ -385,15 +386,17 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
 
     val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
     val showEnableDisable by portViewModel.showEnableDisable.collectAsStateWithLifecycle()
 
-    // In multi select mode this menu only ever holds Enable / Disable, so when neither applies
-    //   there is nothing to open and the button goes away. remember(selectedIds): the lookup logs
-    //   SEVERE for an id it can't find, so keep it off the recomposition path.
-    val anyDisabledSelected = remember(selectedIds) {
-        portViewModel.getSelectedItems(selectedIds).any { !it.portMapping.Enabled }
-    }
-    if (isInMultiSelectMode && !showEnableDisable && !anyDisabledSelected) {
+    // Multi select: a router-only selection always has Deactivate All (plus Enable / Disable as
+    //   applicable), a local-only selection has Activate All unless two selected rules want the
+    //   same slot, and a mixed selection has nothing here - Delete on the bar is its one action.
+    //   When the menu would be empty the button goes away.
+    val routerOnly = selectedIds.isNotEmpty() && selectedLocalIds.isEmpty()
+    val localOnly = selectedLocalIds.isNotEmpty() && selectedIds.isEmpty()
+    val activateAllAvailable = remember(selectedLocalIds) { !selectedLocalIds.hasSlotConflict() }
+    if (isInMultiSelectMode && !routerOnly && !(localOnly && activateAllAvailable)) {
         return
     }
 
@@ -411,15 +414,20 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
 
         val items: MutableList<Int> = mutableListOf()
         if (isInMultiSelectMode) {
-            val anyEnabled =
-                portViewModel.getSelectedItems(selectedIds).any { it -> it.portMapping.Enabled }
-            val anyDisabled =
-                portViewModel.getSelectedItems(selectedIds).any { it -> !it.portMapping.Enabled }
-            if (anyEnabled && showEnableDisable) {
-                items.add(R.string.disable_action)
-            }
-            if (anyDisabled) {
-                items.add(R.string.enable_action)
+            if (routerOnly) {
+                val anyEnabled =
+                    portViewModel.getSelectedItems(selectedIds).any { it -> it.portMapping.Enabled }
+                val anyDisabled =
+                    portViewModel.getSelectedItems(selectedIds).any { it -> !it.portMapping.Enabled }
+                if (anyEnabled && showEnableDisable) {
+                    items.add(R.string.disable_action)
+                }
+                if (anyDisabled) {
+                    items.add(R.string.enable_action)
+                }
+                items.add(R.string.deactivate_all_action)
+            } else if (localOnly && activateAllAvailable) {
+                items.add(R.string.activate_all_action)
             }
         } else {
             items.add(R.string.refresh_action)
@@ -475,6 +483,14 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
                         } else {
                             portViewModel.enableDisableAll(true)
                         }
+                    }
+
+                    R.string.deactivate_all_action -> {
+                        portViewModel.deactivateAll(selectedIds)
+                    }
+
+                    R.string.activate_all_action -> {
+                        portViewModel.activateAll(selectedLocalIds)
                     }
 
                     R.string.delete_all_action -> {

@@ -194,12 +194,15 @@ fun PortMappingCard(
 }
 
 // mostly same as PortMappingCard, slightly ghosted / disabled feel
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LocalRuleCard(
     localRule: LocalRule,
     now: Long = -1,
     isInMultiSelectMode: Boolean = false,
+    toggleSelection: (LocalRuleKey) -> Unit = {},
     onClick: (LocalRuleKey) -> Unit = {},
+    selectedIds: Set<LocalRuleKey>,
     additionalModifier: Modifier = Modifier.Companion
 ) {
     val entity = localRule.entity
@@ -209,7 +212,18 @@ fun LocalRuleCard(
         modifier = additionalModifier
             .fillMaxWidth()
             .padding(4.dp, 4.dp)
-            .clickable(enabled = !isInMultiSelectMode) { onClick(localRule.key) },
+            .combinedClickable(
+                onClick = {
+                    if (isInMultiSelectMode) {
+                        toggleSelection(localRule.key)
+                    } else {
+                        onClick(localRule.key)
+                    }
+                },
+                onLongClick = {
+                    toggleSelection(localRule.key)
+                }
+            ),
         elevation = CardDefaults.cardElevation(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
@@ -218,14 +232,29 @@ fun LocalRuleCard(
     ) {
         Row(
             modifier = Modifier.Companion
-                .alpha(0.7f)
                 .padding(2.dp, 10.dp, 14.dp, 10.dp),
             verticalAlignment = Alignment.Companion.CenterVertically
         ) {
             val padLeft = 13.dp
+
+            AnimatedVisibility(
+                visible = isInMultiSelectMode,
+            ) {
+                CircleCheckbox(
+                    selectedIds.contains(localRule.key),
+                    true,
+                    Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
+                ) {
+                    toggleSelection(localRule.key)
+                }
+            }
+
+            // the ghosting is on the content only, so the checkbox reads the same as on a
+            //   router rule
             Column(
                 modifier = Modifier.Companion
                     .weight(1f)
+                    .alpha(0.7f)
                     .padding(padLeft, 0.dp, 0.dp, 0.dp)
             ) {
                 Row(verticalAlignment = Alignment.Companion.CenterVertically) {
@@ -709,7 +738,7 @@ fun PreviewConversation() {
         for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
-        PortMappingsListContent(msgs, false, {}, {}, {}, emptySet())
+        PortMappingsListContent(msgs, false, {}, {}, {}, {}, emptySet(), emptySet())
     }
 }
 
@@ -718,11 +747,22 @@ fun PortMappingContent(
     uiState: PortUiState,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onLocalToggle: (LocalRuleKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
     onLocalClick: (LocalRuleKey) -> Unit,
-    selectedIds: Set<PortMappingKey>
+    selectedIds: Set<PortMappingKey>,
+    selectedLocalIds: Set<LocalRuleKey>
 ) {
-    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, onClick, onLocalClick, selectedIds)
+    PortMappingsListContent(
+        uiState.items,
+        isInMultiSelectMode,
+        onToggle,
+        onLocalToggle,
+        onClick,
+        onLocalClick,
+        selectedIds,
+        selectedLocalIds
+    )
 }
 
 @Composable
@@ -744,9 +784,11 @@ fun PortMappingsListContent(
     messages: List<UpnpViewRow>,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onLocalToggle: (LocalRuleKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
     onLocalClick: (LocalRuleKey) -> Unit,
-    selectedIds: Set<PortMappingKey>
+    selectedIds: Set<PortMappingKey>,
+    selectedLocalIds: Set<LocalRuleKey>
 ) {
 
     val now by rememberTicker(8_000)
@@ -799,7 +841,9 @@ fun PortMappingsListContent(
                         message.localRule,
                         now,
                         isInMultiSelectMode,
+                        onLocalToggle,
                         onLocalClick,
+                        selectedLocalIds,
                         Modifier.animateItem()
                     )
                 }

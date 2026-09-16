@@ -105,16 +105,31 @@ class PortViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(savedStateHandle.get<List<PortMappingKey>>("selected_ids")?.toSet() ?: emptySet())
     val selectedIds: StateFlow<Set<PortMappingKey>> = _selectedIds
 
+    // local rules are a separate set rather than a shared key type: everything that acts on a
+    //   router rule takes a PortMappingKey, and which side of the split a selection falls on
+    //   (router only / local only / mixed) is what decides the available actions.
+    private val _selectedLocalIds = MutableStateFlow<Set<LocalRuleKey>>(savedStateHandle.get<List<LocalRuleKey>>("selected_local_ids")?.toSet() ?: emptySet())
+    val selectedLocalIds: StateFlow<Set<LocalRuleKey>> = _selectedLocalIds
+
     val inMultiSelectMode: StateFlow<Boolean> =
-        _selectedIds.map { it.isNotEmpty() }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        combine(_selectedIds, _selectedLocalIds) { router, local ->
+            router.isNotEmpty() || local.isNotEmpty()
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun toggle(id: PortMappingKey) {
         _selectedIds.update { s -> if (id in s) s - id else s + id }
     }
 
+    fun toggleLocal(id: LocalRuleKey) {
+        _selectedLocalIds.update { s -> if (id in s) s - id else s + id }
+    }
+
     fun getSelectedItems(selectedIds: Set<PortMappingKey>): List<PortMappingWithPref> {
         return upnpRepository.portMappingsFromIds(selectedIds)
+    }
+
+    fun getSelectedLocalRules(selectedLocalIds: Set<LocalRuleKey>): List<LocalRule> {
+        return upnpRepository.localRulesFromIds(selectedLocalIds)
     }
 
     fun getSelectedItem(selectedId: PortMappingKey): PortMappingWithPref {
@@ -130,6 +145,7 @@ class PortViewModel @Inject constructor(
 
     fun clearSelection() {
         _selectedIds.value = emptySet()
+        _selectedLocalIds.value = emptySet()
     }
 
     val anyDevices: StateFlow<Boolean> =
@@ -284,6 +300,40 @@ class PortViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Deactivate Port Mapping Failed"))
+        }
+    }
+
+    fun activateAll(selectedLocalIds: Set<LocalRuleKey>) = applicationScope.launch {
+        try {
+            val result = upnpRepository.activateLocalRules(
+                upnpRepository.localRulesFromIds(selectedLocalIds)
+            )
+            val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
+            if (anyFailed) {
+                val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Activate Port Mappings Failed"))
+        }
+    }
+
+    fun deactivateAll(selectedIds: Set<PortMappingKey>) = applicationScope.launch {
+        try {
+            val result = upnpRepository.deactivatePortMappingEntries(
+                upnpRepository.portMappingsFromIds(selectedIds)
+            )
+            val anyFailed = result.any { it is UPnPResult.Failure }
+            if (anyFailed) {
+                val res = result.first { it is UPnPResult.Failure }
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Deactivate Port Mappings Failed"))
         }
     }
 
@@ -462,6 +512,17 @@ class PortViewModel @Inject constructor(
                 savedStateHandle["selected_ids"] = filtered.toList()
             }
             .launchIn(viewModelScope)
+        // same for local rules: an activate (or a re-enumeration) moves one back onto the router
+        //   and it leaves the selection with it.
+        combine(_selectedLocalIds, upnpRepository.localRules) { selectedLocalIds, currentLocal ->
+            selectedLocalIds intersect currentLocal.keys
+        }
+            .distinctUntilChanged()
+            .onEach { filtered ->
+                if (filtered != _selectedLocalIds.value) _selectedLocalIds.value = filtered
+                savedStateHandle["selected_local_ids"] = filtered.toList()
+            }
+            .launchIn(viewModelScope)
     }
 
     override fun onCleared() {
@@ -482,9 +543,26 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun deleteAll(selectedIds: Set<PortMappingKey>) {
-        deleteAll(upnpRepository.portMappingsFromIds(selectedIds))
-    }
+    // the trash icon in multi select.  local rules are just rows, so they go first and cannot
+    //   fail against the router; the router batch is then reported the same way deleteAll is.
+    fun deleteSelected(selectedIds: Set<PortMappingKey>, selectedLocalIds: Set<LocalRuleKey>) =
+        applicationScope.launch {
+            try {
+                upnpRepository.forgetLocalRules(upnpRepository.localRulesFromIds(selectedLocalIds))
+            } catch (e: Exception) {
+                ourLogger.log(
+                    Level.SEVERE,
+                    "Forget Local Rules Failed: " + e.message + e.stackTraceToString()
+                )
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to delete local rules"))
+                return@launch
+            }
+            if (selectedIds.isNotEmpty()) {
+                deleteAll(upnpRepository.portMappingsFromIds(selectedIds)).join()
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        }
 
     fun deleteAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {

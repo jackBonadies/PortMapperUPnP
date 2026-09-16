@@ -83,6 +83,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
     val contextMenuUiState by portViewModel.contextMenuUiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -240,7 +241,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 scrollBehavior = scrollBehavior,
                 title = {
                     val title =
-                        if (inMultiSelectMode) "${selectedIds.size} Selected" else "PortMapper"
+                        if (inMultiSelectMode) "${selectedIds.size + selectedLocalIds.size} Selected" else "PortMapper"
                     Text(
                         text = title,
                         fontWeight = FontWeight.Normal
@@ -249,12 +250,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 actions = {
 
                     if (inMultiSelectMode) {
+                        // the one action every selection gets, whatever mix of router and
+                        //   local rules it holds
                         IconButton(onClick = {
-                            if (inMultiSelectMode) {
-                                portViewModel.deleteAll(selectedIds)
-                            } else {
-                                portViewModel.deleteAll()
-                            }
+                            portViewModel.deleteSelected(selectedIds, selectedLocalIds)
                         })
                         {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
@@ -409,14 +408,17 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     } else {
                         val uiState by portViewModel.uiState.collectAsStateWithLifecycle()
                         val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+                        val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
                         val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
                         PortMappingContent(
                             uiState,
                             isInMultiSelectMode,
                             portViewModel::toggle,
+                            portViewModel::toggleLocal,
                             portViewModel::openContextMenu,
                             portViewModel::openLocalContextMenu,
-                            selectedIds
+                            selectedIds,
+                            selectedLocalIds
                         )
                     }
                 }
