@@ -244,6 +244,27 @@ fun EnterContextMenu(
                 navController.navigate(uri.toString())
             }
         )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Deactivate"
+            ) {
+                portViewModel.deactivate(portMappingWithPref)
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Renew"
+            ) {
+                portViewModel.renew(portMappingWithPref)
+            }
+        )
+        menuItems.add(
+            Pair<String, () -> Unit>(
+                "Delete"
+            ) {
+                portViewModel.delete(portMappingWithPref)
+            }
+        )
         // Enable is always offered for a disabled rule: hiding it would strand the rule, since
         //   Deactivate -> Activate round-trips desiredEnabled. Only Disable is behind the setting.
         if (!portMapping.Enabled || showEnableDisable) {
@@ -258,27 +279,6 @@ fun EnterContextMenu(
                 }
             )
         }
-        menuItems.add(
-            Pair<String, () -> Unit>(
-                "Renew"
-            ) {
-                portViewModel.renew(portMappingWithPref)
-            }
-        )
-        menuItems.add(
-            Pair<String, () -> Unit>(
-                "Deactivate"
-            ) {
-                portViewModel.deactivate(portMappingWithPref)
-            }
-        )
-        menuItems.add(
-            Pair<String, () -> Unit>(
-                "Delete"
-            ) {
-                portViewModel.delete(portMappingWithPref)
-            }
-        )
         menuItems.add(
             Pair<String, () -> Unit>(
                 "More Info"

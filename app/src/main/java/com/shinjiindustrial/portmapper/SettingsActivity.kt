@@ -244,16 +244,14 @@ class SettingsActivity : ComponentActivity() {
                     )
                     {
                         Text(
-                            "Enable / Disable actions",
+                            "Show Mapping Enable / Disable actions",
                             fontSize = 26.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         // Enable is always offered for a rule the router reports as disabled; the
                         //   switch only controls Disable (see EnterContextMenu / OverflowMenu).
                         Text(
-                            "Adds Enable and Disable to rule menus. Disable asks the router to keep " +
-                                    "the rule but switch it off — most routers accept the request and " +
-                                    "then ignore it. Deactivate is the reliable way to turn a rule off.",
+                            "not supported on most router firmware • allows keeping a rule in a disabled state on the router",
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
