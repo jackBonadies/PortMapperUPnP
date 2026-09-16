@@ -35,6 +35,12 @@ class SettingsViewModel @Inject constructor(
         initialValue = false
     )
 
+    val showAllLocalRules: StateFlow<Boolean> = preferencesRepository.showAllLocalRules.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
     fun updateDayNight(dayNight: DayNightMode) {
         viewModelScope.launch {
             preferencesRepository.updateDayNight(dayNight)
@@ -50,6 +56,12 @@ class SettingsViewModel @Inject constructor(
     fun updateShowEnableDisable(show: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateShowEnableDisable(show)
+        }
+    }
+
+    fun updateShowAllLocalRules(show: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateShowAllLocalRules(show)
         }
     }
 }

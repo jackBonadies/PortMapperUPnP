@@ -30,6 +30,7 @@ class PreferencesManager @Inject constructor(
         val DAY_NIGHT_KEY = intPreferencesKey("dayNightPref")
         val MATERIAL_YOU_KEY = booleanPreferencesKey("materialYouPref")
         val SHOW_ENABLE_DISABLE_KEY = booleanPreferencesKey("showEnableDisablePref")
+        val SHOW_ALL_LOCAL_RULES_KEY = booleanPreferencesKey("showAllLocalRulesPref")
     }
 
     init {
@@ -47,6 +48,14 @@ class PreferencesManager @Inject constructor(
     val showEnableDisable: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[Keys.SHOW_ENABLE_DISABLE_KEY] ?: false
+        }
+        .distinctUntilChanged()
+
+    // consumed by UpnpRepository.localRules directly (the derivation lives there), not by a
+    //   screen view model like the others
+    val showAllLocalRules: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[Keys.SHOW_ALL_LOCAL_RULES_KEY] ?: false
         }
         .distinctUntilChanged()
 
@@ -80,6 +89,12 @@ class PreferencesManager @Inject constructor(
     suspend fun updateShowEnableDisable(show: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[Keys.SHOW_ENABLE_DISABLE_KEY] = show
+        }
+    }
+
+    suspend fun updateShowAllLocalRules(show: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.SHOW_ALL_LOCAL_RULES_KEY] = show
         }
     }
 
