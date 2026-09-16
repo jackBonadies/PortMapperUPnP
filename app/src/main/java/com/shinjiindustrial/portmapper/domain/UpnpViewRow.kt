@@ -58,13 +58,17 @@ sealed class UpnpViewRow {
         override val key = ViewKey.SectionHeaderKey(device.udn, section.name)
     }
 
+    // from the rule's key, not the entity: the entity's UDN can be another router's (see
+    //   LocalRuleKey) and the same row listed under two routers must be two LazyColumn keys
     data class LocalRuleViewRow(val localRule: LocalRule) : UpnpViewRow() {
-        override val key = ViewKey.LocalRuleViewKey(
-            localRule.entity.deviceSignature,
-            localRule.entity.externalPort,
-            localRule.entity.protocol,
-            localRule.entity.internalIp,
-            localRule.entity.internalPort
-        )
+        override val key = localRule.key.let {
+            ViewKey.LocalRuleViewKey(
+                it.udn,
+                it.externalPort,
+                it.protocol,
+                it.internalIp,
+                it.internalPort
+            )
+        }
     }
 }

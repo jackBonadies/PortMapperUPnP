@@ -54,8 +54,12 @@ class DisableEnableTests {
         every { portMappingDao.observeAll() } returns MutableStateFlow(emptyList())
         val devicesDao = mockk<DevicesDao>(relaxed = true)
         coEvery { devicesDao.getByPrimaryKey(any()) } returns null
-        val repository =
-            UpnpRepository(client, portMappingDao, devicesDao, mockk(relaxed = true), scope)
+        every { devicesDao.observeAll() } returns MutableStateFlow(emptyList())
+        val preferencesManager = mockk<PreferencesManager>()
+        every { preferencesManager.showAllLocalRules } returns MutableStateFlow(false)
+        val repository = UpnpRepository(
+            client, portMappingDao, devicesDao, mockk(relaxed = true), scope, preferencesManager
+        )
         client.deviceFoundEvent(
             MockClingIGDDevice(DeviceDetails("Nokia IGD v2", "192.168.18.1", 2, "UUID-1"))
         )

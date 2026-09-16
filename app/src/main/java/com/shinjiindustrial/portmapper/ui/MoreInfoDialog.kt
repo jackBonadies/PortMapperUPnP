@@ -85,6 +85,9 @@ fun LocalRuleInfoDialog(
             val entity = localRule.entity
             val pairs = mutableListOf<Pair<String, String>>()
             pairs.add(Pair("Device", localRule.device.getDisplayName()))
+            // set only when the row was created on a different router than the one it is
+            //   listed under ("show local rules from all routers")
+            localRule.sourceDeviceName?.let { pairs.add(Pair("Originally on", it)) }
             pairs.add(Pair("Internal IP", entity.internalIp))
             pairs.add(Pair("Internal Port", entity.internalPort.toString()))
             pairs.add(Pair("External Port", entity.externalPort.toString()))

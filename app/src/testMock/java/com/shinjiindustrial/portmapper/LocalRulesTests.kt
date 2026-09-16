@@ -17,6 +17,7 @@ import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.hasSlotConflict
 import com.shinjiindustrial.portmapper.persistence.DevicesDao
+import com.shinjiindustrial.portmapper.persistence.DevicesEntity
 import com.shinjiindustrial.portmapper.persistence.PortMappingDao
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import io.mockk.coEvery
@@ -49,10 +50,16 @@ class LocalRulesTests {
         const val DEVICE_IP = "192.168.18.1"
         const val LAPTOP_A = "192.168.1.13"
         const val LAPTOP_B = "192.168.1.14"
+
+        // a router we are not on right now
+        const val OLD_UDN = "UUID-OLD"
+        const val OLD_DEVICE_IP = "192.168.0.1"
     }
 
     private lateinit var scope: CoroutineScope
     private lateinit var entities: MutableStateFlow<List<PortMappingEntity>>
+    private lateinit var storedDevices: MutableStateFlow<List<DevicesEntity>>
+    private lateinit var showAllLocalRules: MutableStateFlow<Boolean>
 
     @Before
     fun setUp() {
@@ -74,11 +81,12 @@ class LocalRulesTests {
         internalIp: String = LAPTOP_A,
         internalPort: Int = externalPort,
         createdAtUtcMs: Long? = 1_000L,
+        udn: String = UDN,
     ) = PortMappingEntity(
-        deviceSignature = UDN,
+        deviceSignature = udn,
         protocol = protocol,
         externalPort = externalPort,
-        deviceIp = DEVICE_IP,
+        deviceIp = if (udn == UDN) DEVICE_IP else OLD_DEVICE_IP,
         description = description,
         internalIp = internalIp,
         internalPort = internalPort,
@@ -103,8 +111,31 @@ class LocalRulesTests {
     private fun PortMappingEntity.hasKey(key: LocalRuleKey) =
         hasKey(key.udn, key.protocol, key.externalPort, key.internalIp, key.internalPort)
 
-    private fun createRepository(stored: List<PortMappingEntity>): UpnpRepository {
+    private fun storedDevice(udn: String, friendlyName: String?) = DevicesEntity(
+        deviceSignature = udn,
+        useWildcardForRemoteHostDelete = false,
+        lastKnownIp = OLD_DEVICE_IP,
+        displayName = null,
+        friendlyName = friendlyName,
+        manufacturer = null,
+        modelName = null,
+        modelNumber = null,
+        serialNumber = null,
+        upc = null,
+        deviceType = null,
+        upnpVersion = null,
+        udaVersion = null,
+        lastSeenAtUtcMs = null,
+    )
+
+    private fun createRepository(
+        stored: List<PortMappingEntity>,
+        showAll: Boolean = false,
+        devices: List<DevicesEntity> = emptyList(),
+    ): UpnpRepository {
         entities = MutableStateFlow(stored)
+        storedDevices = MutableStateFlow(devices)
+        showAllLocalRules = MutableStateFlow(showAll)
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest, RuleSet.Demo))
         val portMappingDao = mockk<PortMappingDao>(relaxed = true)
         every { portMappingDao.observeAll() } returns entities
@@ -136,8 +167,12 @@ class LocalRulesTests {
         }
         val devicesDao = mockk<DevicesDao>(relaxed = true)
         coEvery { devicesDao.getByPrimaryKey(any()) } returns null
-        val repository =
-            UpnpRepository(client, portMappingDao, devicesDao, mockk(relaxed = true), scope)
+        every { devicesDao.observeAll() } returns storedDevices
+        val preferencesManager = mockk<PreferencesManager>()
+        every { preferencesManager.showAllLocalRules } returns showAllLocalRules
+        val repository = UpnpRepository(
+            client, portMappingDao, devicesDao, mockk(relaxed = true), scope, preferencesManager
+        )
         // enumerates inside runBlocking, so the device has FinishedEnumeratingMappings on return
         client.deviceFoundEvent(
             MockClingIGDDevice(DeviceDetails("Nokia IGD v2", DEVICE_IP, 2, UDN))
@@ -494,5 +529,138 @@ class LocalRulesTests {
         assertFalse(listOf(key(5011, protocol = "TCP"), key(5011, protocol = "UDP")).hasSlotConflict())
         assertFalse(listOf(key(5011), key(5012)).hasSlotConflict())
         assertFalse(emptyList<LocalRuleKey>().hasSlotConflict())
+    }
+
+    // "show local rules from all routers": rows from a router we are not on, listed under the
+    //   one we are
+
+    @Test
+    fun `rule from another router is hidden by default`() {
+        val repository = createRepository(
+            listOf(entity("Gone", 7777), entity("Old", 8888, udn = OLD_UDN))
+        )
+
+        val local = repository.awaitLocalRules { it.containsKey(key(7777)) }
+
+        assertEquals(1, local.size)
+        assertTrue(local.values.none { it.entity.deviceSignature == OLD_UDN })
+    }
+
+    @Test
+    fun `rule from another router is listed under this one when the setting is on`() {
+        val repository = createRepository(
+            listOf(entity("Old", 8888, udn = OLD_UDN)),
+            showAll = true,
+            devices = listOf(storedDevice(OLD_UDN, "Old Router")),
+        )
+
+        // keyed by the router it is listed under, not the row's UDN
+        val local = repository.awaitLocalRules { it.containsKey(key(8888)) }
+
+        val rule = local[key(8888)]!!
+        assertEquals(LocalRuleStatus.Missing, rule.status)
+        assertEquals(OLD_UDN, rule.entity.deviceSignature)
+        assertEquals(UDN, rule.device.udn)
+        assertEquals("Old Router", rule.sourceDeviceName)
+        assertEquals(LocalRuleKey(UDN, 8888, "TCP", LAPTOP_A, 8888), rule.key)
+    }
+
+    @Test
+    fun `source router name falls back to the udn and is null for our own rows`() {
+        val repository = createRepository(
+            listOf(entity("Gone", 7777), entity("Old", 8888, udn = OLD_UDN)),
+            showAll = true,
+        )
+
+        val local = repository.awaitLocalRules { it.containsKey(key(8888)) && it.containsKey(key(7777)) }
+
+        assertEquals(OLD_UDN, local[key(8888)]!!.sourceDeviceName)
+        assertNull(local[key(7777)]!!.sourceDeviceName)
+    }
+
+    @Test
+    fun `rule from another router that this router already has is hidden`() {
+        // matches Demo store Minecraft Server row exactly, so there is nothing to activate
+        val repository = createRepository(
+            listOf(entity("Gone", 7777), entity("Minecraft Server", 5011, udn = OLD_UDN)),
+            showAll = true,
+        )
+
+        val local = repository.awaitLocalRules { it.containsKey(key(7777)) }
+
+        assertFalse(local.containsKey(key(5011)))
+        // and it does not make the router's rule ours
+        assertNull(repository.portMappings.value[PortMappingKey(DEVICE_IP, 5011, "TCP")]!!.portMappingPref)
+    }
+
+    @Test
+    fun `activating a rule from another router copies it to this one`() = runBlocking {
+        val before = System.currentTimeMillis()
+        val repository = createRepository(
+            listOf(entity("Old", 8888, udn = OLD_UDN, createdAtUtcMs = 1_000L)),
+            showAll = true,
+        )
+        val rule = repository.awaitLocalRules { it.containsKey(key(8888)) }[key(8888)]!!
+
+        val res = repository.activateLocalRule(rule)
+
+        assertTrue(res is UPnPCreateMappingWrapperResult.Success)
+        // the router has it and it matches the new row, so the card is gone
+        repository.awaitLocalRules { !it.containsKey(key(8888)) }
+        val onRouter = repository.portMappings.value[PortMappingKey(DEVICE_IP, 8888, "TCP")]
+        assertNotNull(onRouter)
+        assertNotNull("activated rule should be ours", onRouter!!.portMappingPref)
+        // a new row under this router, created now; the old router's row is untouched
+        val copied = entities.value.single { it.hasKey(key(8888)) }
+        assertTrue(copied.createdAtUtcMs!! >= before)
+        val original = entities.value.single { it.deviceSignature == OLD_UDN }
+        assertEquals(1_000L, original.createdAtUtcMs)
+        assertEquals(2, entities.value.size)
+    }
+
+    @Test
+    fun `our own row wins over an identical one from another router`() {
+        // what is left after activating a copied rule and letting it lapse
+        val repository = createRepository(
+            listOf(
+                entity("Old", 8888, udn = OLD_UDN, createdAtUtcMs = 1_000L),
+                entity("Old", 8888, udn = UDN, createdAtUtcMs = 2_000L),
+            ),
+            showAll = true,
+        )
+
+        val local = repository.awaitLocalRules { it.containsKey(key(8888)) }
+
+        assertEquals(1, local.size)
+        assertEquals(UDN, local[key(8888)]!!.entity.deviceSignature)
+        assertNull(local[key(8888)]!!.sourceDeviceName)
+    }
+
+    @Test
+    fun `forgetting a rule from another router deletes only that row`() = runBlocking {
+        val repository = createRepository(
+            listOf(entity("Gone", 7777), entity("Old", 8888, udn = OLD_UDN)),
+            showAll = true,
+        )
+        val rule = repository.awaitLocalRules { it.containsKey(key(8888)) }[key(8888)]!!
+
+        repository.forgetLocalRule(rule)
+
+        repository.awaitLocalRules { !it.containsKey(key(8888)) }
+        assertEquals(listOf("Gone"), entities.value.map { it.description })
+    }
+
+    @Test
+    fun `turning the setting off drops the rules from other routers`() {
+        val repository = createRepository(
+            listOf(entity("Gone", 7777), entity("Old", 8888, udn = OLD_UDN)),
+            showAll = true,
+        )
+        repository.awaitLocalRules { it.containsKey(key(8888)) }
+
+        showAllLocalRules.value = false
+
+        val local = repository.awaitLocalRules { !it.containsKey(key(8888)) }
+        assertTrue(local.containsKey(key(7777)))
     }
 }

@@ -5,9 +5,14 @@ import com.shinjiindustrial.portmapper.PortMappingRequest
 import com.shinjiindustrial.portmapper.persistence.PortMappingEntity
 import kotlinx.parcelize.Parcelize
 
-// same as port_mappings primary key.  the internal target is part of it so that two of our
-//   rules for the same external port (i.e. minecraft on laptop A and on laptop B) are distinct
-//   rows and distinct cards.
+// the router the rule is listed under (which is also what Activate targets) plus the row's slot
+//   and internal target.  the internal target is part of it so that two of our rules for the
+//   same external port (i.e. minecraft on laptop A and on laptop B) are distinct rows and
+//   distinct cards.
+//   this is the port_mappings primary key only while "show local rules from all routers" is
+//   off.  with it on, a row from another router is listed under every router found, so udn
+//   here is the listed-under router and the row's own UDN stays on entity.deviceSignature
+//   (which is what forget deletes by).  the same row under two routers is two keys, two cards.
 @Parcelize
 data class LocalRuleKey(
     val udn: String,
@@ -17,8 +22,10 @@ data class LocalRuleKey(
     val internalPort: Int,
 ) : Parcelable
 
-// the router holds one rule per slot, so two selected local rules at the same slot cannot both
-//   be activated (the second would just overwrite the first).  keys only, no lookup needed.
+// the router holds one rule per slot, so two selected local rules at the same slot on the same
+//   router cannot both be activated (the second would just overwrite the first).  keys only, no
+//   lookup needed.  udn is the target router, so the same rule selected under two routers is
+//   not a conflict, and two rows from two old routers wanting one slot here is.
 fun Collection<LocalRuleKey>.hasSlotConflict(): Boolean {
     return groupingBy { Triple(it.udn, it.protocol, it.externalPort) }
         .eachCount()
@@ -41,15 +48,19 @@ enum class LocalRuleStatus {
     SiblingActive,
 }
 
-// a rule we created on a router that the router no longer reports as ours
+// a rule we created on a router that the router no longer reports as ours.  device is the
+//   router it is listed under; with "show local rules from all routers" that need not be the
+//   router the row was created on, in which case sourceDeviceName names that one (devices table
+//   friendlyName, falling back to the UDN).  null when the row is device's own.
 data class LocalRule(
     val entity: PortMappingEntity,
     val device: IIGDDevice,
     val status: LocalRuleStatus,
+    val sourceDeviceName: String? = null,
 ) {
     val key: LocalRuleKey
         get() = LocalRuleKey(
-            entity.deviceSignature,
+            device.udn,
             entity.externalPort,
             entity.protocol,
             entity.internalIp,

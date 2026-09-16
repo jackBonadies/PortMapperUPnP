@@ -59,7 +59,8 @@ class UpnpRepository @Inject constructor(
     private val portMappingDao: PortMappingDao,
     private val devicesDao: DevicesDao,
     private val ourLogger: ILogger,
-    @ApplicationScope private val applicationContext: CoroutineScope
+    @ApplicationScope private val applicationContext: CoroutineScope,
+    private val preferencesManager: PreferencesManager
 ) {
     private val renewMutex = Mutex()
 
@@ -83,16 +84,35 @@ class UpnpRepository @Inject constructor(
     // rules we created that the router in question no longer reports (expired, rebooted, removed
     //   out of band).  derived, so it needs no maintenance: observeAll() re-emits on every write
     //   to port_mappings and the two in-memory flows cover discovery / enumeration.
+    //   with showAllLocalRules every stored row is a candidate under every router found, so a
+    //   rule made on an old router can be activated on the new one without re-entering it.  the
+    //   router it is listed under is the one Activate targets (LocalRule.device / key.udn); the
+    //   row keeps its own UDN on entity.deviceSignature.
     val localRules: StateFlow<Map<LocalRuleKey, LocalRule>> = combine(
-        _devices, _portMappings, portMappingDao.observeAll()
-    ) { devices, portMappings, entities ->
+        _devices,
+        _portMappings,
+        portMappingDao.observeAll(),
+        devicesDao.observeAll(),
+        preferencesManager.showAllLocalRules
+    ) { devices, portMappings, entities, storedDevices, showAll ->
         buildMap {
             for (device in devices) {
                 // must wait for device to finish enumerating
                 if (device.status != DeviceStatus.FinishedEnumeratingMappings) {
                     continue
                 }
-                val forDevice = entities.filter { it.deviceSignature == device.udn }
+                val ownRows = entities.filter { it.deviceSignature == device.udn }
+                // one row per (slot + internal target) per router.  after a rule from another
+                //   router is activated here there are two rows for it (old UDN and this one);
+                //   both hide while the router has it, and without this both would surface as
+                //   identical cards once it lapses.  this router's own row wins, else the most
+                //   recently seen.
+                val forDevice = if (!showAll) ownRows else entities
+                    .groupBy { Triple(Pair(it.externalPort, it.protocol), it.internalIp, it.internalPort) }
+                    .values.map { rows ->
+                        rows.firstOrNull { it.deviceSignature == device.udn }
+                            ?: rows.maxBy { it.lastSeenAtUtcMs ?: it.createdAtUtcMs ?: 0L }
+                    }
                 fun onRouter(entity: PortMappingEntity): PortMappingWithPref? =
                     portMappings[PortMappingKey(
                         device.getIpAddress(),
@@ -102,7 +122,9 @@ class UpnpRepository @Inject constructor(
                 // slots (ext port + protocol) whose router rule is one of ours.  v3 rows count
                 //   here even though they never show under LOCAL: a v3 rule still on the router
                 //   is ours (isRuleOurs) and so a sibling of it is SiblingActive, not Drifted.
-                val slotsHeldByOurs = forDevice.filter { entity ->
+                //   own rows only, to agree with isRuleOurs: another router's row matching what
+                //   this router has does not make that router rule ours.
+                val slotsHeldByOurs = ownRows.filter { entity ->
                     onRouter(entity)?.let { entity.matches(it.portMapping) } == true
                 }.map { Pair(it.externalPort, it.protocol) }.toSet()
                 for (entity in forDevice) {
@@ -120,7 +142,11 @@ class UpnpRepository @Inject constructor(
                             LocalRuleStatus.SiblingActive
                         else -> LocalRuleStatus.Drifted
                     }
-                    val localRule = LocalRule(entity, device, status)
+                    val sourceDeviceName = if (entity.deviceSignature == device.udn) null else {
+                        val source = storedDevices.firstOrNull { it.deviceSignature == entity.deviceSignature }
+                        source?.friendlyName ?: source?.displayName ?: entity.deviceSignature
+                    }
+                    val localRule = LocalRule(entity, device, status, sourceDeviceName)
                     put(localRule.key, localRule)
                 }
             }

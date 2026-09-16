@@ -105,6 +105,10 @@ interface DevicesDao {
     @Query("SELECT * FROM devices")
     suspend fun getAll(): List<DevicesEntity>
 
+    // names the router a local rule came from when it is listed under another one
+    @Query("SELECT * FROM devices")
+    fun observeAll(): Flow<List<DevicesEntity>>
+
     @Query(
         """
         SELECT * FROM devices
