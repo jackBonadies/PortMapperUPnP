@@ -21,7 +21,6 @@ import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -105,9 +104,7 @@ class PortViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(savedStateHandle.get<List<PortMappingKey>>("selected_ids")?.toSet() ?: emptySet())
     val selectedIds: StateFlow<Set<PortMappingKey>> = _selectedIds
 
-    // local rules are a separate set rather than a shared key type: everything that acts on a
-    //   router rule takes a PortMappingKey, and which side of the split a selection falls on
-    //   (router only / local only / mixed) is what decides the available actions.
+    // local rules are a separate set with their own key type
     private val _selectedLocalIds = MutableStateFlow<Set<LocalRuleKey>>(savedStateHandle.get<List<LocalRuleKey>>("selected_local_ids")?.toSet() ?: emptySet())
     val selectedLocalIds: StateFlow<Set<LocalRuleKey>> = _selectedLocalIds
 
@@ -137,8 +134,7 @@ class PortViewModel @Inject constructor(
         return listOfMappings[0]
     }
 
-    // nullable: a re-enumeration (or an activate) can move the rule back onto the router while
-    //   its menu is still up
+    // can be null since a re-enumeration or background activate can remove the rule from local
     fun getSelectedLocalRule(selectedId: LocalRuleKey): LocalRule? {
         return upnpRepository.localRules.value[selectedId]
     }
@@ -206,6 +202,9 @@ class PortViewModel @Inject constructor(
                 {
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
                 }
+                // for local when show all rules is enabled, each device gets the full set of local
+                //   rules set to its device (so device A will have the full set of local rules with
+                //   device A, device B will have the full set with device B)
                 val localForDevice = localRules.values
                     .filter { it.device.udn == curDevice.udn }
                     .sortedWith { a, b -> comparer.compare(a.toPortMappingWithPref(), b.toPortMappingWithPref()) }
@@ -336,13 +335,13 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun forget(localRule: LocalRule) = applicationScope.launch {
+    fun delete(localRule: LocalRule) = applicationScope.launch {
         try {
-            upnpRepository.forgetLocalRule(localRule)
+            upnpRepository.deleteLocalRule(localRule)
         } catch (e: Exception) {
             ourLogger.log(
                 Level.SEVERE,
-                "Forget Local Rule Failed: " + e.message + e.stackTraceToString()
+                "Delete Local Rule Failed: " + e.message + e.stackTraceToString()
             )
             snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to delete local rule"))
         }
@@ -547,11 +546,11 @@ class PortViewModel @Inject constructor(
     fun deleteSelected(selectedIds: Set<PortMappingKey>, selectedLocalIds: Set<LocalRuleKey>) =
         applicationScope.launch {
             try {
-                upnpRepository.forgetLocalRules(upnpRepository.localRulesFromIds(selectedLocalIds))
+                upnpRepository.deleteLocalRules(upnpRepository.localRulesFromIds(selectedLocalIds))
             } catch (e: Exception) {
                 ourLogger.log(
                     Level.SEVERE,
-                    "Forget Local Rules Failed: " + e.message + e.stackTraceToString()
+                    "Delete Local Rules Failed: " + e.message + e.stackTraceToString()
                 )
                 snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to delete local rules"))
                 return@launch

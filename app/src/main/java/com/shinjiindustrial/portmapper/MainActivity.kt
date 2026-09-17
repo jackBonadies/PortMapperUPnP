@@ -314,7 +314,7 @@ fun LocalRuleContextMenu(
     ContextMenuDialog(closeContextMenu, themeState) {
         listOf(
             Pair<String, () -> Unit>("Activate") { portViewModel.activate(localRule) },
-            Pair<String, () -> Unit>("Delete") { portViewModel.forget(localRule) },
+            Pair<String, () -> Unit>("Delete") { portViewModel.delete(localRule) },
             Pair<String, () -> Unit>("More Info") { showLocalInfoDialog.value = selectedKey },
         )
     }

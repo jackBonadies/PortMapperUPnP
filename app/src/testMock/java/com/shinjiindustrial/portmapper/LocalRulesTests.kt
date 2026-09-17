@@ -282,7 +282,7 @@ class LocalRulesTests {
         val repository = createRepository(listOf(entity("Gone", 7777)))
         val rule = repository.awaitLocalRules { it.containsKey(key(7777)) }[key(7777)]!!
 
-        repository.forgetLocalRule(rule)
+        repository.deleteLocalRule(rule)
 
         repository.awaitLocalRules { !it.containsKey(key(7777)) }
         assertTrue(entities.value.none { it.hasKey(key(7777)) })
@@ -504,7 +504,7 @@ class LocalRulesTests {
         )
         repository.awaitLocalRules { it.size == 3 }
 
-        repository.forgetLocalRules(repository.localRulesFromIds(setOf(key(7777), key(7778))))
+        repository.deleteLocalRules(repository.localRulesFromIds(setOf(key(7777), key(7778))))
 
         val local = repository.awaitLocalRules { it.size == 1 }
         assertTrue(local.containsKey(key(7779)))
@@ -644,7 +644,7 @@ class LocalRulesTests {
         )
         val rule = repository.awaitLocalRules { it.containsKey(key(8888)) }[key(8888)]!!
 
-        repository.forgetLocalRule(rule)
+        repository.deleteLocalRule(rule)
 
         repository.awaitLocalRules { !it.containsKey(key(8888)) }
         assertEquals(listOf("Gone"), entities.value.map { it.description })

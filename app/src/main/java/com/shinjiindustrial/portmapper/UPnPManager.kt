@@ -564,8 +564,8 @@ class UpnpRepository @Inject constructor(
     }
 
     // delete local rule
-    suspend fun forgetLocalRule(localRule: LocalRule) {
-        ourLogger.log(Level.INFO, "Forgetting local rule ${localRule.entity.protocol} ${localRule.entity.externalPort}")
+    suspend fun deleteLocalRule(localRule: LocalRule) {
+        ourLogger.log(Level.INFO, "Deleting local rule ${localRule.entity.protocol} ${localRule.entity.externalPort}")
         portMappingDao.deleteByKey(
             localRule.entity.deviceSignature,
             localRule.entity.protocol,
@@ -575,9 +575,9 @@ class UpnpRepository @Inject constructor(
         )
     }
 
-    suspend fun forgetLocalRules(localRules: List<LocalRule>) {
+    suspend fun deleteLocalRules(localRules: List<LocalRule>) {
         for (localRule in localRules) {
-            forgetLocalRule(localRule)
+            deleteLocalRule(localRule)
         }
     }
 
@@ -1093,7 +1093,7 @@ class UpnpRepository @Inject constructor(
     }
 
     private fun updateDeviceState(deviceToUpdate: IIGDDevice, newStatus : DeviceStatus) {
-        // the ON ROUTER header shows this as "refreshed <time>"
+        // i.e. "refreshed <time>"
         val enumeratedAtUtcMs =
             if (newStatus == DeviceStatus.FinishedEnumeratingMappings) System.currentTimeMillis() else null
         _devices.update { list ->
@@ -1133,8 +1133,6 @@ class UpnpRepository @Inject constructor(
         return portMappingWithPrefList
     }
 
-    // WARNING not SEVERE: a re-enumeration or an activate can legitimately move a selected local
-    //   rule back onto the router before the selection is pruned.
     fun localRulesFromIds(selectedIds: Set<LocalRuleKey>): List<LocalRule> {
         val localRulesList = mutableListOf<LocalRule>()
         for (id in selectedIds) {
@@ -1142,6 +1140,7 @@ class UpnpRepository @Inject constructor(
             if (localRule != null) {
                 localRulesList.add(localRule)
             } else {
+                // this can happen for example with a background re-enumerate or activate
                 ourLogger.log(Level.WARNING, "Cannot find local rule with key $id")
             }
         }
