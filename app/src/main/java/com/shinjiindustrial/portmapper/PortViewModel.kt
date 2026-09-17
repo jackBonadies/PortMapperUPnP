@@ -173,8 +173,7 @@ class PortViewModel @Inject constructor(
         SortInfo(SortBy.ExternalPort, false)
     )
 
-    // Eagerly: this view model is created in onCreate before setContent and PreferencesManager
-    //   already did its blocking first read, so the real value is in place before the first frame.
+    // We will always have the real value before the first frame
     val showEnableDisable: StateFlow<Boolean> = preferencesRepository.showEnableDisable.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,

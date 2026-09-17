@@ -82,52 +82,50 @@ class UpnpRepository @Inject constructor(
     val portMappings: StateFlow<Map<PortMappingKey, PortMappingWithPref>> = _portMappings
 
     // rules we created that the router in question no longer reports (expired, rebooted, removed
-    //   out of band).  derived, so it needs no maintenance: observeAll() re-emits on every write
+    //   out of band, or in the case of showAllLocalRules a rule created on a different device).
+    //   derived, therefore it needs no maintenance: observeAll() re-emits on every write
     //   to port_mappings and the two in-memory flows cover discovery / enumeration.
-    //   with showAllLocalRules every stored row is a candidate under every router found, so a
-    //   rule made on an old router can be activated on the new one without re-entering it.  the
-    //   router it is listed under is the one Activate targets (LocalRule.device / key.udn); the
-    //   row keeps its own UDN on entity.deviceSignature.
+    //   showAllLocalRules every stored row is a candidate under every router found, so a
+    //   rule made on an old router can be activated on the new one without re-entering it
     val localRules: StateFlow<Map<LocalRuleKey, LocalRule>> = combine(
         _devices,
         _portMappings,
         portMappingDao.observeAll(),
         devicesDao.observeAll(),
         preferencesManager.showAllLocalRules
-    ) { devices, portMappings, entities, storedDevices, showAll ->
+    ) { devicesUpnp, portMappingsUpnp, allStoredRules, storedDevices, showAll ->
         buildMap {
-            for (device in devices) {
+            for (device in devicesUpnp) {
                 // must wait for device to finish enumerating
                 if (device.status != DeviceStatus.FinishedEnumeratingMappings) {
                     continue
                 }
-                val ownRows = entities.filter { it.deviceSignature == device.udn }
-                // one row per (slot + internal target) per router.  after a rule from another
-                //   router is activated here there are two rows for it (old UDN and this one);
-                //   both hide while the router has it, and without this both would surface as
-                //   identical cards once it lapses.  this router's own row wins, else the most
-                //   recently seen.
-                val forDevice = if (!showAll) ownRows else entities
-                    .groupBy { Triple(Pair(it.externalPort, it.protocol), it.internalIp, it.internalPort) }
+                val ownStoredRules = allStoredRules.filter { it.deviceSignature == device.udn }
+                val storedRulesForDevice = if (!showAll)
+                    ownStoredRules
+                else
+                    // if we have a rule say Minecraft that was created on Home, and then we activate it on
+                    //   work network then without this groupBy/collapse we would have both the Minecraft
+                    //   rule in both the OnRouter and LocalOnly sections (since they have different udn)
+                    //   prefer the on router one
+                    allStoredRules.groupBy { Triple(Pair(it.externalPort, it.protocol), it.internalIp, it.internalPort) }
                     .values.map { rows ->
                         rows.firstOrNull { it.deviceSignature == device.udn }
                             ?: rows.maxBy { it.lastSeenAtUtcMs ?: it.createdAtUtcMs ?: 0L }
                     }
                 fun onRouter(entity: PortMappingEntity): PortMappingWithPref? =
-                    portMappings[PortMappingKey(
+                    portMappingsUpnp[PortMappingKey(
                         device.getIpAddress(),
                         entity.externalPort,
                         entity.protocol
                     )]
-                // slots (ext port + protocol) whose router rule is one of ours.  v3 rows count
-                //   here even though they never show under LOCAL: a v3 rule still on the router
-                //   is ours (isRuleOurs) and so a sibling of it is SiblingActive, not Drifted.
-                //   own rows only, to agree with isRuleOurs: another router's row matching what
-                //   this router has does not make that router rule ours.
-                val slotsHeldByOurs = ownRows.filter { entity ->
+                // stored rules on this device which are also on the router
+                //   2 rules that are functionally the same but different descriptions will show here
+                val slotsHeldByOurs = ownStoredRules.filter { entity ->
                     onRouter(entity)?.let { entity.matches(it.portMapping) } == true
                 }.map { Pair(it.externalPort, it.protocol) }.toSet()
-                for (entity in forDevice) {
+
+                for (entity in storedRulesForDevice) {
                     // only v4+
                     if (entity.createdAtUtcMs == null) {
                         continue
@@ -146,6 +144,7 @@ class UpnpRepository @Inject constructor(
                         val source = storedDevices.firstOrNull { it.deviceSignature == entity.deviceSignature }
                         source?.friendlyName ?: source?.displayName ?: entity.deviceSignature
                     }
+                    // local rule needs source device for when we activate it
                     val localRule = LocalRule(entity, device, status, sourceDeviceName)
                     put(localRule.key, localRule)
                 }
@@ -247,52 +246,6 @@ class UpnpRepository @Inject constructor(
         delay(delayMilliseconds)
     }
 
-//    private fun delayUntilExpiryBufferThenEmit(portMapping: PortMappingWithPref, expirationTime: Long, renewWithinXSecondsOfExpiring: Long = 45L): Flow<Unit> = flow {
-//        val delaySeconds = (expirationTime - renewWithinXSecondsOfExpiring).coerceAtLeast(0L)
-//        ourLogger.log(Level.FINE, "wait for $delaySeconds seconds")
-//        delay(delaySeconds * 1000)
-//        emit(portMapping)
-//    }
-//
-//    @OptIn(ExperimentalCoroutinesApi::class)
-//    private fun subscribeForAutoRenew()
-//    {
-//        val ruleClosestToExpirationFlow = portMappings.mapNotNull { items ->
-//            items
-//                .filter { it.getAutoRenewOrDefault() }
-//                .minByOrNull { it.portMapping.getExpiresTimeMillis() }
-//                ?.let { pm -> pm to pm.portMapping.getExpiresTimeMillis() }
-//        }.onEach { it -> ourLogger.log(Level.FINE, "Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
-//        val ruleClosestToExpirationDoNotEmitIfSameRuleSameTime = ruleClosestToExpirationFlow.distinctUntilChanged { oldUser, newUser ->
-//            oldUser.first.portMapping === newUser.first.portMapping && oldUser.second == newUser.second
-//        }.onEach { it -> ourLogger.log(Level.FINE, "UPDATE: Rule Closest to Expiration is ${it.first.portMapping.shortName()}") }
-//        val emitOnRenewTime = ruleClosestToExpirationDoNotEmitIfSameRuleSameTime.flatMapLatest { it ->
-//            delayUntilExpiryBufferThenEmit(it.first, it.first.portMapping.getExpiresTimeMillis())
-//            // this is a problem if we are done but we edited or deleted the rule in the meantime. i.e. we will get a rule created that we did not want.
-//            // get next time to renew
-//        }
-//
-//        ruleClosestToExpirationDoNotEmitIfSameRuleSameTime.onEach
-//                portMappings.map { it ->
-//            val minPortMappingOrNull = it.minByOrNull { if(it.getAutoRenewOrDefault()) it.portMapping.getExpiresTimeMillis() else Long.MAX_VALUE }
-//            if (minPortMappingOrNull == null) {
-//                null
-//            }else {
-//                Pair<PortMappingWithPref, Long>(
-//                    minPortMappingOrNull,
-//                    minPortMappingOrNull.portMapping.getExpiresTimeMillis()
-//                )
-//            }
-//        }.filter(it -> it != null)
-//    }
-
-    // region data
-
-
-    //
-//        fun update(pm: PortMapping) = _setFlow.update { old ->
-//            TreeSet(old).apply { add(pm) }
-//        }
     fun add(device: IIGDDevice) {
         // list is sorted
         if (_devices.value.any { it.getIpAddress() == device.getIpAddress() }) {
@@ -306,7 +259,6 @@ class UpnpRepository @Inject constructor(
             }
         }
     }
-
 
     private fun addOrUpdateMapping(pm: PortMappingWithPref) {
         _portMappings.update { old ->
@@ -1138,7 +1090,6 @@ class UpnpRepository @Inject constructor(
     private fun clearOldData() {
         upnpClient.clearOldDevices()
         _devices.update { listOf<IGDDevice>() }
-        //_portMappings.update {TreeSet<PortMappingWithPref>(SharedPrefValues.SortByPortMapping.getComparer(SharedPrefValues.Ascending))}
         _portMappings.update { mapOf() }
     }
 

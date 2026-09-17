@@ -266,8 +266,9 @@ fun EnterContextMenu(
                 portViewModel.delete(portMappingWithPref)
             }
         )
-        // Enable is always offered for a disabled rule: hiding it would strand the rule, since
-        //   Deactivate -> Activate round-trips desiredEnabled. Only Disable is behind the setting.
+        // Enable is always offered for a disabled rule bc (1) otherwise it gets stranded,
+        //   and (2) if we were able to disable it then the router is one of the rare ones
+        //   that likely supports enable/disable
         if (!portMapping.Enabled || showEnableDisable) {
             menuItems.add(
                 Pair<String, () -> Unit>(
@@ -389,10 +390,8 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
     val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
     val showEnableDisable by portViewModel.showEnableDisable.collectAsStateWithLifecycle()
 
-    // Multi select: a router-only selection always has Deactivate All (plus Enable / Disable as
-    //   applicable), a local-only selection has Activate All unless two selected rules want the
-    //   same slot, and a mixed selection has nothing here - Delete on the bar is its one action.
-    //   When the menu would be empty the button goes away.
+    // Multi select: if router-only then Deactivate All, Enable/Disable
+    // if local-only then Activate All.  Both have delete (not part of overflow)
     val routerOnly = selectedIds.isNotEmpty() && selectedLocalIds.isEmpty()
     val localOnly = selectedLocalIds.isNotEmpty() && selectedIds.isEmpty()
     val activateAllAvailable = remember(selectedLocalIds) { !selectedLocalIds.hasSlotConflict() }

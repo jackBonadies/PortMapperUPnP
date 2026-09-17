@@ -209,7 +209,6 @@ class SettingsActivity : ComponentActivity() {
                     {
                         Row(verticalAlignment = Alignment.CenterVertically)
                         {
-                            //Icon(Icons.Filled.Palette, "Material You", tint=MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
                             Text(
                                 "Material You",
                                 fontSize = 26.sp,
@@ -249,12 +248,10 @@ class SettingsActivity : ComponentActivity() {
                     )
                     {
                         Text(
-                            "Show Mapping Enable / Disable actions",
+                            "Show rule enable / disable actions",
                             fontSize = 26.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        // Enable is always offered for a rule the router reports as disabled; the
-                        //   switch only controls Disable (see EnterContextMenu / OverflowMenu).
                         Text(
                             "not supported on most router firmware • allows keeping a rule in a disabled state on the router",
                             fontSize = 16.sp,
@@ -290,7 +287,7 @@ class SettingsActivity : ComponentActivity() {
                         // the derivation is in UpnpRepository.localRules; with two routers found
                         //   the same rule is listed under each of them.
                         Text(
-                            "rules created on any router appear under LOCAL for every router found here • lets a rule be activated on a new router without re-entering it",
+                            "show all local rules even if they weren't created on the current devices",
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
