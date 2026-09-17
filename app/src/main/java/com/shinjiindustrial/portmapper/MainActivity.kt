@@ -427,9 +427,9 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
                 if (anyDisabled) {
                     items.add(R.string.enable_action)
                 }
-                items.add(R.string.deactivate_all_action)
+                items.add(R.string.deactivate_action)
             } else if (localOnly && activateAllAvailable) {
-                items.add(R.string.activate_all_action)
+                items.add(R.string.activate_action)
             }
         } else {
             items.add(R.string.refresh_action)
@@ -487,11 +487,11 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
                         }
                     }
 
-                    R.string.deactivate_all_action -> {
+                    R.string.deactivate_action -> {
                         portViewModel.deactivateAll(selectedIds)
                     }
 
-                    R.string.activate_all_action -> {
+                    R.string.activate_action -> {
                         portViewModel.activateAll(selectedLocalIds)
                     }
 

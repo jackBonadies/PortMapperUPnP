@@ -101,8 +101,8 @@ fun LocalRuleInfoDialog(
                 Pair(
                     "Status",
                     when (localRule.status) {
-                        LocalRuleStatus.Missing -> "Missing from router"
-                        LocalRuleStatus.Drifted -> "Drifted - the router has a different rule at this port"
+                        LocalRuleStatus.Missing -> "Inactive"
+                        LocalRuleStatus.Drifted -> "Inactive - the router has a different rule at this port"
                         LocalRuleStatus.SiblingActive -> "Inactive - another of your rules is using this port"
                     }
                 )

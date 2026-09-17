@@ -28,8 +28,8 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="disable_action">Disable</string>
     <string name="renew_all_action">Renew All</string>
     <string name="renew_action">Renew</string>
-    <string name="deactivate_all_action">Deactivate All</string>
-    <string name="activate_all_action">Activate All</string>
+    <string name="deactivate_action">Deactivate</string>
+    <string name="activate_action">Activate</string>
     <string name="view_log_action">View Log</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>

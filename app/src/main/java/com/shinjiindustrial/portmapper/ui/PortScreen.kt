@@ -313,8 +313,7 @@ private fun RuleTitle(title: String, badges: @Composable RowScope.() -> Unit) {
     }
 }
 
-// small tinted pill i.e. "Disabled" / "Drifted".  the theme has no container tokens for the
-//   semantic colors, so the fill is the text color at low alpha, which reads in both themes.
+// small tinted pill i.e. "Disabled" / "Drifted". fill is low alpha text color.
 @Composable
 fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier.Companion) {
     val shape = RoundedCornerShape(6.dp)
@@ -330,11 +329,7 @@ fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier.Compan
     )
 }
 
-// "5050 → 5050 TCP" on one line.  active (on the router) is primary text over a 10% primary
-//   wash (M3's state-layer technique - primaryContainer read as a tonal button and was too
-//   loud, secondaryContainer / surfaceContainerHighest were tried and rejected), inactive
-//   (local only) is just the outline so it reads ghosted next to a live rule.  both share the
-//   outlineVariant border so the fill is the only difference.
+// "5050 → 5050 TCP" on one line.  if active (on the router) has background color
 @Composable
 fun PortPill(
     externalPort: Int,
@@ -412,10 +407,7 @@ fun SectionHeader(section: RuleSection, device: IIGDDevice, now: Long) {
     )
 }
 
-// local time of day i.e. "3:17 PM", with the date in front once it is no longer today.
-//   DateUtils honors the user's 12/24 hour setting and locale, and only adds the year when it
-//   differs from the current one.  `now` is just a recompute key so the "today" check moves
-//   past midnight with the list ticker.
+// local time of day i.e. "3:17 PM" (including date and year when differs)
 @Composable
 fun formatClockTime(utcMs: Long, now: Long): String {
     val context = LocalContext.current
