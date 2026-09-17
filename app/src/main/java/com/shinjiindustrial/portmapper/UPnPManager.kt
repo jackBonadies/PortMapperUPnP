@@ -119,8 +119,7 @@ class UpnpRepository @Inject constructor(
                         entity.externalPort,
                         entity.protocol
                     )]
-                // stored rules on this device which are also on the router
-                //   2 rules that are functionally the same but different descriptions will show here
+                // whether one of the remote rules is one of ours
                 val slotsHeldByOurs = ownStoredRules.filter { entity ->
                     onRouter(entity)?.let { entity.matches(it.portMapping) } == true
                 }.map { Pair(it.externalPort, it.protocol) }.toSet()

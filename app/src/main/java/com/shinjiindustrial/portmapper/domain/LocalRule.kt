@@ -32,19 +32,15 @@ fun Collection<LocalRuleKey>.hasSlotConflict(): Boolean {
         .any { it.value > 1 }
 }
 
-// what the router has at a local rule's external port / protocol.  a property of the slot, not
-//   the row: the router holds one rule per slot, we may hold several.
+// what the router has at a local rule's external port / protocol
 enum class LocalRuleStatus {
-    // nothing.  expired, router rebooted, or deleted out of band
+    // there is no rule active on our external port, the normal case
     Missing,
 
-    // a rule that matches none of ours (isRuleOurs false for every row at the slot) i.e. it was
-    //   changed out of band, or something unrelated took the port.  shows under ON ROUTER as
-    //   unmanaged.  the only status that gets a badge.
+    // a rule that doesn't belong to us is at the same external port
     Drifted,
 
-    // another of our rules for the same port, which shows under ON ROUTER as ours.  this one is
-    //   simply the inactive alternative; activating it replaces the sibling.
+    // one of our rules at the same external port is active
     SiblingActive,
 }
 
