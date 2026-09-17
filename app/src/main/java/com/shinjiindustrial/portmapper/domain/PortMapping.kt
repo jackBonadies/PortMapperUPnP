@@ -68,6 +68,9 @@ data class PortMappingWithPref(
                     return "Renewing <1 minute"
                 }
             } else {
+                if (totalSecs <= 0) {
+                    return "Expired"
+                }
                 return "$renewsExpiresString <1 minute"
             }
         } else {

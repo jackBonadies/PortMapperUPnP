@@ -347,6 +347,10 @@ class PortViewModel @Inject constructor(
         }
     }
 
+    fun renewAll(selectedIds: Set<PortMappingKey>) {
+        renewAll(upnpRepository.portMappingsFromIds(selectedIds))
+    }
+
     fun renewAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
             val portMappings = chosen?.toList() ?: upnpRepository.getAllRules()
