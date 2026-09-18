@@ -293,11 +293,62 @@ fun formatShortName(protocol: String, externalIp: String, externalPort: String):
     return "$protocol rule at $externalIp:$externalPort"
 }
 
+fun formatAgo(thenUtcMs: Long, nowUtcMs: Long): String {
+    val totalSecs = ((nowUtcMs - thenUtcMs) / 1000L).coerceAtLeast(0L).toInt()
+    if (totalSecs < 60) {
+        return "just now"
+    }
+    return "${roundOneUnit(getDHMS(totalSecs))} ago"
+}
+
 fun PortMappingEntity.getPrefs(lastRenewTimeMs: Long): PortMappingPref =
     PortMappingPref(this.autoRenew, this.desiredLeaseDuration, this.autoRenewManualCadence, lastRenewTimeMs)
 
 fun DevicesEntity.getPrefs(): DevicePreferences =
     DevicePreferences(this.useWildcardForRemoteHostDelete)
+
+private fun String?.orNullIfBlank(): String? = this?.takeIf { it.isNotBlank() }
+
+// for a device we have stored before but is not current on network
+fun DevicesEntity.toDeviceDetails(): DeviceDetails =
+    DeviceDetails(
+        displayName = this.displayName.orNullIfBlank()
+            ?: this.friendlyName.orNullIfBlank()
+            ?: this.modelName.orNullIfBlank()
+            ?: this.deviceSignature,
+        ipAddress = this.lastKnownIp,
+        upnpVersion = this.upnpVersion ?: 0,
+        udn = this.deviceSignature,
+        friendlyName = this.friendlyName,
+        manufacturer = this.manufacturer,
+        modelName = this.modelName,
+        modelNumber = this.modelNumber,
+        serialNumber = this.serialNumber,
+        upc = this.upc,
+        deviceType = this.deviceType,
+        udaVersion = this.udaVersion,
+    )
+
+fun DeviceDetails.toEntity(
+    preferences: DevicePreferences,
+    lastSeenAtUtcMs: Long,
+): DevicesEntity =
+    DevicesEntity(
+        deviceSignature = this.udn,
+        useWildcardForRemoteHostDelete = preferences.useWildcardForRemoteHostDelete,
+        lastKnownIp = this.ipAddress,
+        displayName = this.displayName,
+        friendlyName = this.friendlyName,
+        manufacturer = this.manufacturer,
+        modelName = this.modelName,
+        modelNumber = this.modelNumber,
+        serialNumber = this.serialNumber,
+        upc = this.upc,
+        deviceType = this.deviceType,
+        upnpVersion = this.upnpVersion,
+        udaVersion = this.udaVersion,
+        lastSeenAtUtcMs = lastSeenAtUtcMs,
+    )
 
 
 // when we start up lets set a reasonable last renew time so the rule will not expire

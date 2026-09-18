@@ -1,0 +1,209 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "595fe900523c59bb50a539e96f2f7048",
+    "entities": [
+      {
+        "tableName": "port_mappings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceSignature` TEXT NOT NULL, `protocol` TEXT NOT NULL, `externalPort` INTEGER NOT NULL, `deviceIp` TEXT NOT NULL, `description` TEXT NOT NULL, `internalIp` TEXT NOT NULL, `internalPort` INTEGER NOT NULL, `autorenew` INTEGER NOT NULL, `desiredLeaseDuration` INTEGER NOT NULL, `autorenewManualCadence` INTEGER NOT NULL DEFAULT -1, `desiredEnabled` INTEGER NOT NULL, `createdAtUtcMs` INTEGER, `lastSeenAtUtcMs` INTEGER, PRIMARY KEY(`deviceSignature`, `protocol`, `externalPort`, `internalIp`, `internalPort`))",
+        "fields": [
+          {
+            "fieldPath": "deviceSignature",
+            "columnName": "deviceSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocol",
+            "columnName": "protocol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalPort",
+            "columnName": "externalPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceIp",
+            "columnName": "deviceIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "internalIp",
+            "columnName": "internalIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "internalPort",
+            "columnName": "internalPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoRenew",
+            "columnName": "autorenew",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desiredLeaseDuration",
+            "columnName": "desiredLeaseDuration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoRenewManualCadence",
+            "columnName": "autorenewManualCadence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "-1"
+          },
+          {
+            "fieldPath": "desiredEnabled",
+            "columnName": "desiredEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtUtcMs",
+            "columnName": "createdAtUtcMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastSeenAtUtcMs",
+            "columnName": "lastSeenAtUtcMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "deviceSignature",
+            "protocol",
+            "externalPort",
+            "internalIp",
+            "internalPort"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "devices",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`deviceSignature` TEXT NOT NULL, `useWildcardForRemoteHostDelete` INTEGER NOT NULL, `lastKnownIp` TEXT NOT NULL, `displayName` TEXT, `friendlyName` TEXT, `manufacturer` TEXT, `modelName` TEXT, `modelNumber` TEXT, `serialNumber` TEXT, `upc` TEXT, `deviceType` TEXT, `upnpVersion` INTEGER, `udaVersion` TEXT, `lastSeenAtUtcMs` INTEGER, PRIMARY KEY(`deviceSignature`))",
+        "fields": [
+          {
+            "fieldPath": "deviceSignature",
+            "columnName": "deviceSignature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "useWildcardForRemoteHostDelete",
+            "columnName": "useWildcardForRemoteHostDelete",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastKnownIp",
+            "columnName": "lastKnownIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "friendlyName",
+            "columnName": "friendlyName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "manufacturer",
+            "columnName": "manufacturer",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "modelName",
+            "columnName": "modelName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "modelNumber",
+            "columnName": "modelNumber",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "serialNumber",
+            "columnName": "serialNumber",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "upc",
+            "columnName": "upc",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deviceType",
+            "columnName": "deviceType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "upnpVersion",
+            "columnName": "upnpVersion",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "udaVersion",
+            "columnName": "udaVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastSeenAtUtcMs",
+            "columnName": "lastSeenAtUtcMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "deviceSignature"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '595fe900523c59bb50a539e96f2f7048')"
+    ]
+  }
+}

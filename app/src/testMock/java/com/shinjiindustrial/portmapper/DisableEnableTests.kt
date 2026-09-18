@@ -23,6 +23,7 @@ import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -48,12 +49,17 @@ class DisableEnableTests {
 
     private fun createRepository(): UpnpRepository {
         val client = MockUpnpClient(MockUpnpClientConfig(Speed.Fastest, RuleSet.Demo))
-        val portMappingDao = mockk<PortMappingDao>()
-        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any(), any()) } returns null
-        val devicesDao = mockk<DevicesDao>()
-        coEvery { devicesDao.getByPrimaryKey(any(), any()) } returns null
-        val repository =
-            UpnpRepository(client, portMappingDao, devicesDao, mockk(relaxed = true), scope)
+        val portMappingDao = mockk<PortMappingDao>(relaxed = true)
+        coEvery { portMappingDao.getByPrimaryKey(any(), any(), any(), any(), any()) } returns null
+        every { portMappingDao.observeAll() } returns MutableStateFlow(emptyList())
+        val devicesDao = mockk<DevicesDao>(relaxed = true)
+        coEvery { devicesDao.getByPrimaryKey(any()) } returns null
+        every { devicesDao.observeAll() } returns MutableStateFlow(emptyList())
+        val preferencesManager = mockk<PreferencesManager>()
+        every { preferencesManager.showAllLocalRules } returns MutableStateFlow(false)
+        val repository = UpnpRepository(
+            client, portMappingDao, devicesDao, mockk(relaxed = true), scope, preferencesManager
+        )
         client.deviceFoundEvent(
             MockClingIGDDevice(DeviceDetails("Nokia IGD v2", "192.168.18.1", 2, "UUID-1"))
         )

@@ -20,7 +20,8 @@ import org.fourthline.cling.model.meta.RemoteService
 
 data class MockIGDDevice(override val deviceDetails : DeviceDetails,
                          override val status: DeviceStatus,
-                         override var devicePreferences: DevicePreferences
+                         override var devicePreferences: DevicePreferences,
+                         override val enumeratedAtUtcMs: Long? = null
 ) : IIGDDevice()
 {
     private val displayName : String = deviceDetails.displayName
@@ -45,8 +46,8 @@ data class MockIGDDevice(override val deviceDetails : DeviceDetails,
         return ActionInvocation<RemoteService>(ActionException(0, ""))
     }
 
-    override fun withStatus(status: DeviceStatus): IIGDDevice {
-        return this.copy(status = status)
+    override fun withStatus(status: DeviceStatus, enumeratedAtUtcMs: Long?): IIGDDevice {
+        return this.copy(status = status, enumeratedAtUtcMs = enumeratedAtUtcMs)
     }
 
     override fun getUpnpVersion() : Int {

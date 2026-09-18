@@ -58,10 +58,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.common.NetworkType
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 import com.shinjiindustrial.portmapper.ui.BottomSheetSortBy
 import com.shinjiindustrial.portmapper.ui.LoadingIcon
+import com.shinjiindustrial.portmapper.ui.LocalRuleInfoDialog
 import com.shinjiindustrial.portmapper.ui.MoreInfoDialog
 import com.shinjiindustrial.portmapper.ui.PortMappingContent
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
@@ -77,9 +79,11 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     rememberScrollState()
     val showAboutDialogState = rememberSaveable { mutableStateOf(false) }
     val showMoreInfoDialogState = rememberSaveable { mutableStateOf<PortMappingKey?>(null) }
+    val showLocalInfoDialogState = rememberSaveable { mutableStateOf<LocalRuleKey?>(null) }
     val showAboutDialog by showAboutDialogState //mutable state binds to UI (in sense if value changes, redraw). remember says when redrawing dont discard us.
     val inMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
     val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
     val contextMenuUiState by portViewModel.contextMenuUiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -95,10 +99,28 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
         )
     }
 
+    if (contextMenuUiState.isLocalOpen()) {
+        LocalRuleContextMenu(
+            contextMenuUiState.selectedLocalId,
+            portViewModel::getSelectedLocalRule,
+            portViewModel::closeContextMenu,
+            showLocalInfoDialogState,
+            portViewModel,
+            themeState
+        )
+    }
+
     if (showMoreInfoDialogState.value != null) {
         MoreInfoDialog(
             showMoreInfoDialogState,
             portViewModel::getSelectedItem
+        )
+    }
+
+    if (showLocalInfoDialogState.value != null) {
+        LocalRuleInfoDialog(
+            showLocalInfoDialogState,
+            portViewModel::getSelectedLocalRule
         )
     }
 
@@ -219,7 +241,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 scrollBehavior = scrollBehavior,
                 title = {
                     val title =
-                        if (inMultiSelectMode) "${selectedIds.size} Selected" else "PortMapper"
+                        if (inMultiSelectMode) "${selectedIds.size + selectedLocalIds.size} Selected" else "PortMapper"
                     Text(
                         text = title,
                         fontWeight = FontWeight.Normal
@@ -228,8 +250,10 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 actions = {
 
                     if (inMultiSelectMode) {
+                        // the one action every selection gets, whatever mix of router and
+                        //   local rules it holds
                         IconButton(onClick = {
-                            portViewModel.deleteAll(selectedIds)
+                            portViewModel.deleteSelected(selectedIds, selectedLocalIds)
                         })
                         {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
@@ -384,13 +408,17 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     } else {
                         val uiState by portViewModel.uiState.collectAsStateWithLifecycle()
                         val selectedIds by portViewModel.selectedIds.collectAsStateWithLifecycle()
+                        val selectedLocalIds by portViewModel.selectedLocalIds.collectAsStateWithLifecycle()
                         val isInMultiSelectMode by portViewModel.inMultiSelectMode.collectAsStateWithLifecycle()
                         PortMappingContent(
                             uiState,
                             isInMultiSelectMode,
                             portViewModel::toggle,
+                            portViewModel::toggleLocal,
                             portViewModel::openContextMenu,
-                            selectedIds
+                            portViewModel::openLocalContextMenu,
+                            selectedIds,
+                            selectedLocalIds
                         )
                     }
                 }

@@ -1,18 +1,21 @@
 package com.shinjiindustrial.portmapper.ui
 
 import android.os.SystemClock
+import android.text.format.DateUtils
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,9 +48,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
@@ -56,25 +62,28 @@ import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
+import com.shinjiindustrial.portmapper.domain.LocalRuleStatus
 import com.shinjiindustrial.portmapper.domain.PortMapping
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.RuleSection
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import com.shinjiindustrial.portmapper.domain.Urgency
+import com.shinjiindustrial.portmapper.domain.formatAgo
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import kotlinx.coroutines.delay
 import com.shinjiindustrial.portmapper.PortUiState
 import com.shinjiindustrial.portmapper.ThemeUiState
 
-@OptIn(
-    ExperimentalUnitApi::class, ExperimentalMaterial3Api::class,
-    ExperimentalFoundationApi::class
-)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PortMappingCard(
     portMappingWithPref: PortMappingWithPref,
@@ -88,17 +97,9 @@ fun PortMappingCard(
     val portMapping = portMappingWithPref.portMapping
 
     Card(
-//        onClick = {
-//            if(PortForwardApplication.showPopup != null)
-//            {
-//                PortForwardApplication.showPopup.value = true
-//            }
-//                  },
         modifier = additionalModifier
             .fillMaxWidth()
-            //.clip(RoundedCornerShape(borderRadius))
             .padding(4.dp, 4.dp)
-//            .background(MaterialTheme.colorScheme.secondaryContainer)
             .combinedClickable(
                 onClick = {
 
@@ -113,18 +114,6 @@ fun PortMappingCard(
                     toggleSelection(portMappingWithPref.getKey())
                 }
             ),
-
-
-//                Snackbar
-//                    .make(parentlayout, "This is main activity", Snackbar.LENGTH_LONG)
-//                    .setAction("CLOSE", object : OnClickListener() {
-//                        fun onClick(view: View?) {}
-//                    })
-//                    .setActionTextColor(getResources().getColor(R.color.holo_red_light))
-//                    .show()
-        //isRound = !isRound
-
-
         elevation = CardDefaults.cardElevation(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
@@ -134,50 +123,17 @@ fun PortMappingCard(
 
         Row(
             modifier = Modifier.Companion
-                .padding(2.dp, 6.dp, 15.dp, 6.dp),//.background(Color(0xffc5dceb)),
-            //.background(MaterialTheme.colorScheme.secondaryContainer),
+                .padding(2.dp, 10.dp, 14.dp, 10.dp),
             verticalAlignment = Alignment.Companion.CenterVertically
 
         ) {
 
-            //var padLeft = if(multiSelectMode) 5.dp else 13.dp
-
             //TODO need to do existing content slide to right and fade new element in
-
             val padLeft = 13.dp
-            //val transition = updateTransition(multiSelectMode, label = "transition")
-
-//            val offsetState = remember { MutableTransitionState(initialState = false) }
-//            val visState = remember { MutableTransitionState(initialState = false) }
-//
-////            val padLeft by transition.animateDp(
-////                transitionSpec = {
-////                    if (false isTransitioningTo true) {
-////                        spring(stiffness = Spring.StiffnessLow)
-////                    } else {
-////                        spring(stiffness = Spring.StiffnessLow)
-////                    }
-////                },
-////                label = "offset transition",
-////            ) { isVisible -> if (isVisible) 5.dp else 13.dp}
-//
-//
-//            val padLeft by animateDpAsState(
-//                if (offsetState.currentState) 30.dp else 5.dp,
-//                finishedListener = {
-//                   if (it == 30.dp) {
-//                       offsetState.targetState = false
-//                   }
-//                }
-//            )
-//
-//            offsetState.targetState = multiSelectMode
 
             AnimatedVisibility(
                 visible = isInMultiSelectMode,
             ) {
-
-
                 CircleCheckbox(
                     selectedIds.contains(portMappingWithPref.getKey()),
                     true,
@@ -192,26 +148,34 @@ fun PortMappingCard(
                     .weight(1f)
                     .padding(padLeft, 0.dp, 0.dp, 0.dp)
             ) {
-                Text(
-                    portMapping.Description,
-                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
-                    fontWeight = FontWeight.Companion.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(portMapping.InternalIP, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // pill is centered on the title + ip block, the lease line runs full width below
+                Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                    Column(
+                        modifier = Modifier.Companion
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        RuleTitle(portMapping.Description) {
+                            // nearly every rule is enabled, so only the exception gets called out
+                            if (!portMapping.Enabled) {
+                                StatusBadge("Disabled", PortMapperTheme.semanticColors.disabled)
+                            }
+                        }
+                        Text(
+                            portMapping.InternalIP,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                val semanticColors = PortMapperTheme.semanticColors
-                val text = buildAnnotatedString {
-                    withStyle(style = SpanStyle(color = if (portMapping.Enabled) semanticColors.enabled else semanticColors.disabled)) {
-                        append("⬤")
-                    }
-                    withStyle(style = SpanStyle()) {
-                        append(if (portMapping.Enabled) " Enabled" else " Disabled")
-                    }
+                    PortPill(
+                        portMapping.ExternalPort,
+                        portMapping.InternalPort,
+                        portMapping.Protocol,
+                        active = true
+                    )
                 }
 
-
-                Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val semanticColors = PortMapperTheme.semanticColors
                 val urgency =
                     portMapping.getUrgency(portMappingWithPref.getAutoRenewOrDefault(), now)
                 val color by urgencyColor(
@@ -225,18 +189,234 @@ fun PortMappingCard(
                     color = color
                 )
             }
+        }
+    }
+}
 
-            Column(horizontalAlignment = Alignment.Companion.CenterHorizontally) {
+// mostly same as PortMappingCard, slightly ghosted / disabled feel
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LocalRuleCard(
+    localRule: LocalRule,
+    now: Long = -1,
+    isInMultiSelectMode: Boolean = false,
+    toggleSelection: (LocalRuleKey) -> Unit = {},
+    onClick: (LocalRuleKey) -> Unit = {},
+    selectedIds: Set<LocalRuleKey>,
+    additionalModifier: Modifier = Modifier.Companion
+) {
+    val entity = localRule.entity
+    val nowUtc = remember(now) { System.currentTimeMillis() }
+
+    Card(
+        modifier = additionalModifier
+            .fillMaxWidth()
+            .padding(4.dp, 4.dp)
+            .combinedClickable(
+                onClick = {
+                    if (isInMultiSelectMode) {
+                        toggleSelection(localRule.key)
+                    } else {
+                        onClick(localRule.key)
+                    }
+                },
+                onLongClick = {
+                    toggleSelection(localRule.key)
+                }
+            ),
+        elevation = CardDefaults.cardElevation(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = PortMapperTheme.componentColors.cardContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.Companion
+                .padding(2.dp, 10.dp, 14.dp, 10.dp),
+            verticalAlignment = Alignment.Companion.CenterVertically
+        ) {
+            val padLeft = 13.dp
+
+            AnimatedVisibility(
+                visible = isInMultiSelectMode,
+            ) {
+                CircleCheckbox(
+                    selectedIds.contains(localRule.key),
+                    true,
+                    Modifier.Companion.padding(10.dp, 0.dp, 2.dp, 0.dp)
+                ) {
+                    toggleSelection(localRule.key)
+                }
+            }
+
+            // the ghosting is on the content only, so the checkbox reads the same as on a
+            //   router rule
+            Column(
+                modifier = Modifier.Companion
+                    .weight(1f)
+                    .alpha(0.7f)
+                    .padding(padLeft, 0.dp, 0.dp, 0.dp)
+            ) {
+                Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                    Column(
+                        modifier = Modifier.Companion
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        RuleTitle(entity.description) {
+                            val semanticColors = PortMapperTheme.semanticColors
+                            if (localRule.status == LocalRuleStatus.Drifted) {
+                                StatusBadge("Drifted", semanticColors.logWarning)
+                            }
+                            // what an activate would ask for, not anything the router said
+                            if (!entity.desiredEnabled) {
+                                StatusBadge("Disabled", semanticColors.disabled)
+                            }
+                        }
+                        Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    PortPill(
+                        entity.externalPort,
+                        entity.internalPort,
+                        entity.protocol,
+                        active = false
+                    )
+                }
+
+                val lastSeen = entity.lastSeenAtUtcMs
                 Text(
-                    "${portMapping.ExternalPort} ➝ ${portMapping.InternalPort}",
-                    fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
-                    fontWeight = FontWeight.Companion.SemiBold,
+                    if (lastSeen == null) "Not on router" else "Last seen ${formatAgo(lastSeen, nowUtc)}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text("${portMapping.Protocol}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-
             }
         }
+    }
+}
+
+// title with any status badges trailing it.  the title wraps rather than truncates (router
+//   supplied descriptions can be long) and the badges stay centered on it.
+@Composable
+private fun RuleTitle(title: String, badges: @Composable RowScope.() -> Unit) {
+    Row(
+        verticalAlignment = Alignment.Companion.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            title,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Companion.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.Companion.weight(1f, fill = false)
+        )
+        badges()
+    }
+}
+
+// small tinted pill i.e. "Disabled" / "Drifted". fill is low alpha text color.
+@Composable
+fun StatusBadge(text: String, color: Color, modifier: Modifier = Modifier.Companion) {
+    val shape = RoundedCornerShape(6.dp)
+    Text(
+        text,
+        modifier = modifier
+            .background(color.copy(alpha = 0.14f), shape)
+            .border(1.dp, color.copy(alpha = 0.4f), shape)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Companion.SemiBold,
+        color = color
+    )
+}
+
+// "5050 → 5050 TCP" on one line.  if active (on the router) has background color
+@Composable
+fun PortPill(
+    externalPort: Int,
+    internalPort: Int,
+    protocol: String,
+    active: Boolean,
+    modifier: Modifier = Modifier.Companion
+) {
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(10.dp)
+    val fill = if (active) colors.primary.copy(alpha = 0.10f) else Color.Companion.Transparent
+    val border = colors.outlineVariant
+    val textColor = if (active) colors.primary else colors.onSurfaceVariant
+    Row(
+        modifier = modifier
+            .background(fill, shape)
+            .border(1.dp, border, shape)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.Companion.CenterVertically
+    ) {
+        Text(
+            // the arrow stays in the default face: the monospace fallback glyph is small and
+            //   gets a full cell of side bearing either side
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontFamily = FontFamily.Companion.Monospace)) {
+                    append(externalPort.toString())
+                }
+                append(" → ")
+                withStyle(SpanStyle(fontFamily = FontFamily.Companion.Monospace)) {
+                    append(internalPort.toString())
+                }
+            },
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Companion.SemiBold,
+            color = textColor,
+            maxLines = 1
+        )
+        Text(
+            protocol,
+            fontFamily = FontFamily.Companion.Monospace,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Companion.Bold,
+            color = textColor,
+            maxLines = 1,
+            modifier = Modifier.Companion.padding(start = 6.dp)
+        )
+    }
+}
+
+// "ON ROUTER · refreshed 3:17 PM" / "LOCAL · inactive"
+@Composable
+fun SectionHeader(section: RuleSection, device: IIGDDevice, now: Long) {
+    val detail = when (section) {
+        // null until the device finishes enumerating
+        RuleSection.OnRouter -> device.enumeratedAtUtcMs?.let { "refreshed ${formatClockTime(it, now)}" }
+        RuleSection.Local -> "inactive"
+    }
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.Companion.SemiBold)) {
+                append(section.label)
+            }
+            if (detail != null) {
+                withStyle(SpanStyle(fontWeight = FontWeight.Companion.Normal)) {
+                    append(" · $detail")
+                }
+            }
+        },
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(top = 10.dp, bottom = 2.dp)
+    )
+}
+
+// local time of day i.e. "3:17 PM" (including date and year when differs)
+@Composable
+fun formatClockTime(utcMs: Long, now: Long): String {
+    val context = LocalContext.current
+    return remember(utcMs, now) {
+        var flags = DateUtils.FORMAT_SHOW_TIME
+        if (!DateUtils.isToday(utcMs)) {
+            flags = flags or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH
+        }
+        DateUtils.formatDateTime(context, utcMs, flags)
     }
 }
 
@@ -550,7 +730,7 @@ fun PreviewConversation() {
         for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
-        PortMappingsListContent(msgs, false, {}, {},emptySet())
+        PortMappingsListContent(msgs, false, {}, {}, {}, {}, emptySet(), emptySet())
     }
 }
 
@@ -559,10 +739,22 @@ fun PortMappingContent(
     uiState: PortUiState,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onLocalToggle: (LocalRuleKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
-    selectedIds: Set<PortMappingKey>
+    onLocalClick: (LocalRuleKey) -> Unit,
+    selectedIds: Set<PortMappingKey>,
+    selectedLocalIds: Set<LocalRuleKey>
 ) {
-    PortMappingsListContent(uiState.items, isInMultiSelectMode, onToggle, onClick, selectedIds)
+    PortMappingsListContent(
+        uiState.items,
+        isInMultiSelectMode,
+        onToggle,
+        onLocalToggle,
+        onClick,
+        onLocalClick,
+        selectedIds,
+        selectedLocalIds
+    )
 }
 
 @Composable
@@ -584,8 +776,11 @@ fun PortMappingsListContent(
     messages: List<UpnpViewRow>,
     isInMultiSelectMode: Boolean,
     onToggle: (PortMappingKey) -> Unit,
+    onLocalToggle: (LocalRuleKey) -> Unit,
     onClick: (PortMappingKey) -> Unit,
-    selectedIds: Set<PortMappingKey>
+    onLocalClick: (LocalRuleKey) -> Unit,
+    selectedIds: Set<PortMappingKey>,
+    selectedLocalIds: Set<LocalRuleKey>
 ) {
 
     val now by rememberTicker(8_000)
@@ -625,6 +820,22 @@ fun PortMappingsListContent(
                         onToggle,
                         onClick,
                         selectedIds,
+                        Modifier.animateItem()
+                    )
+                }
+
+                is UpnpViewRow.SectionHeaderViewRow -> {
+                    SectionHeader(message.section, message.device, now)
+                }
+
+                is UpnpViewRow.LocalRuleViewRow -> {
+                    LocalRuleCard(
+                        message.localRule,
+                        now,
+                        isInMultiSelectMode,
+                        onLocalToggle,
+                        onLocalClick,
+                        selectedLocalIds,
                         Modifier.animateItem()
                     )
                 }

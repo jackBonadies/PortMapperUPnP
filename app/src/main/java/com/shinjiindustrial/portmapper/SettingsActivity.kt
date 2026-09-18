@@ -99,10 +99,16 @@ class SettingsActivity : ComponentActivity() {
                 },
                 content = { it ->
                     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+                    val showEnableDisable by settingsViewModel.showEnableDisable.collectAsStateWithLifecycle()
+                    val showAllLocalRules by settingsViewModel.showAllLocalRules.collectAsStateWithLifecycle()
                     SettingsContent(
                         uiState,
+                        showEnableDisable,
+                        showAllLocalRules,
                         settingsViewModel::updateMaterialYou,
                         settingsViewModel::updateDayNight,
+                        settingsViewModel::updateShowEnableDisable,
+                        settingsViewModel::updateShowAllLocalRules,
                         Modifier.padding(it)
                     )
                 }
@@ -122,8 +128,12 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     fun SettingsContent(
         uiState: ThemeUiState,
+        showEnableDisable: Boolean,
+        showAllLocalRules: Boolean,
         updateMaterialYou: (Boolean) -> Unit,
         updateDayNight: (DayNightMode) -> Unit,
+        updateShowEnableDisable: (Boolean) -> Unit,
+        updateShowAllLocalRules: (Boolean) -> Unit,
         modifier: Modifier = Modifier
     ) {
         MyApplicationTheme(uiState)
@@ -199,7 +209,6 @@ class SettingsActivity : ComponentActivity() {
                     {
                         Row(verticalAlignment = Alignment.CenterVertically)
                         {
-                            //Icon(Icons.Filled.Palette, "Material You", tint=MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp))
                             Text(
                                 "Material You",
                                 fontSize = 26.sp,
@@ -219,6 +228,79 @@ class SettingsActivity : ComponentActivity() {
                     }
                     Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
                 }
+
+                Text(
+                    "Advanced",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(12.dp, 16.dp, 0.dp, 4.dp),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                {
+                    Column(
+                        modifier = Modifier
+                            .weight(1.0f)
+                            .padding(12.dp, 12.dp, 12.dp, 12.dp)
+                    )
+                    {
+                        Text(
+                            "Show rule enable / disable actions",
+                            fontSize = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "not supported on most router firmware • allows keeping a rule in a disabled state on the router",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        showEnableDisable,
+                        onCheckedChange = {
+                            updateShowEnableDisable(it)
+                        },
+                        modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                    )
+                }
+                Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                {
+                    Column(
+                        modifier = Modifier
+                            .weight(1.0f)
+                            .padding(12.dp, 12.dp, 12.dp, 12.dp)
+                    )
+                    {
+                        Text(
+                            "Show local rules from all routers",
+                            fontSize = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        // the derivation is in UpnpRepository.localRules; with two routers found
+                        //   the same rule is listed under each of them.
+                        Text(
+                            "show all local rules even if they weren't created on the current devices",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        showAllLocalRules,
+                        onCheckedChange = {
+                            updateShowAllLocalRules(it)
+                        },
+                        modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                    )
+                }
+                Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
 
 //            Column(
 //                modifier = Modifier.clickable(onClick = {

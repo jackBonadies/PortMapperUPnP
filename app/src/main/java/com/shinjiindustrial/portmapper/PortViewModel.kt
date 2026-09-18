@@ -10,15 +10,17 @@ import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.common.SortInfo
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
+import com.shinjiindustrial.portmapper.domain.LocalRule
+import com.shinjiindustrial.portmapper.domain.LocalRuleKey
 import com.shinjiindustrial.portmapper.domain.NetworkInterfaceInfo
 import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.RuleSection
 import com.shinjiindustrial.portmapper.domain.UpnpViewRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -50,12 +52,19 @@ data class PortUiState(
     val userMessage: Int? = null
 )
 
+// mutually exclusive
 data class ContextMenuUiState(
-    val selectedId: PortMappingKey? = null)
+    val selectedId: PortMappingKey? = null,
+    val selectedLocalId: LocalRuleKey? = null)
 {
     fun isOpen() : Boolean
     {
         return selectedId != null
+    }
+
+    fun isLocalOpen() : Boolean
+    {
+        return selectedLocalId != null
     }
 }
 
@@ -78,11 +87,15 @@ class PortViewModel @Inject constructor(
     val contextMenuUiState = _contextMenuUiState.asStateFlow()
 
     fun openContextMenu(id: PortMappingKey) {
-        _contextMenuUiState.update { cur -> ContextMenuUiState(id) }
+        _contextMenuUiState.update { cur -> ContextMenuUiState(selectedId = id) }
+    }
+
+    fun openLocalContextMenu(id: LocalRuleKey) {
+        _contextMenuUiState.update { cur -> ContextMenuUiState(selectedLocalId = id) }
     }
 
     fun closeContextMenu() {
-        _contextMenuUiState.update { cur -> ContextMenuUiState(null) }
+        _contextMenuUiState.update { cur -> ContextMenuUiState() }
     }
 
     // we want to use key for selections.  so if a rule renews while the user is in multi select
@@ -91,16 +104,29 @@ class PortViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<PortMappingKey>>(savedStateHandle.get<List<PortMappingKey>>("selected_ids")?.toSet() ?: emptySet())
     val selectedIds: StateFlow<Set<PortMappingKey>> = _selectedIds
 
+    // local rules are a separate set with their own key type
+    private val _selectedLocalIds = MutableStateFlow<Set<LocalRuleKey>>(savedStateHandle.get<List<LocalRuleKey>>("selected_local_ids")?.toSet() ?: emptySet())
+    val selectedLocalIds: StateFlow<Set<LocalRuleKey>> = _selectedLocalIds
+
     val inMultiSelectMode: StateFlow<Boolean> =
-        _selectedIds.map { it.isNotEmpty() }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        combine(_selectedIds, _selectedLocalIds) { router, local ->
+            router.isNotEmpty() || local.isNotEmpty()
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun toggle(id: PortMappingKey) {
         _selectedIds.update { s -> if (id in s) s - id else s + id }
     }
 
+    fun toggleLocal(id: LocalRuleKey) {
+        _selectedLocalIds.update { s -> if (id in s) s - id else s + id }
+    }
+
     fun getSelectedItems(selectedIds: Set<PortMappingKey>): List<PortMappingWithPref> {
         return upnpRepository.portMappingsFromIds(selectedIds)
+    }
+
+    fun getSelectedLocalRules(selectedLocalIds: Set<LocalRuleKey>): List<LocalRule> {
+        return upnpRepository.localRulesFromIds(selectedLocalIds)
     }
 
     fun getSelectedItem(selectedId: PortMappingKey): PortMappingWithPref {
@@ -108,8 +134,14 @@ class PortViewModel @Inject constructor(
         return listOfMappings[0]
     }
 
+    // can be null since a re-enumeration or background activate can remove the rule from local
+    fun getSelectedLocalRule(selectedId: LocalRuleKey): LocalRule? {
+        return upnpRepository.localRules.value[selectedId]
+    }
+
     fun clearSelection() {
         _selectedIds.value = emptySet()
+        _selectedLocalIds.value = emptySet()
     }
 
     val anyDevices: StateFlow<Boolean> =
@@ -137,18 +169,27 @@ class PortViewModel @Inject constructor(
         SortInfo(SortBy.ExternalPort, false)
     )
 
+    // We will always have the real value before the first frame
+    val showEnableDisable: StateFlow<Boolean> = preferencesRepository.showEnableDisable.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        false
+    )
+
     val uiState: StateFlow<PortUiState> = combine(
         sortInfo,
         upnpRepository.devices,
-        upnpRepository.portMappings
-    ) { sortInfo, devices, portMappings ->
+        upnpRepository.portMappings,
+        upnpRepository.localRules
+    ) { sortInfo, devices, portMappings, localRules ->
 
         val upnpElements = mutableListOf<UpnpViewRow>()
         if (!devices.isEmpty()) {
-            val portMappingsList =
-                portMappings.values.sortedWith(sortInfo.sortBy.getComparer(ascending = !sortInfo.sortDesc))
+            val comparer = sortInfo.sortBy.getComparer(ascending = !sortInfo.sortDesc)
+            val portMappingsList = portMappings.values.sortedWith(comparer)
             for (curDevice in devices) {
                 upnpElements.add(UpnpViewRow.DeviceHeaderViewRow(curDevice))
+                upnpElements.add(UpnpViewRow.SectionHeaderViewRow(curDevice, RuleSection.OnRouter))
                 var anyFound = false
                 for (portMapping in portMappingsList) {
                     if (curDevice.getIpAddress() == portMapping.portMapping.DeviceIP)
@@ -160,6 +201,19 @@ class PortViewModel @Inject constructor(
                 if (!anyFound && curDevice.status == DeviceStatus.FinishedEnumeratingMappings)
                 {
                     upnpElements.add(UpnpViewRow.DeviceEmptyViewRow(curDevice))
+                }
+                // for local when show all rules is enabled, each device gets the full set of local
+                //   rules set to its device (so device A will have the full set of local rules with
+                //   device A, device B will have the full set with device B)
+                val localForDevice = localRules.values
+                    .filter { it.device.udn == curDevice.udn }
+                    .sortedWith { a, b -> comparer.compare(a.toPortMappingWithPref(), b.toPortMappingWithPref()) }
+                if (localForDevice.isNotEmpty())
+                {
+                    upnpElements.add(UpnpViewRow.SectionHeaderViewRow(curDevice, RuleSection.Local))
+                    for (localRule in localForDevice) {
+                        upnpElements.add(UpnpViewRow.LocalRuleViewRow(localRule))
+                    }
                 }
             }
         }
@@ -218,6 +272,78 @@ class PortViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Renew Port Mapping Failed"))
+        }
+    }
+
+    fun activate(localRule: LocalRule) = applicationScope.launch {
+        try {
+            val res = upnpRepository.activateLocalRule(localRule)
+            if (res is UPnPCreateMappingWrapperResult.Success) {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Activate Port Mapping Failed"))
+        }
+    }
+
+    fun deactivate(portMapping: PortMappingWithPref) = applicationScope.launch {
+        try {
+            val res = upnpRepository.deactivatePortMappingEntry(portMapping)
+            if (res is UPnPResult.Success) {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Deactivate Port Mapping Failed"))
+        }
+    }
+
+    fun activateAll(selectedLocalIds: Set<LocalRuleKey>) = applicationScope.launch {
+        try {
+            val result = upnpRepository.activateLocalRules(
+                upnpRepository.localRulesFromIds(selectedLocalIds)
+            )
+            val anyFailed = result.any { it is UPnPCreateMappingWrapperResult.Failure }
+            if (anyFailed) {
+                val res = result.first { it is UPnPCreateMappingWrapperResult.Failure }
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPCreateMappingWrapperResult.Failure).details.reason}"))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Activate Port Mappings Failed"))
+        }
+    }
+
+    fun deactivateAll(selectedIds: Set<PortMappingKey>) = applicationScope.launch {
+        try {
+            val result = upnpRepository.deactivatePortMappingEntries(
+                upnpRepository.portMappingsFromIds(selectedIds)
+            )
+            val anyFailed = result.any { it is UPnPResult.Failure }
+            if (anyFailed) {
+                val res = result.first { it is UPnPResult.Failure }
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failure - ${(res as UPnPResult.Failure).details.reason}"))
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        } catch (e: Exception) {
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Deactivate Port Mappings Failed"))
+        }
+    }
+
+    fun delete(localRule: LocalRule) = applicationScope.launch {
+        try {
+            upnpRepository.deleteLocalRule(localRule)
+        } catch (e: Exception) {
+            ourLogger.log(
+                Level.SEVERE,
+                "Delete Local Rule Failed: " + e.message + e.stackTraceToString()
+            )
+            snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to delete local rule"))
         }
     }
 
@@ -388,6 +514,17 @@ class PortViewModel @Inject constructor(
                 savedStateHandle["selected_ids"] = filtered.toList()
             }
             .launchIn(viewModelScope)
+        // same for local rules: an activate (or a re-enumeration) moves one back onto the router
+        //   and it leaves the selection with it.
+        combine(_selectedLocalIds, upnpRepository.localRules) { selectedLocalIds, currentLocal ->
+            selectedLocalIds intersect currentLocal.keys
+        }
+            .distinctUntilChanged()
+            .onEach { filtered ->
+                if (filtered != _selectedLocalIds.value) _selectedLocalIds.value = filtered
+                savedStateHandle["selected_local_ids"] = filtered.toList()
+            }
+            .launchIn(viewModelScope)
     }
 
     override fun onCleared() {
@@ -408,9 +545,26 @@ class PortViewModel @Inject constructor(
         }
     }
 
-    fun deleteAll(selectedIds: Set<PortMappingKey>) {
-        deleteAll(upnpRepository.portMappingsFromIds(selectedIds))
-    }
+    // the trash icon in multi select.  local rules are just rows, so they go first and cannot
+    //   fail against the router; the router batch is then reported the same way deleteAll is.
+    fun deleteSelected(selectedIds: Set<PortMappingKey>, selectedLocalIds: Set<LocalRuleKey>) =
+        applicationScope.launch {
+            try {
+                upnpRepository.deleteLocalRules(upnpRepository.localRulesFromIds(selectedLocalIds))
+            } catch (e: Exception) {
+                ourLogger.log(
+                    Level.SEVERE,
+                    "Delete Local Rules Failed: " + e.message + e.stackTraceToString()
+                )
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to delete local rules"))
+                return@launch
+            }
+            if (selectedIds.isNotEmpty()) {
+                deleteAll(upnpRepository.portMappingsFromIds(selectedIds)).join()
+            } else {
+                snackbarManager.show(UiSnackToastEvent.ToastEvent("Success", Toast.LENGTH_SHORT))
+            }
+        }
 
     fun deleteAll(chosen: List<PortMappingWithPref>? = null) = applicationScope.launch {
         try {
