@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SaveAs
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,11 +40,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.ui.theme.MyApplicationTheme
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -79,7 +91,13 @@ class LogViewActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun LogViewInner(themeUiState: ThemeUiState, logLines: List<LogEntry>, scrollToBottom: Boolean) {
+    fun LogViewInner(
+        themeUiState: ThemeUiState,
+        logLines: List<LogEntry>,
+        scrollToBottom: Boolean,
+        showTimestamps: Boolean,
+        onToggleTimestamps: () -> Unit,
+    ) {
         MyApplicationTheme(themeUiState) {
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             Scaffold(
@@ -94,7 +112,6 @@ class LogViewActivity : ComponentActivity() {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
                         },
-//                                modifier = Modifier.height(40.dp),
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                             containerColor = PortMapperTheme.componentColors.appBarContainer,
                             scrolledContainerColor = PortMapperTheme.componentColors.appBarScrolledContainer,
@@ -126,6 +143,11 @@ class LogViewActivity : ComponentActivity() {
                             IconButton(onClick = { logsSaveAs() }) {
                                 Icon(Icons.Default.SaveAs, contentDescription = "Save to File")
                             }
+
+                            LogViewOverflowMenu(
+                                showTimestamps = showTimestamps,
+                                onToggleTimestamps = onToggleTimestamps,
+                            )
                         }
                     )
                 },
@@ -181,7 +203,17 @@ class LogViewActivity : ComponentActivity() {
             this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false)
         val logLines = logStoreRepository.entries
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
-        LogViewInner(themeState, logLines, scrollToBottom)
+        var showTimestamps by rememberSaveable { mutableStateOf(false) } // TODO
+        LogViewInner(
+            themeUiState = themeState,
+            logLines = logLines,
+            scrollToBottom = scrollToBottom,
+            showTimestamps = showTimestamps,
+            onToggleTimestamps = {
+                // TODO: feed this into LogFormatter.forView. For now only the menu label reacts.
+                showTimestamps = !showTimestamps
+            },
+        )
     }
 
     private val logSaveAsLauncher = registerForActivityResult(
@@ -215,5 +247,37 @@ class LogViewActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun LogViewOverflowMenu(showTimestamps: Boolean, onToggleTimestamps: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
 
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+        }
 
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            val label = if (showTimestamps) {
+                R.string.hide_timestamps_action
+            } else {
+                R.string.show_timestamps_action
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(label)) },
+                leadingIcon = {
+                    Icon(
+                        ImageVector.vectorResource(R.drawable.ic_schedule),
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onToggleTimestamps()
+                }
+            )
+        }
+    }
+}
