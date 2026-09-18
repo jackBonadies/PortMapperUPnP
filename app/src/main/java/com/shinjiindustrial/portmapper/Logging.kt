@@ -84,8 +84,9 @@ object LogFormatter {
         return viewTimeFormat.get()!!.format(Date(entry.wallClockMs))
     }
 
-    fun forView(entry: LogEntry): String {
-        val head = "${levelPrefix(entry.level)}: ${entry.message}"
+    fun forView(entry: LogEntry, showTimestamp: Boolean): String {
+        val prefix = if (showTimestamp) "${viewTimestamp(entry)} " else ""
+        val head = "$prefix${levelPrefix(entry.level)}: ${entry.message}"
         return if (entry.stackTrace == null) head else "$head\n${entry.stackTrace}"
     }
 

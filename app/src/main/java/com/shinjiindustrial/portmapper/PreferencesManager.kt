@@ -31,6 +31,7 @@ class PreferencesManager @Inject constructor(
         val MATERIAL_YOU_KEY = booleanPreferencesKey("materialYouPref")
         val SHOW_ENABLE_DISABLE_KEY = booleanPreferencesKey("showEnableDisablePref")
         val SHOW_ALL_LOCAL_RULES_KEY = booleanPreferencesKey("showAllLocalRulesPref")
+        val SHOW_LOG_TIMESTAMPS = booleanPreferencesKey("showLogTimestamps")
     }
 
     init {
@@ -73,6 +74,18 @@ class PreferencesManager @Inject constructor(
             )
         }
         .distinctUntilChanged()
+
+    val showLogTimestamps: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[Keys.SHOW_LOG_TIMESTAMPS] ?: false
+        }
+        .distinctUntilChanged()
+
+    suspend fun updateShowLogTimestamps(show: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.SHOW_LOG_TIMESTAMPS] = show
+        }
+    }
 
     suspend fun updateDayNight(dayNightMode: DayNightMode) {
         context.dataStore.edit { preferences ->

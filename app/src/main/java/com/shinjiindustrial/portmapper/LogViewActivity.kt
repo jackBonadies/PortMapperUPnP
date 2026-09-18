@@ -42,7 +42,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +64,7 @@ import kotlin.math.max
 class LogViewActivity : ComponentActivity() {
 
     val settingsViewModel: SettingsViewModel by viewModels()
+    val logViewModel: LogViewModel by viewModels()
 
     @Inject
     lateinit var logStoreRepository : LogStoreRepository
@@ -187,7 +187,7 @@ class LogViewActivity : ComponentActivity() {
                                 Level.SEVERE -> PortMapperTheme.semanticColors.logError
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
-                            Text(LogFormatter.forView(entry), color = color)
+                            Text(LogFormatter.forView(entry, showTimestamps), color = color)
                         }
 
                     }
@@ -203,16 +203,13 @@ class LogViewActivity : ComponentActivity() {
             this.intent.getBooleanExtra(PortForwardApplication.ScrollToBottom, false)
         val logLines = logStoreRepository.entries
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
-        var showTimestamps by rememberSaveable { mutableStateOf(false) } // TODO
+        val showTimestamps by logViewModel.showTimestamps.collectAsStateWithLifecycle()
         LogViewInner(
             themeUiState = themeState,
             logLines = logLines,
             scrollToBottom = scrollToBottom,
             showTimestamps = showTimestamps,
-            onToggleTimestamps = {
-                // TODO: feed this into LogFormatter.forView. For now only the menu label reacts.
-                showTimestamps = !showTimestamps
-            },
+            onToggleTimestamps = logViewModel::toggleShowTimestamps,
         )
     }
 
