@@ -109,7 +109,7 @@ class LogViewActivity : ComponentActivity() {
                             IconButton(onClick = {
                                 this.finish()
                             }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_action))
                             }
                         },
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -119,7 +119,7 @@ class LogViewActivity : ComponentActivity() {
                         scrollBehavior = scrollBehavior,
                         title = {
                             Text(
-                                text = "Logs",
+                                text = stringResource(R.string.logs),
                                 fontWeight = FontWeight.Normal
                             )
                         },
@@ -128,7 +128,7 @@ class LogViewActivity : ComponentActivity() {
                             IconButton(onClick = {
                                 logStoreRepository.clear()
                             }) {
-                                Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Logs")
+                                Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.clear_logs_action))
                             }
 
                             IconButton(onClick = {
@@ -136,12 +136,12 @@ class LogViewActivity : ComponentActivity() {
                             }) {
                                 Icon(
                                     Icons.Default.ContentCopy,
-                                    contentDescription = "Copy to Clipboard"
+                                    contentDescription = stringResource(R.string.copy_to_clipboard_action)
                                 )
                             }
 
                             IconButton(onClick = { logsSaveAs() }) {
-                                Icon(Icons.Default.SaveAs, contentDescription = "Save to File")
+                                Icon(Icons.Default.SaveAs, contentDescription = stringResource(R.string.save_to_file_action))
                             }
 
                             LogViewOverflowMenu(
@@ -239,7 +239,7 @@ class LogViewActivity : ComponentActivity() {
 
     fun copyTextToClipboard(txt: String) {
         val clipboardManager = this.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clipData = ClipData.newPlainText("PortMapper Logs", txt)
+        val clipData = ClipData.newPlainText(getString(R.string.log_clip_label), txt)
         clipboardManager.setPrimaryClip(clipData)
     }
 }
@@ -250,7 +250,7 @@ private fun LogViewOverflowMenu(showTimestamps: Boolean, onToggleTimestamps: () 
 
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options_action))
         }
 
         DropdownMenu(

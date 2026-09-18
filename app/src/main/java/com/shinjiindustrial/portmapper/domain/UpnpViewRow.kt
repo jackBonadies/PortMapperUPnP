@@ -1,6 +1,8 @@
 package com.shinjiindustrial.portmapper.domain
 
 import android.os.Parcelable
+import androidx.annotation.StringRes
+import com.example.myapplication.R
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
@@ -33,9 +35,9 @@ sealed class ViewKey : Parcelable {
     ) : ViewKey()
 }
 
-enum class RuleSection(val label: String) {
-    OnRouter("ON ROUTER"),
-    Local("LOCAL")
+enum class RuleSection(@StringRes val labelRes: Int) {
+    OnRouter(R.string.section_on_router),
+    Local(R.string.section_local)
 }
 
 sealed class UpnpViewRow {

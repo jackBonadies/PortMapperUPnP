@@ -207,7 +207,7 @@ fun EnterContextMenu(
         val portMapping = portMappingWithPref.portMapping
         menuItems.add(
             Pair<String, () -> Unit>(
-                "Edit"
+                stringResource(R.string.edit_action)
             ) {
                 ///{description}/{internalIp}/{internalRange}/{externalIp}/{externalRange}/{protocol}/{leaseDuration}/{enabled}
                 val uriBuilder = Uri.Builder()
@@ -247,7 +247,7 @@ fun EnterContextMenu(
         )
         menuItems.add(
             Pair<String, () -> Unit>(
-                "Deactivate"
+                stringResource(R.string.deactivate_action)
             ) {
                 portViewModel.deactivate(portMappingWithPref)
             }
@@ -261,7 +261,7 @@ fun EnterContextMenu(
         )
         menuItems.add(
             Pair<String, () -> Unit>(
-                "Delete"
+                stringResource(R.string.delete_action)
             ) {
                 portViewModel.delete(portMappingWithPref)
             }
@@ -272,7 +272,7 @@ fun EnterContextMenu(
         if (!portMapping.Enabled || showEnableDisable) {
             menuItems.add(
                 Pair<String, () -> Unit>(
-                    if (portMapping.Enabled) "Disable" else "Enable"
+                    stringResource(if (portMapping.Enabled) R.string.disable_action else R.string.enable_action)
                 ) {
                     portViewModel.enableDisable(
                         portMappingWithPref,
@@ -283,7 +283,7 @@ fun EnterContextMenu(
         }
         menuItems.add(
             Pair<String, () -> Unit>(
-                "More Info"
+                stringResource(R.string.more_info_action)
             ) {
                 showMoreInfoDialog.value = selectedKey
             }
@@ -313,9 +313,9 @@ fun LocalRuleContextMenu(
 
     ContextMenuDialog(closeContextMenu, themeState) {
         listOf(
-            Pair<String, () -> Unit>("Activate") { portViewModel.activate(localRule) },
-            Pair<String, () -> Unit>("Delete") { portViewModel.delete(localRule) },
-            Pair<String, () -> Unit>("More Info") { showLocalInfoDialog.value = selectedKey },
+            Pair<String, () -> Unit>(stringResource(R.string.activate_action)) { portViewModel.activate(localRule) },
+            Pair<String, () -> Unit>(stringResource(R.string.delete_action)) { portViewModel.delete(localRule) },
+            Pair<String, () -> Unit>(stringResource(R.string.more_info_action)) { showLocalInfoDialog.value = selectedKey },
         )
     }
 }
@@ -402,7 +402,7 @@ fun OverflowMenu(showAboutDialogState: MutableState<Boolean>, portViewModel: Por
     IconButton(
         onClick = { expanded = true },
         modifier = Modifier.semantics { testTag = "moreActionsButton" }) {
-        Icon(Icons.Default.MoreVert, contentDescription = "menu")
+        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options_action))
     }
 
     DropdownMenu(

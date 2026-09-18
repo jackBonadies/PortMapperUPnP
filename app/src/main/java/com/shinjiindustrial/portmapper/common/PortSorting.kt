@@ -1,5 +1,7 @@
 package com.shinjiindustrial.portmapper.common
 
+import androidx.annotation.StringRes
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.ComparerWrapper
 import com.shinjiindustrial.portmapper.PortMapperComparatorDescription
 import com.shinjiindustrial.portmapper.PortMapperComparatorDevice
@@ -13,13 +15,14 @@ import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
 
 data class SortInfo(val sortBy: SortBy, val sortDesc: Boolean)
 
-enum class SortBy(val sortByValue: Int) {
-    Slot(0),
-    Description(1),
-    InternalPort(2),
-    ExternalPort(3),
-    Device(4),
-    Expiration(5);
+// shortNameRes is the sort panel button label
+enum class SortBy(val sortByValue: Int, @StringRes val shortNameRes: Int) {
+    Slot(0, R.string.sort_slot),
+    Description(1, R.string.description),
+    InternalPort(2, R.string.sort_internal_port_short),
+    ExternalPort(3, R.string.sort_external_port_short),
+    Device(4, R.string.device),
+    Expiration(5, R.string.sort_expiration);
 
     companion object {
         fun from(findValue: Int): SortBy = SortBy.values().first { it.sortByValue == findValue }
@@ -30,16 +33,6 @@ enum class SortBy(val sortByValue: Int) {
             "Internal Port"
         } else if (this == ExternalPort) {
             "External Port"
-        } else {
-            name
-        }
-    }
-
-    fun getShortName(): String {
-        return if (this == InternalPort) {
-            "Int. Port"
-        } else if (this == ExternalPort) {
-            "Ext. Port"
         } else {
             name
         }

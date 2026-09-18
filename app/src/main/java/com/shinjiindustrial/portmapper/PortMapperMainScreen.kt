@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -129,7 +130,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialogState.value = false },
-            title = { Text("About") },
+            title = { Text(stringResource(R.string.about)) },
             text = {
 
                 Column()
@@ -170,7 +171,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
             },
             confirmButton = {
                 Button(onClick = { showAboutDialogState.value = false }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ok))
                 }
             })
     }
@@ -217,7 +218,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     }) {
                     Icon(
                         Icons.Default.Add,
-                        contentDescription = "Localized description",
+                        contentDescription = stringResource(R.string.add_rule_action),
                     )
                 }
             }
@@ -230,7 +231,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             portViewModel.clearSelection()
                         })
                         {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.Filled.ArrowBack, contentDescription = stringResource(R.string.back_action))
                         }
                     }
                 },
@@ -241,7 +242,11 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                 scrollBehavior = scrollBehavior,
                 title = {
                     val title =
-                        if (inMultiSelectMode) "${selectedIds.size + selectedLocalIds.size} Selected" else "PortMapper"
+                        if (inMultiSelectMode) {
+                            stringResource(R.string.n_selected, selectedIds.size + selectedLocalIds.size)
+                        } else {
+                            stringResource(R.string.app_name)
+                        }
                     Text(
                         text = title,
                         fontWeight = FontWeight.Normal
@@ -256,7 +261,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             portViewModel.deleteSelected(selectedIds, selectedLocalIds)
                         })
                         {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_action))
                         }
                     } else {
                         IconButton(onClick = {
@@ -266,7 +271,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             }
                         })
                         {
-                            Icon(Icons.Default.Sort, contentDescription = "Sort")
+                            Icon(Icons.Default.Sort, contentDescription = stringResource(R.string.sort_action))
                         }
                     }
 
@@ -321,7 +326,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                     if (searchStartedRecentlyAndNothingFoundYet) {
                         val offset = boxHeight * 0.28f
                         LoadingIcon(
-                            "Searching for devices",
+                            stringResource(R.string.searching_for_devices),
                             Modifier.offset(y = offset)
                         )
                     } else if (!anyDevices) {
@@ -329,7 +334,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                         Column(modifier = Modifier.offset(y = offset))
                         {
                             Text(
-                                "No UPnP enabled internet gateway devices found",
+                                stringResource(R.string.no_devices_found),
                                 modifier = Modifier
                                     .padding(0.dp, 10.dp)
                                     .align(Alignment.CenterHorizontally),
@@ -343,7 +348,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                                 portViewModel.isInitialized()
                             if (!anyInterfaces) {
                                 Text(
-                                    "No valid interfaces",
+                                    stringResource(R.string.no_valid_interfaces),
                                     modifier = Modifier
                                         .padding(0.dp, 10.dp)
                                         .align(Alignment.CenterHorizontally),
@@ -352,7 +357,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             } else {
 
                                 Text(
-                                    "Interfaces Searched:",
+                                    stringResource(R.string.interfaces_searched),
                                     modifier = Modifier
                                         .padding(0.dp, 10.dp, 0.dp, 0.dp)
                                         .align(Alignment.CenterHorizontally),
@@ -362,7 +367,11 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
 
                                 for (interfaceUsed in interfacesUsedInSearch!!) {
                                     Text(
-                                        "${interfaceUsed.networkInterface.displayName} (${interfaceUsed.networkType.networkTypeString.lowercase()})",
+                                        stringResource(
+                                            R.string.interface_with_network_type,
+                                            interfaceUsed.networkInterface.displayName,
+                                            stringResource(interfaceUsed.networkType.labelRes)
+                                        ),
                                         modifier = Modifier
                                             .padding(0.dp, 0.dp)
                                             .align(Alignment.CenterHorizontally),
@@ -375,7 +384,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                             if (!interfacesUsedInSearch.any { it.networkType == NetworkType.WIFI }
                             ) {
                                 Text(
-                                    "Enable WiFi and retry",
+                                    stringResource(R.string.enable_wifi_and_retry),
                                     modifier = Modifier
                                         .padding(0.dp, 20.dp, 0.dp, 10.dp)
                                         .align(Alignment.CenterHorizontally),
@@ -383,7 +392,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                                 )
                             } else {
                                 Text(
-                                    "Ensure a valid UPnP enabled internet gateway device is on the network and retry",
+                                    stringResource(R.string.ensure_gateway_and_retry),
                                     modifier = Modifier
                                         .padding(0.dp, 20.dp, 0.dp, 10.dp)
                                         .align(Alignment.CenterHorizontally),
@@ -402,7 +411,7 @@ fun PortMapperMainScreen(portViewModel : PortViewModel, themeState: ThemeUiState
                                     .align(Alignment.CenterHorizontally),
                                 shape = RoundedCornerShape(4),
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.retry_action))
                             }
                         }
                     } else {

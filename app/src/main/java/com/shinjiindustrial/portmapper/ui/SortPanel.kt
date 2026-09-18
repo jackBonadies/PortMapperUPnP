@@ -14,10 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.common.SortBy
 import com.shinjiindustrial.portmapper.PortViewModel
 
@@ -29,7 +31,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
             .fillMaxWidth()
     ) {
         Text(
-            text = "Sort By",
+            text = stringResource(R.string.sort_by),
             fontWeight = FontWeight.SemiBold,
             fontSize = 24.sp,
             color = MaterialTheme.colorScheme.onSurface,
@@ -52,7 +54,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
                         //todo if index is out of range of sortby.values then produce an empty
                         SortSelectButton(
                             modifier = Modifier.weight(1.0f),
-                            text = SortBy.from(index).getShortName(),//FilterField.from(i).name,
+                            text = stringResource(SortBy.from(index).shortNameRes),
                             isSelected = index == curIndex,
                             onClick = {
                                 portViewModel.updateSortingSortBy(SortBy.from(index))
@@ -77,7 +79,7 @@ fun BottomSheetSortBy(portViewModel: PortViewModel) {
                     val ascendingButton = j == 0
                     SortSelectButton(
                         modifier = Modifier.weight(1.0f),
-                        text = if (ascendingButton) "Ascending" else "Descending",//FilterField.from(i).name,
+                        text = stringResource(if (ascendingButton) R.string.ascending else R.string.descending),
                         isSelected = ascendingButton == !desc,
                         onClick = {
                             portViewModel.updateSortingDesc(!ascendingButton)

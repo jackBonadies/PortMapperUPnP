@@ -198,13 +198,13 @@ fun RuleCreationDialog(
                     IconButton(onClick = {
                         navController.popBackStack()
                     }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close_action))
                     }
                 },
                 //colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.secondary),// change the height here
                 title = {
                     Text(
-                        text = if (ruleToEdit == null) "New Rule" else "Edit Rule",
+                        text = stringResource(if (ruleToEdit == null) R.string.new_rule else R.string.edit_rule),
                         fontWeight = FontWeight.Normal
                     )
                 },
@@ -242,36 +242,37 @@ fun RuleCreationDialog(
                             ) {
                                 // show toast and return
                                 // Invalid Description, ExternalPort.
-                                val invalidFields = mutableListOf<String>()
+                                // onClick is not a composable scope, so resolve via context
+                                val invalidFields = mutableListOf<Int>()
                                 if (descriptionHasError.value) {
-                                    invalidFields.add("Description")
+                                    invalidFields.add(R.string.description)
                                 }
                                 if (startInternalHasError.value) {
-                                    invalidFields.add(if (usingInternalRange) "Internal Port Start" else "Internal Port")
+                                    invalidFields.add(if (usingInternalRange) R.string.internal_port_start else R.string.internal_port)
                                 }
                                 if (startExternalHasError.value) {
-                                    invalidFields.add(if (usingExternalRange) "External Port Start" else "External Port")
+                                    invalidFields.add(if (usingExternalRange) R.string.external_port_start else R.string.external_port)
                                 }
                                 if (actualEndInternalError) {
-                                    invalidFields.add("Internal Port End")
+                                    invalidFields.add(R.string.internal_port_end)
                                 }
                                 if (actualEndExternalError) {
-                                    invalidFields.add("External Port End")
+                                    invalidFields.add(R.string.external_port_end)
                                 }
                                 if (internalIpHasError.value) {
-                                    invalidFields.add("Internal IP")
+                                    invalidFields.add(R.string.internal_ip)
                                 }
                                 if (leaseHasError) {
-                                    invalidFields.add("Lease")
+                                    invalidFields.add(R.string.lease)
                                 }
                                 if (cadenceError)
                                 {
-                                    invalidFields.add("Renewal Cadence")
+                                    invalidFields.add(R.string.renewal_cadence)
                                 }
 
-                                val invalidFieldsStr = invalidFields.joinToString(", ")
+                                val invalidFieldsStr = invalidFields.joinToString(", ") { context.getString(it) }
 
-                                portViewModel.snackbarManager.show(UiSnackToastEvent.SnackBarLongNoAction("Invalid Fields: $invalidFieldsStr"))
+                                portViewModel.snackbarManager.show(UiSnackToastEvent.SnackBarLongNoAction(context.getString(R.string.invalid_fields, invalidFieldsStr)))
                                 return@TextButton
                             }
 
@@ -329,7 +330,7 @@ fun RuleCreationDialog(
                         }
                     ) {
                         Text(
-                            text = if (ruleToEdit == null) "CREATE" else "APPLY",
+                            text = stringResource(if (ruleToEdit == null) R.string.create_action else R.string.apply_action),
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                         )
                     }
@@ -439,7 +440,7 @@ fun ColumnScope.RuleContents(
                 descriptionErrorString.value =
                     validateDescription(description.value).validationError
             },
-            label = { Text("Description") },
+            label = { Text(stringResource(R.string.description)) },
             singleLine = true,
             modifier = Modifier
                 .weight(0.4f, true),//.height(60.dp),
@@ -502,7 +503,7 @@ fun ColumnScope.RuleContents(
                 }
             },
             singleLine = true,
-            label = { Text("Internal Device") },
+            label = { Text(stringResource(R.string.internal_device)) },
             modifier = Modifier
                 .weight(0.5f, true)
                 //.height(60.dp)
@@ -617,7 +618,7 @@ fun ColumnScope.RuleContents(
         DropDownOutline( selectedProtocolMutable.value,
             {selectedProtocolMutable.value = it },
             items = listOf(Protocol.TCP.str(), Protocol.UDP.str(), Protocol.BOTH.str()),
-            "Protocol",
+            stringResource(R.string.protocol),
             defaultModifier,
             { it })
 
@@ -636,7 +637,7 @@ fun ColumnScope.RuleContents(
                     leaseDuration.value = capLeaseDur(digitsOnly, wanIpIsV1.value)
                 }
             },
-            label = { Text("Lease") },
+            label = { Text(stringResource(R.string.lease)) },
             trailingIcon = {
                 IconButton(onClick = { showLeaseDialog.value = true })
                 {
@@ -695,7 +696,7 @@ fun AutoRenewSection(
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = autoRenew, onCheckedChange = onAutoRenewChange, modifier = Modifier.testTag("autoRenew"))
-            Text("Auto-renew")
+            Text(stringResource(R.string.auto_renew_checkbox))
         }
 
         AnimatedVisibility(visible = autoRenew) {
@@ -723,7 +724,7 @@ fun AutoRenewSection(
                                     val digitsOnly = it.filter { charIt -> charIt.isDigit() }
                                     onCadenceChange(digitsOnly)
                                 },
-                                label = { Text("Renewal Cadence") },
+                                label = { Text(stringResource(R.string.renewal_cadence)) },
                                 isError = validationCadenceResult.hasError,
                                 supportingText = {
                                     if(validationCadenceResult.hasError)
@@ -789,7 +790,7 @@ fun StartPortExpandable(
             hasError.value = validateStartPort(portText.value).hasError
             errorString.value = validateStartPort(portText.value).validationError
         },
-        label = { if (expanded.value) Text("Port Start") else Text("Port") },
+        label = { Text(stringResource(if (expanded.value) R.string.port_start else R.string.port)) },
         //modifier = Modifier.then(modifier),
         //.height(60.dp),
         isError = hasSubmitted.value && hasError.value,
@@ -989,7 +990,7 @@ fun PortRangeRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Text("to", modifier = Modifier.align(Alignment.CenterVertically))
+        Text(stringResource(R.string.port_range_to), modifier = Modifier.align(Alignment.CenterVertically))
 
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -1004,7 +1005,7 @@ fun PortRangeRow(
                 endHasErrorString.value =
                     validateEndPort(startPortText.value, endPortText.value).validationError
             },
-            label = { Text("Port End") },
+            label = { Text(stringResource(R.string.port_end)) },
             modifier = Modifier.width(with(LocalDensity.current) { portSize.width.toDp() }),
             isError = hasSubmitted.value && endHasError.value,
             supportingText = {
