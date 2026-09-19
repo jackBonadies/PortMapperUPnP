@@ -19,6 +19,8 @@ fun ValidationError.toMessage(): String {
     return when (this) {
         ValidationError.EMPTY_DESCRIPTION -> stringResource(R.string.error_empty)
         ValidationError.EMPTY_PORT -> stringResource(R.string.error_empty)
+        ValidationError.EMPTY_LEASE -> stringResource(R.string.error_empty)
+        ValidationError.EMPTY_CADENCE -> stringResource(R.string.error_empty)
         ValidationError.INVALID_PORT_RANGE ->
             stringResource(R.string.error_invalid_port_range, MIN_PORT, MAX_PORT)
 
@@ -33,6 +35,8 @@ enum class ValidationError {
     NONE,
     EMPTY_DESCRIPTION,
     EMPTY_PORT,
+    EMPTY_LEASE,
+    EMPTY_CADENCE,
     INVALID_PORT_RANGE,
     END_BEFORE_START,
     INVALID_INTERNAL_IP,
@@ -81,6 +85,13 @@ fun validateEndPort(startPort: String, endPort: String): ValidationResult {
     return ValidationResult.ok
 }
 
+fun validateLeaseDuration(leaseDuration: String): ValidationResult {
+    if (leaseDuration.isBlank()) {
+        return ValidationResult.error(ValidationError.EMPTY_LEASE)
+    }
+    return ValidationResult.ok
+}
+
 fun validateInternalIp(ip: String): ValidationResult {
     val regexIPv4 =
         """^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$""".toRegex()
@@ -106,6 +117,9 @@ fun parseCadence(cadence: String): AutoRenewalCadence
 
 fun validateCadence(cadence: String): ValidationResult
 {
+    if (cadence.isBlank()) {
+        return ValidationResult.error(ValidationError.EMPTY_CADENCE)
+    }
     val cadenceInt = cadence.toIntOrMaxValue()
     if (cadenceInt < 180) {
         return ValidationResult.error(ValidationError.MINIMUM_CADENCE)

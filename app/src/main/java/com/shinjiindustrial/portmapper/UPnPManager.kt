@@ -22,6 +22,7 @@ import com.shinjiindustrial.portmapper.domain.PortMappingKey
 import com.shinjiindustrial.portmapper.domain.PortMappingPref
 import com.shinjiindustrial.portmapper.domain.PortMappingUserInput
 import com.shinjiindustrial.portmapper.domain.PortMappingWithPref
+import com.shinjiindustrial.portmapper.domain.formatShortName
 import com.shinjiindustrial.portmapper.domain.getPrefs
 import com.shinjiindustrial.portmapper.domain.matches
 import com.shinjiindustrial.portmapper.domain.toEntity
@@ -885,9 +886,7 @@ class UpnpRepository @Inject constructor(
             is UPnPCreateMappingResult.Success -> {
                 ourLogger.log(
                     Level.INFO,
-                    "Successfully $createContext rule (${
-                        portMappingRequest.realize().shortName()
-                    })."
+                    "Successfully $createContext rule (${portMappingRequest.shortName()})."
                 )
                 ourLogger.log(Level.FINE, "Successfully added, now reading back")
                 if (skipReadingBack) {
@@ -912,11 +911,10 @@ class UpnpRepository @Inject constructor(
                         )
                     }
                     else if (result is UPnPGetSpecificMappingResult.Failure) {
-                        val rule = portMappingRequest.realize()
-                        ourLogger.logBreadcrumb(rule)
+                        ourLogger.logBreadcrumb(portMappingRequest)
                         ourLogger.log(
                             Level.SEVERE,
-                            "Failed to read back our new rule (${rule.shortName()}). Remote Host: ${portMappingRequest.remoteHost}"
+                            "Failed to read back our new rule (${portMappingRequest.shortName()}). Remote Host: ${portMappingRequest.remoteHost}"
                         )
                        ourLogger.log(Level.SEVERE, result.details.toString())
                     }
@@ -941,11 +939,11 @@ class UpnpRepository @Inject constructor(
 
             is UPnPCreateMappingResult.Failure -> {
                 // TODO past tense
-                val rule = portMappingRequest.realize()
-                ourLogger.logBreadcrumb(rule)
+                // better to log the actual request than the realized request
+                ourLogger.logBreadcrumb(portMappingRequest)
                 ourLogger.log(
                     Level.SEVERE,
-                    "Failed to $createContext rule (${rule.shortName()}).",
+                    "Failed to $createContext rule (${portMappingRequest.shortName()}).",
                     null,
                     LogOptions(FirebaseRoute.BREADCRUMB)
                 )
@@ -1176,6 +1174,10 @@ data class PortMappingRequest(
     val enabled: Boolean,
     val remoteHost: String
 ) {
+    fun shortName(): String {
+        return formatShortName(protocol, externalIp, externalPort)
+    }
+
     fun realize(): PortMapping {
         return PortMapping(
             description,
