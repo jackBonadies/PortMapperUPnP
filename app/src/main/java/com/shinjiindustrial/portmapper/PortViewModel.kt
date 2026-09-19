@@ -634,6 +634,7 @@ class PortViewModel @Inject constructor(
 
     fun createRules(portMappingUserInput: PortMappingUserInput, modifyCase: Boolean = false) =
         applicationScope.launch {
+            val verbString = if (modifyCase) "modify" else "create"
             try {
                 val result = upnpRepository.createPortMappingRulesEntry(portMappingUserInput)
                 result.forEach { res ->
@@ -658,8 +659,6 @@ class PortViewModel @Inject constructor(
 
                 if (anyFailed) {
 
-                    val verbString = if (modifyCase) "modify" else "create"
-
                     // all failed
                     if (numFailed == result.size) {
                         if (result.size == 1) {
@@ -676,9 +675,9 @@ class PortViewModel @Inject constructor(
             } catch (exception: Exception) {
                 ourLogger.log(
                     Level.SEVERE,
-                    "Delete Original Port Mappings Failed: " + exception.message + exception.stackTraceToString()
+                    "Create Port Mappings Failed: " + exception.message + exception.stackTraceToString()
                 )
-                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to modify entry."))
+                snackbarManager.show(UiSnackToastEvent.SnackBarViewLogEvent("Failed to $verbString rule."))
                 return@launch
             }
         }

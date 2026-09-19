@@ -70,6 +70,7 @@ import com.shinjiindustrial.portmapper.Protocol
 import com.shinjiindustrial.portmapper.common.validateDescription
 import com.shinjiindustrial.portmapper.common.validateEndPort
 import com.shinjiindustrial.portmapper.common.validateInternalIp
+import com.shinjiindustrial.portmapper.common.validateLeaseDuration
 import com.shinjiindustrial.portmapper.common.validateStartPort
 import com.shinjiindustrial.portmapper.domain.OurNetworkInfo
 import com.shinjiindustrial.portmapper.ui.theme.PortMapperTheme
@@ -224,9 +225,15 @@ fun RuleCreationDialog(
                             val cadenceError = autoRenewMode.value == AutoRenewMode.FIXED_CADENCE && validationCadenceResult.value.hasError
                             val cadenceValue = if (autoRenewMode.value == AutoRenewMode.FIXED_CADENCE) parseCadence(renewCadence.value).cadence else -1
 
+                            // in onFocusChanged we restore Lease to 0 but its possible to hit
+                            //   create/edit before focus is left
+                            val leaseDurationStr = leaseDuration.value.replace(" (max)", "")
+                            val leaseHasError = validateLeaseDuration(leaseDurationStr).hasError
+
                             hasSubmitted.value = true
                             if (descriptionHasError.value ||
                                 cadenceError ||
+                                leaseHasError ||
                                 startInternalHasError.value ||
                                 startExternalHasError.value ||
                                 actualEndInternalError ||
@@ -254,6 +261,9 @@ fun RuleCreationDialog(
                                 if (internalIpHasError.value) {
                                     invalidFields.add("Internal IP")
                                 }
+                                if (leaseHasError) {
+                                    invalidFields.add("Lease")
+                                }
                                 if (cadenceError)
                                 {
                                     invalidFields.add("Renewal Cadence")
@@ -277,7 +287,7 @@ fun RuleCreationDialog(
                                 externalDeviceText.value,
                                 externalRangeStr,
                                 selectedProtocolMutable.value,
-                                leaseDuration.value.replace(" (max)", ""),
+                                leaseDurationStr,
                                 true, //TODO ??
                                 autoRenew.value,
                                 cadenceValue)

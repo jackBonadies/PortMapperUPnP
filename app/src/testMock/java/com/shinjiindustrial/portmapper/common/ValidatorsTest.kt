@@ -1,5 +1,6 @@
 package com.shinjiindustrial.portmapper.common
 
+import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import org.junit.Test
@@ -35,5 +36,21 @@ class ValidatorsTest {
         assertFalse(validateInternalIp("192.168.10.100").hasError)
         assertTrue(validateInternalIp("-192.168.10.100").hasError)
         assertTrue(validateInternalIp("-19216810100").hasError)
+    }
+
+    @Test
+    fun `test lease duration validation`() {
+        assertEquals(ValidationError.EMPTY_LEASE, validateLeaseDuration("").validationError)
+        assertTrue(validateLeaseDuration(" ").hasError)
+        assertFalse(validateLeaseDuration("0").hasError)
+        assertFalse(validateLeaseDuration("3600").hasError)
+    }
+
+    @Test
+    fun `test cadence validation`() {
+        assertEquals(ValidationError.EMPTY_CADENCE, validateCadence("").validationError)
+        assertEquals(ValidationError.MINIMUM_CADENCE, validateCadence("100").validationError)
+        assertFalse(validateCadence("180").hasError)
+        assertFalse(validateCadence("300").hasError)
     }
 }
