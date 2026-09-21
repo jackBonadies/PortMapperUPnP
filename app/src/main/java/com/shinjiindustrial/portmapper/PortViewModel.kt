@@ -194,7 +194,7 @@ class PortViewModel @Inject constructor(
                 for (portMapping in portMappingsList) {
                     if (curDevice.getIpAddress() == portMapping.portMapping.DeviceIP)
                     {
-                        upnpElements.add(UpnpViewRow.PortViewRow(portMapping))
+                        upnpElements.add(UpnpViewRow.PortViewRow(portMapping, curDevice.udn))
                         anyFound = true
                     }
                 }

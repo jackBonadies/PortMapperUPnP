@@ -7,8 +7,12 @@ import kotlinx.parcelize.Parcelize
 sealed class ViewKey : Parcelable {
     // TODO include slot? what does it mean for 2 ports to be the same since we can edit them?
     @Parcelize
-    data class PortViewKey(val externalPort: Int, val protocol: String, val deviceIp: String) :
-        ViewKey()
+    data class PortViewKey(
+        val udn: String,
+        val externalPort: Int,
+        val protocol: String,
+        val deviceIp: String
+    ) : ViewKey()
 
     @Parcelize
     data class DeviceHeaderKey(val deviceIp: String) : ViewKey()
@@ -37,8 +41,9 @@ enum class RuleSection(val label: String) {
 sealed class UpnpViewRow {
     abstract val key: ViewKey
 
-    data class PortViewRow(val portMapping: PortMappingWithPref) : UpnpViewRow() {
+    data class PortViewRow(val portMapping: PortMappingWithPref, val udn: String) : UpnpViewRow() {
         override val key = ViewKey.PortViewKey(
+            udn,
             portMapping.portMapping.ExternalPort,
             portMapping.portMapping.Protocol,
             portMapping.portMapping.DeviceIP

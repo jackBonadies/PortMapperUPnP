@@ -726,7 +726,7 @@ fun PreviewConversation() {
     MyApplicationTheme(ThemeUiState(DayNightMode.FORCE_NIGHT, false)) {
         val msgs = mutableListOf<UpnpViewRow>()
         val pm = _getDefaultPortMapping()
-        val upnpViewEl = UpnpViewRow.PortViewRow(pm)
+        val upnpViewEl = UpnpViewRow.PortViewRow(pm, "uuid:preview")
         for (i in 0..20) {
             msgs.add(upnpViewEl)
         }
