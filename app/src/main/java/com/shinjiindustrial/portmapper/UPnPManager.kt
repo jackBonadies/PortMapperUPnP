@@ -10,6 +10,7 @@ import com.shinjiindustrial.portmapper.client.UPnPResult
 import com.shinjiindustrial.portmapper.common.Event
 import com.shinjiindustrial.portmapper.common.toIntOrMaxValue
 import com.shinjiindustrial.portmapper.domain.ACTION_NAMES
+import com.shinjiindustrial.portmapper.domain.DeviceDetails
 import com.shinjiindustrial.portmapper.domain.DevicePreferences
 import com.shinjiindustrial.portmapper.domain.DeviceStatus
 import com.shinjiindustrial.portmapper.domain.IGDDevice
@@ -154,12 +155,10 @@ class UpnpRepository @Inject constructor(
 
     init {
         upnpClient.deviceFoundEvent += { device ->
-            // this is on the cling thread
+            // this is on the cling threadpool, therefore its possible for race conditions
+            //   TOCTOU for the devices.value.any. we fix this in addDevice
             if (_devices.value.any { it.getIpAddress() == device.deviceDetails.ipAddress }) {
-                ourLogger.log(
-                    Level.WARNING,
-                    "device ${device.deviceDetails.udn} came in again at ${device.deviceDetails.ipAddress}. ignoring."
-                )
+                logDuplicateDevice(device.deviceDetails)
             } else {
 
                 val devicePreferencesNullable = runBlocking {
@@ -172,12 +171,15 @@ class UpnpRepository @Inject constructor(
                 }
                 val devicePreferences = devicePreferencesNullable?.getPrefs() ?: DevicePreferences()
                 val igdDevice = device.createClingDevice(devicePreferences)
-                addDevice(igdDevice)
-                runBlocking {
-                    devicesDao.upsert(
-                        device.deviceDetails.toEntity(devicePreferences, System.currentTimeMillis())
-                    )
-                    enumeratePortMappings(igdDevice.getIpAddress())
+                if (addDevice(igdDevice)) {
+                    runBlocking {
+                        devicesDao.upsert(
+                            device.deviceDetails.toEntity(devicePreferences, System.currentTimeMillis())
+                        )
+                        enumeratePortMappings(igdDevice.getIpAddress())
+                    }
+                } else {
+                    logDuplicateDevice(device.deviceDetails)
                 }
             }
         }
@@ -246,18 +248,26 @@ class UpnpRepository @Inject constructor(
         delay(delayMilliseconds)
     }
 
-    fun add(device: IIGDDevice) {
-        // list is sorted
-        if (_devices.value.any { it.getIpAddress() == device.getIpAddress() }) {
-            return
-        }
+    // returns false if a device at that ip is already present.
+    //   the check is inside update which runs as a compare and set loop and so this will effectively
+    //   serialize concurrent calls
+    fun add(device: IIGDDevice): Boolean {
+        var added = false
         _devices.update { curList ->
-            buildList {
-                addAll(curList)
-                add(device)
-                sortWith { o1, o2 -> o1.getIpAddress().compareTo(o2.getIpAddress()) }
+            if (curList.any { it.getIpAddress() == device.getIpAddress() }) {
+                added = false
+                curList
+            } else {
+                added = true
+                // list is sorted
+                buildList {
+                    addAll(curList)
+                    add(device)
+                    sortWith { o1, o2 -> o1.getIpAddress().compareTo(o2.getIpAddress()) }
+                }
             }
         }
+        return added
     }
 
     private fun addOrUpdateMapping(pm: PortMappingWithPref) {
@@ -1108,11 +1118,34 @@ class UpnpRepository @Inject constructor(
         }
     }
 
-    private fun addDevice(igdDevice: IIGDDevice) {
-        add(igdDevice)
+    private fun addDevice(igdDevice: IIGDDevice): Boolean {
+        if (!add(igdDevice)) {
+            return false
+        }
         ourLogger.log(
             Level.INFO,
             "Added Device ${igdDevice.getDisplayName()} at ${igdDevice.getIpAddress()}."
+        )
+        logBreadcrumbIfMoreThanOneDevice()
+        return true
+    }
+
+    private fun logBreadcrumbIfMoreThanOneDevice() {
+        val devices = _devices.value
+        if (devices.size > 1) {
+            ourLogger.log(
+                Level.INFO,
+                "${devices.size} devices: " + devices.joinToString { "${it.getDisplayName()} at ${it.getIpAddress()} (${it.udn})" },
+                opts = LogOptions(FirebaseRoute.BREADCRUMB)
+            )
+        }
+
+    }
+
+    private fun logDuplicateDevice(deviceDetails: DeviceDetails) {
+        ourLogger.log(
+            Level.WARNING,
+            "device ${deviceDetails.udn} came in again at ${deviceDetails.ipAddress}. ignoring."
         )
     }
 

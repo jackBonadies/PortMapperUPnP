@@ -139,7 +139,7 @@ class LogViewActivity : ComponentActivity() {
                         //   passing in Unit ensures its only done the first time.
                         if (logLines.isEmpty())
                         {
-                            // I think this can happen on process getting recreated.
+                            // I think this can happen on process getting recreated. // TODO is this an issue?
                             ourLogger.log(Level.SEVERE, "scrollToBottom is true but logLines is empty")
                         }
                         LaunchedEffect(Unit) {
