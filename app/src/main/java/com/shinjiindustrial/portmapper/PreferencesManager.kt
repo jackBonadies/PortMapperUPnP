@@ -41,7 +41,7 @@ class PreferencesManager @Inject constructor(
 
     val materialYou: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[Keys.MATERIAL_YOU_KEY] ?: false
+            preferences[Keys.MATERIAL_YOU_KEY] ?: true
         }
         .distinctUntilChanged()
 
