@@ -19,3 +19,17 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# cling / seamless / jetty use reflection
+-keep class org.fourthline.cling.** { *; }
+-keep class org.seamless.** { *; }
+-keep class org.eclipse.jetty.** { *; }
+-keep class javax.servlet.** { *; }
+-dontwarn org.fourthline.cling.**
+-dontwarn org.seamless.**
+-dontwarn org.eclipse.jetty.**
+-dontwarn javax.**
+-dontwarn java.awt.**
+-dontwarn org.slf4j.**
+
+# Crashlytics readability
+-keepattributes SourceFile,LineNumberTable

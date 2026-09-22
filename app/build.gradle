@@ -55,15 +55,20 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
         release_no_gps {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             ext.noGps = false
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
         debug
         {
