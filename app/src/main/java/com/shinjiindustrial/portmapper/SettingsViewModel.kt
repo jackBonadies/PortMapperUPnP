@@ -26,7 +26,7 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = ThemeUiState(DayNightMode.FOLLOW_SYSTEM, false)
+        initialValue = ThemeUiState(DayNightMode.FOLLOW_SYSTEM, true)
     )
 
     val showEnableDisable: StateFlow<Boolean> = preferencesRepository.showEnableDisable.stateIn(

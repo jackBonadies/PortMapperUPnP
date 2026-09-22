@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -181,9 +180,9 @@ class SettingsActivity : ComponentActivity() {
 
                     Text(
                         "Theme",
-                        fontSize = 26.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(12.dp, 0.dp, 0.dp, 0.dp)
+                        modifier = Modifier.padding(12.dp, 12.dp, 12.dp, 0.dp)
                     )
                     var pref = when (uiState.dayNightMode.intVal) {
                         0 -> followSystem
@@ -192,11 +191,10 @@ class SettingsActivity : ComponentActivity() {
                         else -> followSystem
                     }
                     Text(
-                        pref, fontSize = 16.sp, modifier = Modifier
-                            .padding(12.dp, 0.dp, 0.dp, 4.dp)
-                            .offset(
-                                0.dp, (-4).dp
-                            ), color = MaterialTheme.colorScheme.onSurfaceVariant
+                        pref,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp, 0.dp, 12.dp, 12.dp)
                     )
                 }
                 Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
@@ -211,7 +209,7 @@ class SettingsActivity : ComponentActivity() {
                         {
                             Text(
                                 "Material You",
-                                fontSize = 26.sp,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .padding(12.dp, 18.dp, 0.dp, 18.dp)
@@ -249,12 +247,12 @@ class SettingsActivity : ComponentActivity() {
                     {
                         Text(
                             "Show rule enable / disable actions",
-                            fontSize = 26.sp,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             "not supported on most router firmware • allows keeping a rule in a disabled state on the router",
-                            fontSize = 16.sp,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -281,14 +279,14 @@ class SettingsActivity : ComponentActivity() {
                     {
                         Text(
                             "Show local rules from all routers",
-                            fontSize = 26.sp,
+                            style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         // the derivation is in UpnpRepository.localRules; with two routers found
                         //   the same rule is listed under each of them.
                         Text(
                             "show all local rules even if they weren't created on the current devices",
-                            fontSize = 16.sp,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

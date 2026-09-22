@@ -30,8 +30,8 @@ android {
         applicationId "com.shinjiindustrial.portmapper"
         minSdk 21
         targetSdk 36
-        versionCode 13
-        versionName '1.4.0'
+        versionCode 14
+        versionName '1.4.1'
         multiDexEnabled true
 
         testInstrumentationRunner = "com.shinjiindustrial.portmapper.CustomTestRunner"
@@ -55,15 +55,20 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
         release_no_gps {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             ext.noGps = false
+            firebaseCrashlytics {
+                mappingFileUploadEnabled false
+            }
         }
         debug
         {
@@ -205,8 +210,7 @@ dependencies {
     androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
     androidTestImplementation "tools.fastlane:screengrab:2.1.1"
     kspAndroidTest("com.google.dagger:hilt-android-compiler:2.48")
-    testImplementation "org.jetbrains.kotlin:kotlin-test:1.7.20"
-    implementation "org.jetbrains.kotlin:kotlin-test:1.9.22"
+    testImplementation "org.jetbrains.kotlin:kotlin-test:1.9.22"
 
 }
 
