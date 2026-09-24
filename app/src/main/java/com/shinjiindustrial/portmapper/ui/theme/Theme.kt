@@ -1,8 +1,12 @@
 package com.shinjiindustrial.portmapper.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.res.Resources
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -175,15 +179,16 @@ fun MyApplicationTheme(
         dayNightMode == DayNightMode.FORCE_NIGHT || (dayNightMode == DayNightMode.FOLLOW_SYSTEM && darkTheme)
     val useMaterialYou = themeState.materialYou
 
-    val usingDynamicColor =
-        useMaterialYou && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val dynamicScheme =
+        if (useMaterialYou && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            dynamicColorSchemeOrNull(LocalContext.current, useDark)
+        } else {
+            null
+        }
+    val usingDynamicColor = dynamicScheme != null
 
     val colorScheme = when {
-        usingDynamicColor -> {
-            val context = LocalContext.current
-            if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
+        dynamicScheme != null -> dynamicScheme
         useDark -> PortMapperDarkColors
         else -> PortMapperLightColors
     }
@@ -238,5 +243,15 @@ fun MyApplicationTheme(
             typography = Typography,
             content = content
         )
+    }
+}
+
+// Some devices spoof other APIs and will throw NotFoundException, in that case just fall back to default
+@RequiresApi(Build.VERSION_CODES.S)
+private fun dynamicColorSchemeOrNull(context: Context, dark: Boolean): ColorScheme? {
+    return try {
+        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } catch (e: Resources.NotFoundException) {
+        null
     }
 }
