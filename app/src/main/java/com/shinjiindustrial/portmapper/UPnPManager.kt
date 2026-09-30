@@ -1,6 +1,7 @@
 package com.shinjiindustrial.portmapper
 
 import android.os.SystemClock
+import com.shinjiindustrial.portmapper.background.isLiveAutoRenew
 import com.shinjiindustrial.portmapper.client.IUpnpClient
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingResult
 import com.shinjiindustrial.portmapper.client.UPnPCreateMappingWrapperResult
@@ -50,10 +51,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.logging.Level
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.system.measureTimeMillis
+
+// discovery + enumeration bound for the background renew path + settle time
+private const val BACKGROUND_DISCOVERY_TIMEOUT_MS = 8_000L
+private const val BACKGROUND_DISCOVERY_SETTLE_MS = 1_000L
 
 @Singleton
 class UpnpRepository @Inject constructor(
@@ -246,6 +252,62 @@ class UpnpRepository @Inject constructor(
             )
         ourLogger.log(Level.FINE, "Wait for $delayMilliseconds ms")
         delay(delayMilliseconds)
+    }
+
+    // renews every live rule (on the router, ours, auto renew)
+    //   rules that fell off do not get resurrected (otherwise can cause scenario where all inactive
+    //   rules get reborn when user opens app back up again for the first time in a while, also
+    //   gives little visibility into what was previously inactive before opening the app).
+    //   TODO: db lastseen can make this more optimal? i.e. if now < lastseen + leaseDuration then renew
+    suspend fun renewLiveAutoRenewRules(): Int = renewMutex.withLock {
+        // initialize(false) replaces the cling stack without shutting the old one down
+        if (!initialize(false)) {
+            ourLogger.log(Level.WARNING, "Background renew: upnp service failed to initialize")
+            return 0
+        }
+        // we need to find the upnp devices (since they may have changed / no longer available) and the
+        //   rules since we are only interested in renewing live rules
+        search(false)
+        // after finding the first device which finishes wait 2s intervals for the list to "settle"
+        //   i.e. if a 2nd device is coming in
+        // timeout bc in doze network goes away after 10s
+        val discovered = withTimeoutOrNull(BACKGROUND_DISCOVERY_TIMEOUT_MS) {
+            while (true) {
+                // suspends until we get a list that matches predicate
+                devices.first { list ->
+                    list.isNotEmpty() && list.all { it.status == DeviceStatus.FinishedEnumeratingMappings }
+                }
+                val settled = devices.value.map { it.udn to it.status }
+                delay(BACKGROUND_DISCOVERY_SETTLE_MS)
+                if (devices.value.map { it.udn to it.status } == settled) {
+                    break
+                }
+            }
+            true
+        }
+        if (discovered == null) {
+            ourLogger.log(
+                Level.INFO,
+                "Background renew: discovery still running after ${BACKGROUND_DISCOVERY_TIMEOUT_MS / 1000} s, only renewing what has been read so far"
+            )
+        }
+        val eligible = portMappings.value.values.filter { it.isLiveAutoRenew() }
+        if (eligible.isEmpty()) {
+            ourLogger.log(Level.INFO, "Background renew: no live rules on the router want auto-renew")
+            return 0
+        }
+        var renewed = 0
+        for (rule in eligible) {
+            ourLogger.log(Level.FINE, "Background renew: renewing ${rule.portMapping.shortName()}")
+            try {
+                if (renewRule(rule, Level.WARNING) is UPnPCreateMappingWrapperResult.Success) {
+                    renewed++
+                }
+            } catch (_: Exception) {
+                // already logged by renewRule
+            }
+        }
+        return renewed
     }
 
     // returns false if a device at that ip is already present.
@@ -462,8 +524,10 @@ class UpnpRepository @Inject constructor(
         }
     }
 
+    // failureLevel: the background path passes WARNING, a router it cannot reach is expected
     suspend fun renewRule(
         portMapping: PortMappingWithPref,
+        failureLevel: Level = Level.SEVERE,
     ): UPnPCreateMappingWrapperResult {
         try {
             val portMappingRequest = PortMappingRequest.from(portMapping)
@@ -478,7 +542,7 @@ class UpnpRepository @Inject constructor(
         } catch (exception: Exception) {
             ourLogger.logBreadcrumb(portMapping)
             ourLogger.log(
-                Level.SEVERE,
+                failureLevel,
                 "Renew Port Mappings Failed: " + exception.message + exception.stackTraceToString()
             )
             throw exception
@@ -861,7 +925,7 @@ class UpnpRepository @Inject constructor(
         }
     }
 
-    private fun addOrUpdateForRenew(
+    private suspend fun addOrUpdateForRenew(
         res: UPnPCreateMappingWrapperResult,
         portMapping: PortMappingWithPref
     ) {
@@ -870,6 +934,18 @@ class UpnpRepository @Inject constructor(
             var portMappingPref = portMapping.portMappingPref
             if (portMappingPref != null) {
                 portMappingPref = portMappingPref.copy(timeLastRenewedMs = SystemClock.elapsedRealtime())
+                // a renew is a sighting too. useful if using lastseen to decide if we should renew.
+                val mapping = res.resultingMapping
+                val device = getIGDDevice(mapping.DeviceIP)
+                portMappingDao.markSeen(
+                    device.udn,
+                    mapping.Protocol,
+                    mapping.ExternalPort,
+                    mapping.InternalIP,
+                    mapping.InternalPort,
+                    System.currentTimeMillis(),
+                    device.getIpAddress()
+                )
             }
             addOrUpdateMapping(
                 PortMappingWithPref(

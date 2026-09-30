@@ -152,6 +152,7 @@ dependencies {
     //implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation "androidx.datastore:datastore-preferences:1.0.0"
     implementation "androidx.lifecycle:lifecycle-runtime-compose:$compose_version"
+    implementation 'androidx.lifecycle:lifecycle-process:2.9.0'
     implementation("androidx.compose.animation:animation")
 
 

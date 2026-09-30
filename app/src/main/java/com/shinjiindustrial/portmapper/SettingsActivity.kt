@@ -102,14 +102,17 @@ class SettingsActivity : ComponentActivity() {
                     val uiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
                     val showEnableDisable by settingsViewModel.showEnableDisable.collectAsStateWithLifecycle()
                     val showAllLocalRules by settingsViewModel.showAllLocalRules.collectAsStateWithLifecycle()
+                    val backgroundRenew by settingsViewModel.backgroundRenew.collectAsStateWithLifecycle()
                     SettingsContent(
                         uiState,
                         showEnableDisable,
                         showAllLocalRules,
+                        backgroundRenew,
                         settingsViewModel::updateMaterialYou,
                         settingsViewModel::updateDayNight,
                         settingsViewModel::updateShowEnableDisable,
                         settingsViewModel::updateShowAllLocalRules,
+                        settingsViewModel::updateBackgroundRenew,
                         Modifier.padding(it)
                     )
                 }
@@ -131,10 +134,12 @@ class SettingsActivity : ComponentActivity() {
         uiState: ThemeUiState,
         showEnableDisable: Boolean,
         showAllLocalRules: Boolean,
+        backgroundRenew: Boolean,
         updateMaterialYou: (Boolean) -> Unit,
         updateDayNight: (DayNightMode) -> Unit,
         updateShowEnableDisable: (Boolean) -> Unit,
         updateShowAllLocalRules: (Boolean) -> Unit,
+        updateBackgroundRenew: (Boolean) -> Unit,
         modifier: Modifier = Modifier
     ) {
         MyApplicationTheme(uiState)
@@ -290,6 +295,38 @@ class SettingsActivity : ComponentActivity() {
                         showAllLocalRules,
                         onCheckedChange = {
                             updateShowAllLocalRules(it)
+                        },
+                        modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
+                    )
+                }
+                Divider(thickness = 1.dp, modifier = Modifier.padding(0.dp, 0.dp, 0.dp, 0.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                {
+                    Column(
+                        modifier = Modifier
+                            .weight(1.0f)
+                            .padding(12.dp, 12.dp, 12.dp, 12.dp)
+                    )
+                    {
+                        Text(
+                            stringResource(R.string.background_renew_title),
+                            fontSize = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            stringResource(R.string.background_renew_summary),
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        backgroundRenew,
+                        onCheckedChange = {
+                            updateBackgroundRenew(it)
                         },
                         modifier = Modifier.padding(0.dp, 0.dp, 20.dp, 0.dp)
                     )

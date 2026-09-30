@@ -38,6 +38,10 @@
             android:name="com.shinjiindustrial.portmapper.LogViewActivity"
             android:parentActivityName="com.shinjiindustrial.portmapper.MainActivity"></activity>
 
+        <receiver
+            android:name="com.shinjiindustrial.portmapper.background.RenewAlarmReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
