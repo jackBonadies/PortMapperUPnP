@@ -8,6 +8,7 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -16,17 +17,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SaveAs
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,20 +41,30 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.myapplication.R
@@ -97,7 +113,24 @@ class LogViewActivity : ComponentActivity() {
         scrollToBottom: Boolean,
         showTimestamps: Boolean,
         onToggleTimestamps: () -> Unit,
+        searchActive: Boolean,
+        query: String,
+        onQueryChange: (String) -> Unit,
+        onOpenSearch: () -> Unit,
+        onCloseSearch: () -> Unit,
     ) {
+        // we search raw text, so if showTimestamps changes we recompute
+        val filteredLines by remember(query, showTimestamps) {
+            derivedStateOf {
+                logLines.filter { matchesLogFilter(LogFormatter.forView(it, showTimestamps), query) }
+            }
+        }
+        val visibleLines = if (query.isEmpty()) logLines else filteredLines
+
+        BackHandler(enabled = searchActive) {
+            onCloseSearch()
+        }
+
         MyApplicationTheme(themeUiState) {
             val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             Scaffold(
@@ -107,7 +140,11 @@ class LogViewActivity : ComponentActivity() {
                     TopAppBar(
                         navigationIcon = {
                             IconButton(onClick = {
-                                this.finish()
+                                if (searchActive) {
+                                    onCloseSearch()
+                                } else {
+                                    this.finish()
+                                }
                             }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_action))
                             }
@@ -118,36 +155,50 @@ class LogViewActivity : ComponentActivity() {
                         ),
                         scrollBehavior = scrollBehavior,
                         title = {
-                            Text(
-                                text = stringResource(R.string.logs),
-                                fontWeight = FontWeight.Normal
-                            )
+                            if (searchActive) {
+                                LogFilterField(query = query, onQueryChange = onQueryChange)
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.logs),
+                                    fontWeight = FontWeight.Normal
+                                )
+                            }
                         },
                         actions = {
 
-                            IconButton(onClick = {
-                                logStoreRepository.clear()
-                            }) {
-                                Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.clear_logs_action))
-                            }
+                            if (searchActive) {
+                                IconButton(onClick = onCloseSearch) {
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_search_action))
+                                }
+                            } else {
+                                IconButton(onClick = onOpenSearch) {
+                                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_logs_action))
+                                }
 
-                            IconButton(onClick = {
-                                copyTextToClipboard(logStoreRepository.getLogsAsText())
-                            }) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.copy_to_clipboard_action)
+                                IconButton(onClick = {
+                                    logStoreRepository.clear()
+                                }) {
+                                    Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.clear_logs_action))
+                                }
+
+                                IconButton(onClick = {
+                                    copyTextToClipboard(logStoreRepository.getLogsAsText())
+                                }) {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = stringResource(R.string.copy_to_clipboard_action)
+                                    )
+                                }
+
+                                IconButton(onClick = { logsSaveAs() }) {
+                                    Icon(Icons.Default.SaveAs, contentDescription = stringResource(R.string.save_to_file_action))
+                                }
+
+                                LogViewOverflowMenu(
+                                    showTimestamps = showTimestamps,
+                                    onToggleTimestamps = onToggleTimestamps,
                                 )
                             }
-
-                            IconButton(onClick = { logsSaveAs() }) {
-                                Icon(Icons.Default.SaveAs, contentDescription = stringResource(R.string.save_to_file_action))
-                            }
-
-                            LogViewOverflowMenu(
-                                showTimestamps = showTimestamps,
-                                onToggleTimestamps = onToggleTimestamps,
-                            )
                         }
                     )
                 },
@@ -169,27 +220,47 @@ class LogViewActivity : ComponentActivity() {
                         }
                     }
 
-                    LazyColumn(
-                        state = listState,
-                        //modifier = Modifier.background(MaterialTheme.colorScheme.background),
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(it)
-                            .fillMaxHeight()
-                            .fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal=2.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                    ) {
-
-                        items(logLines, key = { it.seq }) { entry ->
-                            val color = when (entry.level) {
-                                Level.WARNING -> PortMapperTheme.semanticColors.logWarning
-                                Level.SEVERE -> PortMapperTheme.semanticColors.logError
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                            Text(LogFormatter.forView(entry, showTimestamps), color = color)
+                    LaunchedEffect(query) {
+                        if (query.isNotEmpty() && visibleLines.isNotEmpty()) {
+                            listState.scrollToItem(visibleLines.lastIndex)
                         }
+                    }
 
+                    if (query.isNotEmpty() && visibleLines.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(it)
+                                .fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(R.string.no_matching_logs),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(it)
+                                .fillMaxHeight()
+                                .fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal=2.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
+                        ) {
+
+                            items(visibleLines, key = { it.seq }) { entry ->
+                                val color = when (entry.level) {
+                                    Level.WARNING -> PortMapperTheme.semanticColors.logWarning
+                                    Level.SEVERE -> PortMapperTheme.semanticColors.logError
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                                Text(LogFormatter.forView(entry, showTimestamps), color = color)
+                            }
+
+                        }
                     }
                 }
             )
@@ -204,12 +275,22 @@ class LogViewActivity : ComponentActivity() {
         val logLines = logStoreRepository.entries
         val themeState by settingsViewModel.uiState.collectAsStateWithLifecycle()
         val showTimestamps by logViewModel.showTimestamps.collectAsStateWithLifecycle()
+        var searchActive by rememberSaveable { mutableStateOf(false) }
+        var query by rememberSaveable { mutableStateOf("") }
         LogViewInner(
             themeUiState = themeState,
             logLines = logLines,
             scrollToBottom = scrollToBottom,
             showTimestamps = showTimestamps,
             onToggleTimestamps = logViewModel::toggleShowTimestamps,
+            searchActive = searchActive,
+            query = query,
+            onQueryChange = { query = it },
+            onOpenSearch = { searchActive = true },
+            onCloseSearch = {
+                searchActive = false
+                query = ""
+            },
         )
     }
 
@@ -242,6 +323,40 @@ class LogViewActivity : ComponentActivity() {
         val clipData = ClipData.newPlainText(getString(R.string.log_clip_label), txt)
         clipboardManager.setPrimaryClip(clipData)
     }
+}
+
+// Matches against the full rendered line, so "E: " finds errors
+internal fun matchesLogFilter(text: String, query: String): Boolean {
+    val ignoreCase = query.none { it.isUpperCase() }
+    return text.contains(query, ignoreCase = ignoreCase)
+}
+
+@Composable
+private fun LogFilterField(query: String, onQueryChange: (String) -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
+        placeholder = { Text(stringResource(R.string.search_logs_action)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+    )
 }
 
 @Composable

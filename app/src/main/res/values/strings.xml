@@ -35,6 +35,9 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="about">About</string>
     <string name="show_timestamps_action">Show timestamps</string>
     <string name="hide_timestamps_action">Hide timestamps</string>
+    <string name="search_logs_action">Filter logs</string>
+    <string name="close_search_action">Close filter</string>
+    <string name="no_matching_logs">No log lines match</string>
 
     <!-- common -->
     <string name="ok">OK</string>
