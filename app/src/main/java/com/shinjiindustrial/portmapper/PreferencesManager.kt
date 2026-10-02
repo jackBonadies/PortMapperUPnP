@@ -84,7 +84,7 @@ class PreferencesManager @Inject constructor(
 
     val backgroundRenew: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[Keys.BACKGROUND_RENEW_KEY] ?: false
+            preferences[Keys.BACKGROUND_RENEW_KEY] ?: true
         }
         .distinctUntilChanged()
 

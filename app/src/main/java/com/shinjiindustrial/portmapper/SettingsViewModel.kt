@@ -44,7 +44,7 @@ class SettingsViewModel @Inject constructor(
     val backgroundRenew: StateFlow<Boolean> = preferencesRepository.backgroundRenew.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = false
+        initialValue = true
     )
 
     fun updateDayNight(dayNight: DayNightMode) {
