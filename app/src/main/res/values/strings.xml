@@ -174,6 +174,7 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="battery_optimized_warning_title">Battery optimization is on for this app.</string>
     <string name="battery_optimized_warning_body">Android may stop renewals while the app is in background. In App info, set Battery to Unrestricted.</string>
     <string name="battery_optimized_warning_action">Open App info</string>
+    <string name="battery_settings_not_found">Could not open battery settings. Set Battery to Unrestricted for this app in system Settings.</string>
 
     <!-- log view -->
     <string name="logs">Logs</string>

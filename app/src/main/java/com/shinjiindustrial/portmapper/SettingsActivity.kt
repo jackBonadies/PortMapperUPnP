@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.widget.Toast
 import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -169,7 +170,15 @@ class SettingsActivity : ComponentActivity() {
         } catch (e: ActivityNotFoundException) {
             // this opens the main list of apps and their battery optimization settings - no special
             //   permission required
-            startActivity(Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            try {
+                startActivity(Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(
+                    this,
+                    getString(R.string.battery_settings_not_found),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
