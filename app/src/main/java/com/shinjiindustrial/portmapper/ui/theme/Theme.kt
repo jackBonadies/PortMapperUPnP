@@ -115,6 +115,9 @@ data class SemanticColors(
     val disabled: Color,
     val logError: Color,
     val logWarning: Color,
+    // warn banner (for battery optimization notice)
+    val warningContainer: Color,
+    val onWarningContainer: Color,
 )
 
 private val LightSemanticColors = SemanticColors(
@@ -122,6 +125,8 @@ private val LightSemanticColors = SemanticColors(
     disabled = Color(0xFFB3261E),
     logError = Color(0xFFC00000),
     logWarning = Color(0xFF6F5B00),
+    warningContainer = Color(0xFFFCEBCB),
+    onWarningContainer = Color(0xFF4A3300),
 )
 
 private val DarkSemanticColors = SemanticColors(
@@ -129,6 +134,8 @@ private val DarkSemanticColors = SemanticColors(
     disabled = Color(0xFFF2B8B5),
     logError = Color(0xFFFF897D),
     logWarning = Color(0xFFE0C74A),
+    warningContainer = Color(0xFF4A3800),
+    onWarningContainer = Color(0xFFFFE08B),
 )
 
 /**
