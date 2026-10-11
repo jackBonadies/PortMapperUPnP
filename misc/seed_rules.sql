@@ -8,6 +8,6 @@ INSERT INTO port_mappings
 	  autorenew, desiredLeaseDuration, autorenewManualCadence, desiredEnabled, createdAtUtcMs, lastSeenAtUtcMs)
 VALUES
  ('uuid:old-router-0001','TCP',25565,'192.168.0.1','minecraft','192.168.0.42',25565,0,0,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000),
- ('uuid:old-router-0001','UDP',51820,'192.168.0.1','wireguard','192.168.0.42',51820,1,3600,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000);
- ('uuid:old-router-0001','TCP',51820,'192.168.0.1','bittorrentx','192.168.0.42',51820,1,3600,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000);
+ ('uuid:old-router-0001','UDP',51820,'192.168.0.1','wireguard','192.168.0.42',51820,1,3600,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000),
+ ('uuid:old-router-0001','TCP',51820,'192.168.0.1','bittorrentx','192.168.0.42',51820,1,3600,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000),
  ('uuid:old-router-0001','TCP',51820,'192.168.0.1','bittorrenty','192.168.0.44',51820,1,3600,-1,1,strftime('%s','now')*1000,strftime('%s','now')*1000);

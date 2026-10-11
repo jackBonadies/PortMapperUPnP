@@ -155,6 +155,16 @@ data class PortMapping(
         return TimeReadLeaseDurationMs + LeaseDuration.toLong() * 1000
     }
 
+    // getExpiresTimeMillis in wall clock, for persistence (that way when we restore from disk
+    //   we can calculate if the rule should still be alive / when it will expire)
+    //   null for a permanent lease.
+    fun getExpiresAtUtcMs(nowUtcMs: Long = System.currentTimeMillis()): Long? {
+        if (LeaseDuration == 0) {
+            return null
+        }
+        return nowUtcMs + getRemainingLeaseTimeSeconds() * 1000L
+    }
+
     fun getRemainingLeaseTimeString(now: Long = -1): String {
         if (this.LeaseDuration == 0) {
             return "Never"

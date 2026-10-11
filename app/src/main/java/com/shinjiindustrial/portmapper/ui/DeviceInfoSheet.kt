@@ -13,10 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.domain.DeviceDetails
 import com.shinjiindustrial.portmapper.domain.IIGDDevice
 
@@ -40,23 +42,23 @@ fun DeviceInfoBottomSheet(device: IIGDDevice, onDismiss: () -> Unit) {
 @Composable
 fun DeviceInfoContent(details: DeviceDetails) {
     val pairs = mutableListOf<Pair<String, String>>()
-    pairs.add(Pair("Friendly Name", details.friendlyName.orDash()))
-    pairs.add(Pair("Manufacturer", details.manufacturer.orDash()))
-    pairs.add(Pair("Model Name", details.modelName.orDash()))
-    pairs.add(Pair("Model Number", details.modelNumber.orDash()))
-    pairs.add(Pair("Serial Number", details.serialNumber.orDash()))
-    pairs.add(Pair("UPC", details.upc.orDash()))
+    pairs.add(Pair(stringResource(R.string.friendly_name), details.friendlyName.orDash()))
+    pairs.add(Pair(stringResource(R.string.manufacturer), details.manufacturer.orDash()))
+    pairs.add(Pair(stringResource(R.string.model_name), details.modelName.orDash()))
+    pairs.add(Pair(stringResource(R.string.model_number), details.modelNumber.orDash()))
+    pairs.add(Pair(stringResource(R.string.serial_number), details.serialNumber.orDash()))
+    pairs.add(Pair(stringResource(R.string.upc), details.upc.orDash()))
     // i.e. InternetGatewayDevice:2 - this is the device type version, distinct from the spec version below
     pairs.add(
         Pair(
-            "Device Type",
+            stringResource(R.string.device_type),
             if (details.deviceType != null) "${details.deviceType}:${details.upnpVersion}"
             else details.upnpVersion.toString()
         )
     )
-    pairs.add(Pair("UPnP Version", details.udaVersion.orDash()))
-    pairs.add(Pair("UDN", details.udn.orDash()))
-    pairs.add(Pair("IP Address", details.ipAddress.orDash()))
+    pairs.add(Pair(stringResource(R.string.upnp_version), details.udaVersion.orDash()))
+    pairs.add(Pair(stringResource(R.string.udn), details.udn.orDash()))
+    pairs.add(Pair(stringResource(R.string.ip_address), details.ipAddress.orDash()))
 
     Column(
         modifier = Modifier
@@ -65,7 +67,7 @@ fun DeviceInfoContent(details: DeviceDetails) {
             .padding(vertical = 16.dp, horizontal = 10.dp)
     ) {
         Text(
-            text = "Device Info",
+            text = stringResource(R.string.device_info),
             fontWeight = FontWeight.SemiBold,
             fontSize = 24.sp,
             color = MaterialTheme.colorScheme.onSurface,

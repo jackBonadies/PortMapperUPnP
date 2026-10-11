@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.PortForwardApplication
 import com.shinjiindustrial.portmapper._getDefaultPortMapping
@@ -158,7 +160,7 @@ fun PortMappingCard(
                         RuleTitle(portMapping.Description) {
                             // nearly every rule is enabled, so only the exception gets called out
                             if (!portMapping.Enabled) {
-                                StatusBadge("Disabled", PortMapperTheme.semanticColors.disabled)
+                                StatusBadge(stringResource(R.string.badge_disabled), PortMapperTheme.semanticColors.disabled)
                             }
                         }
                         Text(
@@ -266,11 +268,11 @@ fun LocalRuleCard(
                         RuleTitle(entity.description) {
                             val semanticColors = PortMapperTheme.semanticColors
                             if (localRule.status == LocalRuleStatus.Drifted) {
-                                StatusBadge("Drifted", semanticColors.logWarning)
+                                StatusBadge(stringResource(R.string.badge_drifted), semanticColors.logWarning)
                             }
                             // what an activate would ask for, not anything the router said
                             if (!entity.desiredEnabled) {
-                                StatusBadge("Disabled", semanticColors.disabled)
+                                StatusBadge(stringResource(R.string.badge_disabled), semanticColors.disabled)
                             }
                         }
                         Text(entity.internalIp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -286,7 +288,11 @@ fun LocalRuleCard(
 
                 val lastSeen = entity.lastSeenAtUtcMs
                 Text(
-                    if (lastSeen == null) "Not on router" else "Last seen ${formatAgo(lastSeen, nowUtc)}",
+                    if (lastSeen == null) {
+                        stringResource(R.string.not_on_router)
+                    } else {
+                        stringResource(R.string.last_seen_ago, formatAgo(lastSeen, nowUtc))
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -384,13 +390,16 @@ fun PortPill(
 fun SectionHeader(section: RuleSection, device: IIGDDevice, now: Long) {
     val detail = when (section) {
         // null until the device finishes enumerating
-        RuleSection.OnRouter -> device.enumeratedAtUtcMs?.let { "refreshed ${formatClockTime(it, now)}" }
-        RuleSection.Local -> "inactive"
+        RuleSection.OnRouter -> device.enumeratedAtUtcMs?.let {
+            stringResource(R.string.section_refreshed_at, formatClockTime(it, now))
+        }
+        RuleSection.Local -> stringResource(R.string.section_inactive)
     }
+    val label = stringResource(section.labelRes)
     Text(
         buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.Companion.SemiBold)) {
-                append(section.label)
+                append(label)
             }
             if (detail != null) {
                 withStyle(SpanStyle(fontWeight = FontWeight.Companion.Normal)) {
@@ -572,7 +581,7 @@ fun DeviceHeader(device: IIGDDevice, onInfoClick: () -> Unit) {
         IconButton(onClick = onInfoClick) {
             Icon(
                 Icons.Outlined.Info,
-                contentDescription = "Device info",
+                contentDescription = stringResource(R.string.device_info),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -583,7 +592,7 @@ fun DeviceHeader(device: IIGDDevice, onInfoClick: () -> Unit) {
 @Preview
 @Composable
 fun LoadingIcon() {
-    LoadingIcon("Searching for devices", Modifier.Companion)
+    LoadingIcon(stringResource(R.string.searching_for_devices), Modifier.Companion)
 }
 
 @Composable
@@ -595,7 +604,7 @@ fun LoadingIcon(label: String, modifier: Modifier) {
                 .size(160.dp), strokeWidth = 6.dp, color = MaterialTheme.colorScheme.secondary
         )
         Text(
-            "Searching for devices", modifier = Modifier.Companion
+            label, modifier = Modifier.Companion
                 .align(Alignment.Companion.CenterHorizontally)
                 .padding(0.dp, 30.dp, 0.dp, 0.dp)
         )
@@ -646,11 +655,8 @@ fun NoMappingsCard() {
 
 
                     // this one is awkward if one intentionally removes all port mappings
-                    //var deviceHasNoPortMappings = "No port mappings found \nfor this device"
-                    "Device has no UPnP port mappings"
-
                     Text(
-                        "No port mappings found \nfor this device",
+                        stringResource(R.string.no_port_mappings_for_device),
                         fontSize = TextUnit(20f, TextUnitType.Companion.Sp),
                         fontWeight = FontWeight.Companion.SemiBold,
                         modifier = Modifier.Companion
@@ -665,18 +671,18 @@ fun NoMappingsCard() {
                         modifier = Modifier.Companion.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Tap ",
+                            text = stringResource(R.string.tap_to_add_prefix),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                             //color = MaterialTheme.colors.onSurface
                         )
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Add icon",
+                            contentDescription = stringResource(R.string.add_icon),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                             //tint = MaterialTheme.colors.secondary
                         )
                         Text(
-                            text = " to add new rules",
+                            text = stringResource(R.string.tap_to_add_suffix),
                             //style = MaterialTheme.typography.body1,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

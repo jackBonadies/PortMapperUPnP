@@ -33,4 +33,153 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="view_log_action">View Log</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>
+    <string name="show_timestamps_action">Show timestamps</string>
+    <string name="hide_timestamps_action">Hide timestamps</string>
+    <string name="search_logs_action">Filter logs</string>
+    <string name="close_search_action">Close filter</string>
+    <string name="no_matching_logs">No log lines match</string>
+
+    <!-- common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="set_action">Set</string>
+    <string name="retry_action">Retry</string>
+    <string name="back_action">Back</string>
+    <string name="close_action">Close</string>
+    <string name="delete_action">Delete</string>
+    <string name="edit_action">Edit</string>
+    <string name="more_info_action">More Info</string>
+    <string name="more_options_action">More options</string>
+    <string name="checkbox">checkbox</string>
+    <string name="value_true">True</string>
+    <string name="value_false">False</string>
+    <string name="unknown">Unknown</string>
+
+    <!-- main screen -->
+    <string name="n_selected">%1$d Selected</string>
+    <string name="add_rule_action">Add rule</string>
+    <string name="sort_action">Sort</string>
+    <string name="searching_for_devices">Searching for devices</string>
+    <string name="no_devices_found">No UPnP enabled internet gateway devices found</string>
+    <string name="no_valid_interfaces">No valid interfaces</string>
+    <string name="interfaces_searched">Interfaces Searched:</string>
+    <!-- %1$s interface name, %2$s network type -->
+    <string name="interface_with_network_type">%1$s (%2$s)</string>
+    <string name="network_type_none">none</string>
+    <string name="network_type_wifi">wifi</string>
+    <string name="network_type_data">data</string>
+    <string name="enable_wifi_and_retry">Enable WiFi and retry</string>
+    <string name="ensure_gateway_and_retry">Ensure a valid UPnP enabled internet gateway device is on the network and retry</string>
+
+    <!-- rule list -->
+    <string name="section_on_router">ON ROUTER</string>
+    <string name="section_local">LOCAL</string>
+    <string name="section_refreshed_at">refreshed %1$s</string>
+    <string name="section_inactive">inactive</string>
+    <string name="badge_disabled">Disabled</string>
+    <string name="badge_drifted">Drifted</string>
+    <string name="not_on_router">Not on router</string>
+    <string name="last_seen_ago">Last seen %1$s</string>
+    <string name="device_info">Device Info</string>
+    <string name="no_port_mappings_for_device">No port mappings found \nfor this device</string>
+    <!-- quoted to keep the space next to the inline + icon -->
+    <string name="tap_to_add_prefix">"Tap "</string>
+    <string name="tap_to_add_suffix">" to add new rules"</string>
+    <string name="add_icon">Add icon</string>
+
+    <!-- rule fields (shared by the create/edit dialog, info dialogs and sort panel) -->
+    <string name="description">Description</string>
+    <string name="internal_ip">Internal IP</string>
+    <string name="internal_port">Internal Port</string>
+    <string name="internal_port_start">Internal Port Start</string>
+    <string name="internal_port_end">Internal Port End</string>
+    <string name="external_ip">External IP</string>
+    <string name="external_port">External Port</string>
+    <string name="external_port_start">External Port Start</string>
+    <string name="external_port_end">External Port End</string>
+    <string name="protocol">Protocol</string>
+    <string name="lease">Lease</string>
+    <string name="enabled">Enabled</string>
+    <string name="device">Device</string>
+    <string name="renewal_cadence">Renewal Cadence</string>
+    <string name="port">Port</string>
+    <string name="port_start">Port Start</string>
+    <string name="port_end">Port End</string>
+    <string name="port_range_to">to</string>
+
+    <!-- rule creation / edit -->
+    <string name="new_rule">New Rule</string>
+    <string name="edit_rule">Edit Rule</string>
+    <string name="create_action">CREATE</string>
+    <string name="apply_action">APPLY</string>
+    <string name="invalid_fields">Invalid Fields: %1$s</string>
+    <string name="auto_renew_checkbox">Auto-renew</string>
+
+    <!-- more info dialogs -->
+    <string name="info">Info</string>
+    <string name="local_rule_info">Local Rule Info</string>
+    <string name="expires">Expires</string>
+    <string name="originally_on">Originally on</string>
+    <string name="never_expires">Never expires</string>
+    <string name="seconds_short">%1$d s</string>
+    <string name="auto_renew">Auto Renew</string>
+    <string name="created">Created</string>
+    <string name="last_seen">Last Seen</string>
+    <string name="status">Status</string>
+    <string name="status_inactive">Inactive</string>
+    <string name="status_inactive_drifted">Inactive - the router has a different rule at this port</string>
+    <string name="status_inactive_sibling_active">Inactive - another of your rules is using this port</string>
+
+    <!-- device info sheet -->
+    <string name="friendly_name">Friendly Name</string>
+    <string name="manufacturer">Manufacturer</string>
+    <string name="model_name">Model Name</string>
+    <string name="model_number">Model Number</string>
+    <string name="serial_number">Serial Number</string>
+    <string name="upc">UPC</string>
+    <string name="device_type">Device Type</string>
+    <string name="upnp_version">UPnP Version</string>
+    <string name="udn">UDN</string>
+    <string name="ip_address">IP Address</string>
+
+    <!-- sort panel -->
+    <string name="sort_by">Sort By</string>
+    <string name="ascending">Ascending</string>
+    <string name="descending">Descending</string>
+    <string name="sort_slot">Slot</string>
+    <string name="sort_internal_port_short">Int. Port</string>
+    <string name="sort_external_port_short">Ext. Port</string>
+    <string name="sort_expiration">Expiration</string>
+
+    <!-- duration picker -->
+    <string name="duration">Duration</string>
+    <string name="days">Days</string>
+    <string name="hours">Hours</string>
+    <string name="minutes">Minutes</string>
+
+    <!-- settings -->
+    <string name="appearance">Appearance</string>
+    <string name="theme">Theme</string>
+    <string name="theme_follow_system">Follow System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="material_you">Material You</string>
+    <string name="advanced">Advanced</string>
+    <string name="show_enable_disable_title">Show rule enable / disable actions</string>
+    <string name="show_enable_disable_summary">not supported on most router firmware • allows keeping a rule in a disabled state on the router</string>
+    <string name="show_all_local_rules_title">Show local rules from all routers</string>
+    <string name="show_all_local_rules_summary">show all local rules even if they weren\'t created on the current devices</string>
+    <string name="background_renew_title">Best effort renewal in background</string>
+    <string name="background_renew_summary">renew auto-renew rules while app is in background • Android background restrictions may cause rules with short leases to lapse</string>
+    <string name="battery_optimized_warning_title">Battery optimization is on for this app.</string>
+    <string name="battery_optimized_warning_body">Android may stop renewals while the app is in background. In App info, set Battery to Unrestricted.</string>
+    <string name="battery_optimized_warning_action">Open App info</string>
+    <string name="battery_settings_not_found">Could not open battery settings. Set Battery to Unrestricted for this app in system Settings.</string>
+
+    <!-- log view -->
+    <string name="logs">Logs</string>
+    <string name="clear_logs_action">Clear Logs</string>
+    <string name="copy_to_clipboard_action">Copy to Clipboard</string>
+    <string name="save_to_file_action">Save to File</string>
+    <string name="log_clip_label">PortMapper Logs</string>
 </resources>

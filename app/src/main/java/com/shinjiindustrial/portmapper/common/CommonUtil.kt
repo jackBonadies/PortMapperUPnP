@@ -40,10 +40,11 @@ class Event<T> {
 }
 
 
-enum class NetworkType(val networkTypeString: String) {
-    NONE("None"),
-    WIFI("Wifi"),
-    DATA("Data");
+// networkTypeString is for logs; labelRes is what the "interfaces searched" screen shows
+enum class NetworkType(val networkTypeString: String, @StringRes val labelRes: Int) {
+    NONE("None", R.string.network_type_none),
+    WIFI("Wifi", R.string.network_type_wifi),
+    DATA("Data", R.string.network_type_data);
 
     override fun toString(): String {
         return networkTypeString

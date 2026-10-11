@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import com.example.myapplication.R
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -60,7 +61,7 @@ suspend fun showSnackBarLongNoAction(snackbarHostState : SnackbarHostState, mess
 }
 
 suspend fun showSnackBarViewLog(snackbarHostState : SnackbarHostState, context : Context, message: String) {
-    showSnackBar(snackbarHostState, message, "View Log", SnackbarDuration.Long) {
+    showSnackBar(snackbarHostState, message, context.getString(R.string.view_log_action), SnackbarDuration.Long) {
         viewLogCallback(
             context
         )

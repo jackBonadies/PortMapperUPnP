@@ -67,6 +67,9 @@ data class PortMappingEntity(
     @ColumnInfo(name = "createdAtUtcMs") val createdAtUtcMs: Long?,
     // last time we saw this rule still present on the router
     @ColumnInfo(name = "lastSeenAtUtcMs") val lastSeenAtUtcMs: Long?,
+    // wall clock time this rules lease time ends, as of the last time we read or wrote it.
+    //   null if permanent or deactivated
+    @ColumnInfo(name = "leaseExpiresAtUtcMs") val leaseExpiresAtUtcMs: Long? = null,
 )
 
 @Entity(
@@ -176,7 +179,8 @@ interface PortMappingDao {
     @Query(
         """
           UPDATE port_mappings
-          SET lastSeenAtUtcMs = :seenAtUtcMs, deviceIp = :deviceIp
+          SET lastSeenAtUtcMs = :seenAtUtcMs, deviceIp = :deviceIp,
+              leaseExpiresAtUtcMs = :leaseExpiresAtUtcMs
           WHERE deviceSignature = :deviceSignature
             AND protocol = :protocol
             AND externalPort = :externalPort
@@ -192,6 +196,7 @@ interface PortMappingDao {
         internalPort: Int,
         seenAtUtcMs: Long,
         deviceIp: String,
+        leaseExpiresAtUtcMs: Long?,
     ): Int
 
     @Query(
@@ -340,8 +345,23 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+// v5 -> v6 adds port_mappings.leaseExpiresAtUtcMs. updates v5 existing rows to be backfilled
+//   with an (over)estimate of lastSeen + desired lease
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `port_mappings` ADD COLUMN `leaseExpiresAtUtcMs` INTEGER")
+        db.execSQL(
+            """
+            UPDATE `port_mappings`
+            SET `leaseExpiresAtUtcMs` = `lastSeenAtUtcMs` + `desiredLeaseDuration` * 1000
+            WHERE `lastSeenAtUtcMs` IS NOT NULL AND `desiredLeaseDuration` > 0
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(entities = [PortMappingEntity::class, DevicesEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
 abstract class AppDatabase : RoomDatabase() {
@@ -357,7 +377,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
     @Provides

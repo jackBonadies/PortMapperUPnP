@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +48,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.myapplication.R
 import com.shinjiindustrial.portmapper.DayNightMode
 import com.shinjiindustrial.portmapper.common.capLeaseDur
 import com.shinjiindustrial.portmapper.domain.DayHourMinSec
@@ -80,7 +82,7 @@ fun DurationPickerDialog(
         Surface(shape = MaterialTheme.shapes.medium, shadowElevation = 24.dp) {
             Column(modifier = Modifier.padding(0.dp)) {
                 Text(
-                    "Duration",
+                    stringResource(R.string.duration),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(18.dp, 12.dp)
@@ -108,7 +110,7 @@ fun DurationPickerDialog(
                 ) {
                     TextButton(onClick = { showDialog.value = false }) {
                         Text(
-                            "Cancel",
+                            stringResource(R.string.cancel),
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp)
@@ -121,7 +123,7 @@ fun DurationPickerDialog(
                             capLeaseDur(chosenValue.value, wanIpConnectionV1)
                     }) {
                         Text(
-                            "Set",
+                            stringResource(R.string.set_action),
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(4.dp, 9.dp, 4.dp, 9.dp)
@@ -182,7 +184,7 @@ fun PickerRow(
                 .height(240.dp)
         ) {
             Picker(
-                header = "Days",
+                header = stringResource(R.string.days),
                 infinite = infiniteScroll,
                 state = dayValuesPickerState,
                 items = dayValues,
@@ -193,7 +195,7 @@ fun PickerRow(
                 startIndex = dhms.days,
             )
             Picker(
-                header = "Hours",
+                header = stringResource(R.string.hours),
                 infinite = infiniteScroll,
                 state = hoursValuesPickerState,
                 items = hoursValues,
@@ -204,7 +206,7 @@ fun PickerRow(
                 startIndex = dhms.hours,
             )
             Picker(
-                header = "Minutes",
+                header = stringResource(R.string.minutes),
                 infinite = infiniteScroll,
                 state = minsValuesPickerState,
                 items = minsValues,

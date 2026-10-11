@@ -41,6 +41,12 @@ class SettingsViewModel @Inject constructor(
         initialValue = false
     )
 
+    val backgroundRenew: StateFlow<Boolean> = preferencesRepository.backgroundRenew.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = true
+    )
+
     fun updateDayNight(dayNight: DayNightMode) {
         viewModelScope.launch {
             preferencesRepository.updateDayNight(dayNight)
@@ -62,6 +68,12 @@ class SettingsViewModel @Inject constructor(
     fun updateShowAllLocalRules(show: Boolean) {
         viewModelScope.launch {
             preferencesRepository.updateShowAllLocalRules(show)
+        }
+    }
+
+    fun updateBackgroundRenew(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updateBackgroundRenew(enabled)
         }
     }
 }

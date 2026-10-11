@@ -2,6 +2,7 @@ package com.shinjiindustrial.portmapper
 
 import android.app.Application
 import androidx.compose.ui.unit.dp
+import com.shinjiindustrial.portmapper.background.BackgroundRenewer
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -15,6 +16,9 @@ class PortForwardApplication : Application() {
 
     @Inject
     lateinit var preferencesManager: PreferencesManager
+
+    @Inject
+    lateinit var backgroundRenewer: BackgroundRenewer
 
     companion object {
 
