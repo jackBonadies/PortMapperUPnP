@@ -171,9 +171,9 @@ PortMapper is a free and open source app for Android.  Its function is to set up
     <string name="show_all_local_rules_summary">show all local rules even if they weren\'t created on the current devices</string>
     <string name="background_renew_title">Best effort renewal in background</string>
     <string name="background_renew_summary">renew auto-renew rules while app is in background • Android background restrictions may cause rules with short leases to lapse</string>
-    <string name="battery_optimized_warning_title">Battery optimization is on for this app</string>
-    <string name="battery_optimized_warning_body">Android may stop renewals while the app is in background</string>
-    <string name="battery_optimized_warning_action">Turn off optimization (Battery > Unrestricted)</string>
+    <string name="battery_optimized_warning_title">Battery optimization is on for this app.</string>
+    <string name="battery_optimized_warning_body">Android may stop renewals while the app is in background. In App info, set Battery to Unrestricted.</string>
+    <string name="battery_optimized_warning_action">Open App info</string>
 
     <!-- log view -->
     <string name="logs">Logs</string>
