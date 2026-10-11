@@ -608,7 +608,7 @@ class UpnpRepository @Inject constructor(
                     portMappingWithPref.getAutoRenewCadenceOrDefault(),
                     SystemClock.elapsedRealtime()
                 )
-                portMappingDao.upsert(createPortMappingDaoEntity(pm, pref))
+                portMappingDao.upsert(createPortMappingDaoEntity(pm, pref, onRouter = false))
                 removeMapping(portMappingWithPref)
             }
             else if (result is UPnPResult.Failure)
@@ -811,7 +811,8 @@ class UpnpRepository @Inject constructor(
 
     private suspend fun createPortMappingDaoEntity(
         portMapping: PortMapping,
-        pref: PortMappingPref
+        pref: PortMappingPref,
+        onRouter: Boolean = true,
     ): PortMappingEntity {
         val igdDevice = getIGDDevice(portMapping.DeviceIP)
         val nowUtcMs = System.currentTimeMillis()
@@ -838,6 +839,7 @@ class UpnpRepository @Inject constructor(
             desiredEnabled = portMapping.Enabled, // TODO enabled
             createdAtUtcMs = existingCreatedAtUtcMs ?: nowUtcMs,
             lastSeenAtUtcMs = nowUtcMs,
+            leaseExpiresAtUtcMs = if (onRouter) portMapping.getExpiresAtUtcMs(nowUtcMs) else null,
         )
     }
 
@@ -944,7 +946,8 @@ class UpnpRepository @Inject constructor(
                     mapping.InternalIP,
                     mapping.InternalPort,
                     System.currentTimeMillis(),
-                    device.getIpAddress()
+                    device.getIpAddress(),
+                    mapping.getExpiresAtUtcMs()
                 )
             }
             addOrUpdateMapping(
@@ -1110,7 +1113,8 @@ class UpnpRepository @Inject constructor(
                                 portMapping.InternalIP,
                                 portMapping.InternalPort,
                                 System.currentTimeMillis(),
-                                device.getIpAddress()
+                                device.getIpAddress(),
+                                portMapping.getExpiresAtUtcMs()
                             )
                         } else {
                             ourLogger.log(

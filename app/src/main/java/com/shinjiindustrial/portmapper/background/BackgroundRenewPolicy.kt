@@ -15,7 +15,7 @@ fun PortMappingWithPref.isLiveAutoRenew(): Boolean {
 }
 
 // The elapsedRealtime by which the next background renew must happen. Considers both live rules
-//   and stores rules (checking their recency with lastSeen + leaseDuration)
+//   and stored rules (checking their recency with leaseExpiresAtUtcMs)
 fun backgroundRenewDeadline(
     devices: List<IIGDDevice>,
     portMappings: Map<PortMappingKey, PortMappingWithPref>,
@@ -40,11 +40,10 @@ fun backgroundRenewDeadline(
         .filter {
             it.deviceSignature !in enumeratedUdns &&
                     it.autoRenew &&
-                    it.desiredLeaseDuration > 0 &&
-                    it.lastSeenAtUtcMs != null
+                    it.leaseExpiresAtUtcMs != null
         }
         .mapNotNull { row ->
-            val remainingMs = row.lastSeenAtUtcMs!! + row.desiredLeaseDuration * 1000L - nowUtcMs
+            val remainingMs = row.leaseExpiresAtUtcMs!! - nowUtcMs
             if (remainingMs <= 0) {
                 null
             } else {

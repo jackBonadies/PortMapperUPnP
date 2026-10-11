@@ -151,7 +151,7 @@ class BackgroundRenewTests {
         internalPort: Int,
         lease: Int,
         autoRenew: Boolean = true,
-        lastSeenAtUtcMs: Long? = 1L,
+        leaseExpiresAtUtcMs: Long? = null,
     ) = PortMappingEntity(
         deviceSignature = udn,
         protocol = "TCP",
@@ -165,11 +165,12 @@ class BackgroundRenewTests {
         autoRenewManualCadence = -1,
         desiredEnabled = true,
         createdAtUtcMs = 1L,
-        lastSeenAtUtcMs = lastSeenAtUtcMs,
+        lastSeenAtUtcMs = 1L,
+        leaseExpiresAtUtcMs = leaseExpiresAtUtcMs,
     )
 
-    private fun shareDriveRow(autoRenew: Boolean = true, lastSeenAtUtcMs: Long? = 1L) =
-        demoRow("ShareDrive", 4044, 4044, 2 * 3600, autoRenew, lastSeenAtUtcMs)
+    private fun shareDriveRow(autoRenew: Boolean = true, leaseExpiresAtUtcMs: Long? = null) =
+        demoRow("ShareDrive", 4044, 4044, 2 * 3600, autoRenew, leaseExpiresAtUtcMs)
 
     private fun gameHostRow() = demoRow("Game Host 1", 50345, 4000, 1800)
 
@@ -248,8 +249,8 @@ class BackgroundRenewTests {
 
     @Test
     fun `an enumerated router's stored rows do not count, only what it reports`() {
-        // ours with auto-renew and seen just now, but the router no longer has it
-        val gone = demoRow("Gone", 7777, 7777, 3600, lastSeenAtUtcMs = 1_000_000L)
+        // ours with auto-renew and an hour left, but the router no longer has it
+        val gone = demoRow("Gone", 7777, 7777, 3600, leaseExpiresAtUtcMs = 1_000_000L + 3600_000L)
         val f = createRepository(listOf(gone))
         f.discoverDemo()
 
@@ -261,27 +262,42 @@ class BackgroundRenewTests {
     }
 
     @Test
-    fun `a router not enumerated falls back to stored rows seen within one lease`() {
+    fun `a router not enumerated falls back to stored rows whose lease has not run out`() {
         val nowUtc = 10 * 3600_000L
         val nowElapsed = 5_000L
-        val seenAnHourAgo = shareDriveRow(lastSeenAtUtcMs = nowUtc - 3600_000L)
-        val seenThreeHoursAgo = gameHostRow().copy(desiredLeaseDuration = 2 * 3600, lastSeenAtUtcMs = nowUtc - 3 * 3600_000L)
-        val neverSeen = minecraftRow().copy(lastSeenAtUtcMs = null)
-        val autoRenewOff = shareDriveRow(autoRenew = false, lastSeenAtUtcMs = nowUtc).copy(externalPort = 4045)
+        val anHourLeft = shareDriveRow(leaseExpiresAtUtcMs = nowUtc + 3600_000L)
+        val expiredAnHourAgo = gameHostRow().copy(desiredLeaseDuration = 2 * 3600, leaseExpiresAtUtcMs = nowUtc - 3600_000L)
+        val noExpiry = minecraftRow().copy(leaseExpiresAtUtcMs = null)
+        val autoRenewOff = shareDriveRow(autoRenew = false, leaseExpiresAtUtcMs = nowUtc + 600_000L).copy(externalPort = 4045)
         val noDevices = emptyList<IIGDDevice>()
         val noMappings = emptyMap<PortMappingKey, PortMappingWithPref>()
 
         val deadline = backgroundRenewDeadline(
-            noDevices, noMappings, listOf(seenAnHourAgo, seenThreeHoursAgo, neverSeen, autoRenewOff), nowElapsed, nowUtc
+            noDevices, noMappings, listOf(anHourLeft, expiredAnHourAgo, noExpiry, autoRenewOff), nowElapsed, nowUtc
         )
 
-        // 2 h lease seen 1 h ago: at most 1 h left, less 5% of 2 h
+        // 1 h left, less 5% of the 2 h desired lease
         assertEquals(nowElapsed + 3600_000L - 360_000L, deadline)
 
-        // a 2 h lease seen 3 h ago has certainly lapsed: nothing left to protect
+        // a lapsed lease has nothing left to protect
         assertNull(
-            backgroundRenewDeadline(noDevices, noMappings, listOf(seenThreeHoursAgo, neverSeen, autoRenewOff), nowElapsed, nowUtc)
+            backgroundRenewDeadline(noDevices, noMappings, listOf(expiredAnHourAgo, noExpiry, autoRenewOff), nowElapsed, nowUtc)
         )
+    }
+
+    @Test
+    fun `the fallback uses the lease the router reported, not lastSeen plus the desired lease`() {
+        // 2 h desired lease, seen just now with only 10 min of it left.  lastSeen + desired would
+        //   say 2 h and arm the alarm after the rule has already lapsed.
+        val nowUtc = 10 * 3600_000L
+        val nowElapsed = 5_000L
+        val row = shareDriveRow(leaseExpiresAtUtcMs = nowUtc + 600_000L).copy(lastSeenAtUtcMs = nowUtc)
+
+        val deadline = backgroundRenewDeadline(
+            emptyList(), emptyMap(), listOf(row), nowElapsed, nowUtc
+        )
+
+        assertEquals(nowElapsed + 600_000L - 360_000L, deadline)
     }
 
     // endregion
@@ -303,9 +319,9 @@ class BackgroundRenewTests {
         assertEquals(1, renewed)
         assertTrue(f.repository.portMappings.value.values.none { it.portMapping.ExternalPort == 5011 })
         assertEquals(false, f.rule(50345).portMapping.Enabled)
-        // the renew stamps lastSeen, which the cold-start estimate relies on
+        // the renew stamps the lease expiry, which the cold-start estimate relies on
         coVerify {
-            f.portMappingDao.markSeen(udn, "TCP", 4044, "192.168.1.13", 4044, any(), deviceIp)
+            f.portMappingDao.markSeen(udn, "TCP", 4044, "192.168.1.13", 4044, any(), deviceIp, isNull(inverse = true))
         }
     }
 
@@ -385,8 +401,8 @@ class BackgroundRenewTests {
         }
     }
 
-    // a rule of ours seen a minute ago: might still be on the router
-    private fun recentRow() = shareDriveRow(lastSeenAtUtcMs = System.currentTimeMillis() - 60_000L)
+    // a rule of ours with an hour of lease left: might still be on the router
+    private fun recentRow() = shareDriveRow(leaseExpiresAtUtcMs = System.currentTimeMillis() + 3600_000L)
 
     @Test
     fun `arms at a cold start from the stored rows`() {
@@ -398,7 +414,7 @@ class BackgroundRenewTests {
 
     @Test
     fun `cancels when nothing might still be on the router`() {
-        val lapsed = shareDriveRow(lastSeenAtUtcMs = System.currentTimeMillis() - 3 * 3600_000L)
+        val lapsed = shareDriveRow(leaseExpiresAtUtcMs = System.currentTimeMillis() - 3600_000L)
         val f = RenewerFixture(listOf(lapsed), scope)
 
         verify(exactly = 0) { f.scheduler.scheduleBy(any()) }
